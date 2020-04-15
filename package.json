@@ -2,10 +2,8 @@
   "name": "avo-inspector",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/avohq/web-avo-inspector.git"
