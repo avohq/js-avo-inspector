@@ -3,11 +3,9 @@ import './App.css';
 import {AvoInspector} from 'avo-inspector';
 
 function App() {
-  new AvoInspector().trackSchemaFromEvent("Ts Event Name", { "prop0": true, "prop1": 1, "prop2": "str" });
-
+  new AvoInspector().trackSchemaFromEvent("Js Event Name", {"prop0": "str", "prop1": true, "prop2": 10});
   return (
     <div className="App">
-
       <form>
         <label>
           Event name:
