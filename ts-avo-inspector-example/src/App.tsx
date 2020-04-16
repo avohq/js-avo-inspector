@@ -1,9 +1,15 @@
 import React from 'react';
 import './App.css';
-import {AvoInspector} from 'avo-inspector';
+import {AvoInspector, AvoInspectorEnv, AvoType} from 'avo-inspector';
 
 function App() {
-  new AvoInspector().trackSchemaFromEvent("Ts Event Name", { "prop0": true, "prop1": 1, "prop2": "str" });
+  let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Dev);
+  inspector.trackSchemaFromEvent("Ts Event Name", { "prop0": true, "prop1": 1, "prop2": "str" });
+  inspector.trackSchema("Ts Event Name", { "prop0": new AvoType(), "prop1": new AvoType(), "prop2": new AvoType() });
+  inspector.enableLogging(true);
+  inspector.extractSchema({ "prop0": true, "prop1": 1, "prop2": "str" });
+  inspector.setBatchSize(10);
+  inspector.setBatchFlushSeconds(5);
 
   return (
     <div className="App">
