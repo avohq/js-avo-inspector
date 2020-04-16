@@ -4,6 +4,10 @@
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "parcel src/index.ts",
+    "build": "tsc --emitDeclarationOnly && parcel src/index.ts"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/avohq/web-avo-inspector.git"
@@ -19,5 +23,9 @@
   "bugs": {
     "url": "https://github.com/avohq/web-avo-inspector/issues"
   },
-  "homepage": "https://github.com/avohq/web-avo-inspector#readme"
+  "homepage": "https://github.com/avohq/web-avo-inspector#readme",
+  "devDependencies": {
+    "parcel-bundler": "^1.12.4",
+    "typescript": "^3.8.3"
+  }
 }
