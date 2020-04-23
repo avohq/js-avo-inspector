@@ -1,12 +1,15 @@
 {
     "compilerOptions": {
       "module": "commonjs",
-      "target": "es5",
+      "target": "es2015",
       "declaration": true,
       "outDir": "./dist",
       "baseUrl": "./src",
     },
     "include": [
       "src/**/*"
+    ],
+    "exclude": [
+      "src/**/*.test.ts"
     ]
   }
