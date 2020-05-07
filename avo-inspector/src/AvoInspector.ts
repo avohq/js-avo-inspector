@@ -3,8 +3,10 @@ import { AvoSchemaParser } from './AvoSchemaParser';
 
 export class AvoInspector {
     
-    constructor(apiKey: string, env: AvoInspectorEnv) {
+    environment: AvoInspectorEnv;
 
+    constructor(apiKey: string, env: AvoInspectorEnv) {
+        this.environment = env;
     }
     
     trackSchemaFromEvent(eventName: string, eventProperties: { [propName: string] : any}): { [propName: string] : string} {
