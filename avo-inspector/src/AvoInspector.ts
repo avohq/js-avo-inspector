@@ -6,9 +6,11 @@ export class AvoInspector {
     
     environment: AvoInspectorEnv;
     sessionTracker: AvoSessionTracker;
+    apiKey: string;
 
     constructor(apiKey: string, env: AvoInspectorEnv) {
         this.environment = env;
+        this.apiKey = apiKey;
 
         this.sessionTracker = new AvoSessionTracker({ startSession: () => {} });
 

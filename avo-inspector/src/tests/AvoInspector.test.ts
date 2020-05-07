@@ -1,7 +1,15 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
-describe('Environments', () => {
+describe('Initialization', () => {
+
+  test('Api Key', () => {  
+    // When
+    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod);
+    
+    // Then
+    expect(inspector.apiKey).toBe("apiKey") 
+  });
 
   test('Prod', () => {  
     // When
