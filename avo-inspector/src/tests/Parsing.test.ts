@@ -1,5 +1,5 @@
-import { AvoInspector } from "./AvoInspector";
-import { AvoInspectorEnv } from "./AvoInspectorEnv";
+import { AvoInspector } from "../AvoInspector";
+import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 describe('Parsing', () => {
   test('Event parsing', () => {

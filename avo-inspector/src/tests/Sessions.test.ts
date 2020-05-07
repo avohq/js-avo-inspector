@@ -1,6 +1,6 @@
-import { AvoInspector } from "./AvoInspector";
-import { AvoInspectorEnv } from "./AvoInspectorEnv";
-import { AvoSessionTracker } from "./AvoSessionTracker";
+import { AvoInspector } from "../AvoInspector";
+import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import { AvoSessionTracker } from "../AvoSessionTracker";
 
 describe('Sessions', () => {
 
