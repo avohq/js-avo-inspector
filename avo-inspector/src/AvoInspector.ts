@@ -1,5 +1,5 @@
 import { AvoInspectorEnv } from './AvoInspectorEnv';
-import { AvoType } from './AvoType';
+import { AvoSchemaParser } from './AvoSchemaParser';
 
 export class AvoInspector {
     
@@ -7,12 +7,12 @@ export class AvoInspector {
 
     }
     
-    trackSchemaFromEvent(eventName: string, eventProperties: { [propName: string] : any}): { [propName: string] : AvoType.Type} {
+    trackSchemaFromEvent(eventName: string, eventProperties: { [propName: string] : any}): { [propName: string] : string} {
         console.log('Inspected event: ' + eventName + ": " + JSON.stringify(eventProperties));
-        return { "prop": new AvoType.Unknown() };
+        return { "prop": "unknown" };
     }
 
-    trackSchema(eventName: string, eventSchema: { [propName: string] : AvoType.Type}) {
+    trackSchema(eventName: string, eventSchema: { [propName: string] : string}) {
         console.log('Inspected event: ' + eventName + ": " + JSON.stringify(eventSchema));
     }
 
@@ -20,45 +20,8 @@ export class AvoInspector {
         
     }
     
-    extractSchema(eventProperties: { [propName: string] : any}): { [propName: string] : AvoType.Type} {
-        if (eventProperties == null) {
-            return {};
-        }
-
-        let result: {[propName: string] : AvoType.Type} = {};
-
-        for (let propName in eventProperties) {
-            let propValue = eventProperties[propName];
-
-            result[propName] = this.getPropValueType(propValue);
-        }
-
-        return result;
-    }
-
-    private getPropValueType(propValue: any): AvoType.Type {
-        let propType = typeof propValue;
-        if (propValue == null) {
-            return new AvoType.Null();
-        } else if (propType === "string" ) {
-            return new AvoType.String();
-        } else if (propType === "number" || propType === "bigint") {
-            if ((propValue + "").indexOf(".") >= 0) {
-                return new AvoType.Float();
-            } else {
-                return new AvoType.Int();
-            }
-        } else if (propType === "boolean") {
-            return new AvoType.Boolean();
-        } else if (propType === "object") {
-            if (propValue instanceof Array) {
-                return new AvoType.List();
-            } else {
-                return new AvoType.AvoObject();
-            }
-        } else {
-            return new AvoType.Unknown();
-        }
+    extractSchema(eventProperties: { [propName: string] : any}): string {
+        return new AvoSchemaParser().extractSchema(eventProperties)
     }
 
     setBatchSize(newBatchSize: Number) {
