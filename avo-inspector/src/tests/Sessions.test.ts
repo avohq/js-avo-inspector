@@ -6,7 +6,7 @@ describe('Sessions', () => {
 
     test('Inits with session tracker', () => {  
       // When
-      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod);
+      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
       
       // Then
       expect(inspector.sessionTracker).not.toBeNull()
@@ -144,7 +144,7 @@ describe('Sessions', () => {
       window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
       window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
       let mockBatcher = { startSession: jest.fn() };
-      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod);
+      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
       inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
   
       // When
@@ -159,7 +159,7 @@ describe('Sessions', () => {
       window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
       window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
       let mockBatcher = { startSession: jest.fn() };
-      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod);
+      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
       inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
   
       // When
@@ -174,7 +174,7 @@ describe('Sessions', () => {
       window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
       window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
       let mockBatcher = { startSession: jest.fn() };
-      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod);
+      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
       inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
   
       // When
@@ -189,7 +189,7 @@ describe('Sessions', () => {
       window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
       window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
       let mockBatcher = { startSession: jest.fn() };
-      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod);
+      let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
       inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
   
       // When

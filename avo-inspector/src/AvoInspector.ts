@@ -7,10 +7,22 @@ export class AvoInspector {
     environment: AvoInspectorEnv;
     sessionTracker: AvoSessionTracker;
     apiKey: string;
+    version: string;
 
-    constructor(apiKey: string, env: AvoInspectorEnv) {
+    constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
         this.environment = env;
+        if (this.environment == null) {
+            this.environment = AvoInspectorEnv.Dev;
+            console.error("[Avo Inspector] No environment provided. Defaulting to dev.");
+        }
         this.apiKey = apiKey;
+        if (this.apiKey == null || this.apiKey.trim().length == 0) {
+            throw new Error("[Avo Inspector] No API key provided. Inspector can't operate without API key.");
+        }
+        this.version = version;
+        if (this.version == null || this.version.trim().length == 0) {
+            throw new Error("[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic.");
+        }
 
         this.sessionTracker = new AvoSessionTracker({ startSession: () => {} });
 
