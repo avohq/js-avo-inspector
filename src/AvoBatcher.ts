@@ -14,6 +14,8 @@ export interface AvoBatcherType {
 export class AvoBatcher {
   private static avoInspectorBatchKey = "avo_inspector_batch_key";
 
+  private static trackingEndpoint = "https://api.avo.app/inspector/v1/track";
+
   startSession(): void {}
 
   trackEventSchema(
@@ -23,7 +25,18 @@ export class AvoBatcher {
       propertyValue: string;
       children?: any;
     }>
-  ): void {}
+  ): void {
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", AvoBatcher.trackingEndpoint);
+    xmlhttp.setRequestHeader("Content-Type", "text/plain");
+    xmlhttp.send(
+      JSON.stringify({
+        type: "event",
+        eventName: eventName,
+        eventProperties: schema,
+      })
+    );
+  }
 
   private checkIfBatchNeedsToBeSent(): void {
     // check if batch is ready
