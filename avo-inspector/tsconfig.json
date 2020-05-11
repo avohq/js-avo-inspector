@@ -5,8 +5,7 @@
     "declaration": true,
     "outDir": "./dist",
     "baseUrl": "./src",
-    "strict": true,
-    "noImplicitAny": true
+    "strict": true
   },
   "include": ["src/**/*"],
   "exclude": ["src/**/*.test.ts"]

@@ -9,24 +9,34 @@ export class AvoInspector {
   version: string;
 
   constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
-    this.environment = env;
-    if (this.environment == null) {
+    // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
+    if (env === null || env === undefined) {
       this.environment = AvoInspectorEnv.Dev;
       console.error(
         "[Avo Inspector] No environment provided. Defaulting to dev."
       );
+    } else {
+      this.environment = env;
     }
-    this.apiKey = apiKey;
-    if (this.apiKey == null || this.apiKey.trim().length == 0) {
+
+    if (apiKey === null || apiKey === undefined || apiKey.trim().length == 0) {
       throw new Error(
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
+    } else {
+      this.apiKey = apiKey;
     }
-    this.version = version;
-    if (this.version == null || this.version.trim().length == 0) {
+
+    if (
+      version === null ||
+      version === undefined ||
+      version.trim().length == 0
+    ) {
       throw new Error(
         "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
       );
+    } else {
+      this.version = version;
     }
 
     this.sessionTracker = new AvoSessionTracker({ startSession: () => {} });
