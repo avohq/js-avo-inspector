@@ -4,22 +4,21 @@ export class AvoInstallationId {
   static installationId: null | string = null;
 
   static getInstallationId() {
-    if (AvoInstallationId.installationId != null) {
+    if (AvoInstallationId.installationId !== null) {
       return AvoInstallationId.installationId;
     }
 
-    AvoInstallationId.installationId = window.localStorage.getItem(
+    let maybeInstallationId = window.localStorage.getItem(
       AvoInstallationId.cacheKey
     );
-    if (
-      AvoInstallationId.installationId === null ||
-      AvoInstallationId.installationId === undefined
-    ) {
+    if (maybeInstallationId === null || maybeInstallationId === undefined) {
       AvoInstallationId.installationId = AvoGuid.newGuid();
       window.localStorage.setItem(
         AvoInstallationId.cacheKey,
-        AvoInstallationId.installationId
+        JSON.stringify(AvoInstallationId.installationId)
       );
+    } else {
+      AvoInstallationId.installationId = JSON.parse(maybeInstallationId);
     }
     return AvoInstallationId.installationId;
   }

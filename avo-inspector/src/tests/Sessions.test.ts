@@ -48,7 +48,7 @@ describe("Sessions", () => {
     const callMoment = Date.now();
     window.localStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      (callMoment - 5 * 60 * 1000 - 1).toString()
+      JSON.stringify(callMoment - 5 * 60 * 1000 - 1)
     );
     window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
@@ -70,7 +70,7 @@ describe("Sessions", () => {
     const callMoment = Date.now();
     window.localStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      (callMoment - 5 * 60 * 1000 + 1).toString()
+      JSON.stringify(callMoment - 5 * 60 * 1000 + 1)
     );
     window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
@@ -92,7 +92,7 @@ describe("Sessions", () => {
     const callMoment = Date.now();
     window.localStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      (callMoment - 5 * 60 * 1000 + 1).toString()
+      JSON.stringify(callMoment - 5 * 60 * 1000 + 1)
     );
     window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
