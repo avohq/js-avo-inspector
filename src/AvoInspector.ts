@@ -45,9 +45,13 @@ export class AvoInspector {
     this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
 
     let inspector = this;
-    window.onload = function () {
-      inspector.sessionTracker.startOrProlongSession(Date.now());
-    };
+    window.addEventListener(
+      "load",
+      function () {
+        inspector.sessionTracker.startOrProlongSession(Date.now());
+      },
+      false
+    );
   }
 
   trackSchemaFromEvent(

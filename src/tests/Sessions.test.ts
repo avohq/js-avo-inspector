@@ -221,8 +221,9 @@ describe("Sessions", () => {
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
-    // XXX TODO why is this cast needed after enabling strict mode
-    (window as any).onload(new Event("test"));
+    let loadEvent = document.createEvent("Event");
+    loadEvent.initEvent("load", false, false);
+    window.dispatchEvent(loadEvent);
 
     // Then
     expect(mockBatcher.startSession.mock.calls.length).toBe(1);
