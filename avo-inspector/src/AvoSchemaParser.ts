@@ -71,7 +71,7 @@ export class AvoSchemaParser {
         } else if (propType === "boolean") {
             return "boolean";
         } else if (propType === "object") {
-            if (propValue instanceof Array) {
+            if (Object.prototype.toString.call(propValue) === '[object Array]') {
                 return "list";
             } else {
                 return "object";
