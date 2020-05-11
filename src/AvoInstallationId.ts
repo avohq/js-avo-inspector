@@ -4,7 +4,7 @@ import LocalStorage from "./LocalStorage";
 export class AvoInstallationId {
   static installationId: null | string = null;
 
-  static getInstallationId() {
+  static getInstallationId(): string {
     if (AvoInstallationId.installationId !== null) {
       return AvoInstallationId.installationId;
     }

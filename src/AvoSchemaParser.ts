@@ -3,24 +3,7 @@ function isArray(obj: any): boolean {
 }
 
 export class AvoSchemaParser {
-  private removeDuplicates(array: Array<any>) {
-    // XXX TODO fix any types
-    var primitives: any = { boolean: {}, number: {}, string: {} };
-    var objects: Array<any> = [];
-
-    return array.filter(function (item: any) {
-      var type: string = typeof item;
-      if (type in primitives) {
-        return primitives[type].hasOwnProperty(item)
-          ? false
-          : (primitives[type][item] = true);
-      } else {
-        return objects.indexOf(item) >= 0 ? false : objects.push(item);
-      }
-    });
-  }
-
-  public extractSchema(eventProperties: {
+  extractSchema(eventProperties: {
     [propName: string]: any;
   }): Array<{
     propertyName: string;
@@ -71,6 +54,23 @@ export class AvoSchemaParser {
     var mappedEventProps = mapping(eventProperties);
 
     return mappedEventProps;
+  }
+
+  private removeDuplicates(array: Array<any>): Array<any> {
+    // XXX TODO fix any types
+    var primitives: any = { boolean: {}, number: {}, string: {} };
+    var objects: Array<any> = [];
+
+    return array.filter(function (item: any) {
+      var type: string = typeof item;
+      if (type in primitives) {
+        return primitives[type].hasOwnProperty(item)
+          ? false
+          : (primitives[type][item] = true);
+      } else {
+        return objects.indexOf(item) >= 0 ? false : objects.push(item);
+      }
+    });
   }
 
   private getPropValueType(propValue: any): string {

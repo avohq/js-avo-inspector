@@ -44,7 +44,7 @@ export class AvoSessionTracker {
     this.avoBatcher = avoBatcher;
   }
 
-  startOrProlongSession(atTime: number) {
+  startOrProlongSession(atTime: number): void {
     const timeSinceLastSession = atTime - this._lastSessionTimestamp;
 
     if (timeSinceLastSession > this._sessionLengthMillis) {
@@ -60,7 +60,7 @@ export class AvoSessionTracker {
     );
   }
 
-  private updateSessionId() {
+  private updateSessionId(): void {
     AvoSessionTracker.sessionId = AvoGuid.newGuid();
     LocalStorage.setItem(
       AvoSessionTracker.idCacheKey,

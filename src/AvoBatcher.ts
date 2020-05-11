@@ -38,8 +38,9 @@ export class AvoBatcher {
     );
   }
 
-  private checkIfBatchNeedsToBeSent(): void {
+  private checkIfBatchNeedsToBeSent(): boolean {
     // check if batch is ready
+    return true;
   }
 
   private postAllAvailableEvents(): void {
