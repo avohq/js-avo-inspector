@@ -1,5 +1,5 @@
-import { AvoInspector } from "./AvoInspector";
-import { AvoInspectorEnv } from "./AvoInspectorEnv";
+import { AvoInspector } from "../AvoInspector";
+import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 describe('Parsing', () => {
   test('Event parsing', () => {
@@ -9,7 +9,7 @@ describe('Parsing', () => {
     "prop6": { "an": "object" }, "prop7": ["a", "list", {"obj in list": true, "int field": 1}, ["another", "list"]] };
 
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Dev);
+    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Dev, "0");
     let res = JSON.parse(inspector.extractSchema(eventProperties));
 
     expect(res[0]["propertyValue"]).toBe("boolean");
@@ -25,32 +25,4 @@ describe('Parsing', () => {
     expect(res[7]["children"]).toMatchObject(["string", [{"propertyName": "obj in list", "propertyValue": "boolean"},
       {"propertyName": "int field", "propertyValue": "int"}], ["string"]]);
   });
-});
-
-describe('Environments', () => {
-
-  test('Prod', () => {  
-    // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod);
-    
-    // Then
-    expect(inspector.environment).toBe(AvoInspectorEnv.Prod) 
-  });
-
-  test('Dev', () => {
-    // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Dev);
-    
-    // Then
-    expect(inspector.environment).toBe(AvoInspectorEnv.Dev)
-  });
-
-  test('Staging', () => {
-    // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Staging);
-    
-    // Then
-    expect(inspector.environment).toBe(AvoInspectorEnv.Staging)
-  });
-
 });
