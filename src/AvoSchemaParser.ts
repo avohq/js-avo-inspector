@@ -1,4 +1,4 @@
-function isArray(obj: any) {
+function isArray(obj: any): boolean {
   return Object.prototype.toString.call(obj) === "[object Array]";
 }
 
