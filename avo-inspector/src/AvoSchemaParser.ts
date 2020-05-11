@@ -1,10 +1,15 @@
+function isArray(obj: any) {
+  return Object.prototype.toString.call(obj) === "[object Array]";
+}
+
 export class AvoSchemaParser {
   private removeDuplicates(array: Array<any>) {
-    var primitives = { boolean: {}, number: {}, string: {} };
-    var objects = [];
+    // XXX TODO fix any types
+    var primitives: any = { boolean: {}, number: {}, string: {} };
+    var objects: Array<any> = [];
 
-    return array.filter(function (item) {
-      var type = typeof item;
+    return array.filter(function (item: any) {
+      var type: string = typeof item;
       if (type in primitives) {
         return primitives[type].hasOwnProperty(item)
           ? false
@@ -15,26 +20,36 @@ export class AvoSchemaParser {
     });
   }
 
-  public extractSchema(eventProperties: { [propName: string]: any }): string {
-    if (eventProperties == null) {
-      return "";
+  public extractSchema(eventProperties: {
+    [propName: string]: any;
+  }): Array<{
+    propertyName: string;
+    propertyValue: string;
+    children?: any;
+  }> {
+    if (eventProperties === null || eventProperties === undefined) {
+      return [];
     }
 
     let inspector = this;
 
-    let mapping = function (object) {
-      if (object instanceof Array) {
-        let list = object.map((x) => {
+    let mapping = function (object: any) {
+      if (isArray(object)) {
+        let list = object.map((x: any) => {
           return mapping(x);
         });
         return inspector.removeDuplicates(list);
       } else if (typeof object === "object") {
-        let mappedResult = [];
+        let mappedResult: any = [];
         for (var key in object) {
           if (object.hasOwnProperty(key)) {
             let val = object[key];
 
-            let mappedEntry = {
+            let mappedEntry: {
+              propertyName: string;
+              propertyValue: string;
+              children?: any;
+            } = {
               propertyName: key,
               propertyValue: inspector.getPropValueType(val),
             };
@@ -55,7 +70,7 @@ export class AvoSchemaParser {
 
     var mappedEventProps = mapping(eventProperties);
 
-    return JSON.stringify(mappedEventProps);
+    return mappedEventProps;
   }
 
   private getPropValueType(propValue: any): string {
@@ -73,7 +88,7 @@ export class AvoSchemaParser {
     } else if (propType === "boolean") {
       return "boolean";
     } else if (propType === "object") {
-      if (Object.prototype.toString.call(propValue) === "[object Array]") {
+      if (isArray(propValue)) {
         return "list";
       } else {
         return "object";

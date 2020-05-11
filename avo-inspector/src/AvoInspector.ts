@@ -1,62 +1,84 @@
-import { AvoInspectorEnv } from './AvoInspectorEnv';
-import { AvoSchemaParser } from './AvoSchemaParser';
-import { AvoSessionTracker } from './AvoSessionTracker';
+import { AvoInspectorEnv } from "./AvoInspectorEnv";
+import { AvoSchemaParser } from "./AvoSchemaParser";
+import { AvoSessionTracker } from "./AvoSessionTracker";
 
 export class AvoInspector {
-    
-    environment: AvoInspectorEnv;
-    sessionTracker: AvoSessionTracker;
-    apiKey: string;
-    version: string;
+  environment: AvoInspectorEnv;
+  sessionTracker: AvoSessionTracker;
+  apiKey: string;
+  version: string;
 
-    constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
-        this.environment = env;
-        if (this.environment == null) {
-            this.environment = AvoInspectorEnv.Dev;
-            console.error("[Avo Inspector] No environment provided. Defaulting to dev.");
-        }
-        this.apiKey = apiKey;
-        if (this.apiKey == null || this.apiKey.trim().length == 0) {
-            throw new Error("[Avo Inspector] No API key provided. Inspector can't operate without API key.");
-        }
-        this.version = version;
-        if (this.version == null || this.version.trim().length == 0) {
-            throw new Error("[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic.");
-        }
-
-        this.sessionTracker = new AvoSessionTracker({ startSession: () => {} });
-
-        let inspector = this;
-        window.onload = function() {
-            inspector.sessionTracker.startOrProlongSession(Date.now());
-        };
-    }
-    
-    trackSchemaFromEvent(eventName: string, eventProperties: { [propName: string] : any}): { [propName: string] : string} {
-        console.log('Inspected event: ' + eventName + ": " + JSON.stringify(eventProperties));
-        this.sessionTracker.startOrProlongSession(Date.now());
-        return { "prop": "unknown" };
+  constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
+    // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
+    if (env === null || env === undefined) {
+      this.environment = AvoInspectorEnv.Dev;
+      console.error(
+        "[Avo Inspector] No environment provided. Defaulting to dev."
+      );
+    } else {
+      this.environment = env;
     }
 
-    trackSchema(eventName: string, eventSchema: { [propName: string] : string}) {
-        console.log('Inspected event: ' + eventName + ": " + JSON.stringify(eventSchema));
-        this.sessionTracker.startOrProlongSession(Date.now());
+    if (apiKey === null || apiKey === undefined || apiKey.trim().length == 0) {
+      throw new Error(
+        "[Avo Inspector] No API key provided. Inspector can't operate without API key."
+      );
+    } else {
+      this.apiKey = apiKey;
     }
 
-    enableLogging(enable: Boolean) {
-        
-    }
-    
-    extractSchema(eventProperties: { [propName: string] : any}): string {
-        this.sessionTracker.startOrProlongSession(Date.now());
-        return new AvoSchemaParser().extractSchema(eventProperties)
+    if (
+      version === null ||
+      version === undefined ||
+      version.trim().length == 0
+    ) {
+      throw new Error(
+        "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
+      );
+    } else {
+      this.version = version;
     }
 
-    setBatchSize(newBatchSize: Number) {
+    this.sessionTracker = new AvoSessionTracker({ startSession: () => {} });
 
-    }
+    let inspector = this;
+    window.onload = function () {
+      inspector.sessionTracker.startOrProlongSession(Date.now());
+    };
+  }
 
-    setBatchFlushSeconds(newBatchFlushSeconds: Number) {
+  trackSchemaFromEvent(
+    eventName: string,
+    eventProperties: { [propName: string]: any }
+  ): { [propName: string]: string } {
+    console.log(
+      "Inspected event: " + eventName + ": " + JSON.stringify(eventProperties)
+    );
+    this.sessionTracker.startOrProlongSession(Date.now());
+    return { prop: "unknown" };
+  }
 
-    }
+  trackSchema(eventName: string, eventSchema: { [propName: string]: string }) {
+    console.log(
+      "Inspected event: " + eventName + ": " + JSON.stringify(eventSchema)
+    );
+    this.sessionTracker.startOrProlongSession(Date.now());
+  }
+
+  enableLogging(enable: Boolean) {}
+
+  extractSchema(eventProperties: {
+    [propName: string]: any;
+  }): Array<{
+    propertyName: string;
+    propertyValue: string;
+    children?: any;
+  }> {
+    this.sessionTracker.startOrProlongSession(Date.now());
+    return new AvoSchemaParser().extractSchema(eventProperties);
+  }
+
+  setBatchSize(newBatchSize: Number) {}
+
+  setBatchFlushSeconds(newBatchFlushSeconds: Number) {}
 }
