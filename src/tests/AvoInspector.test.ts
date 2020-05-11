@@ -9,7 +9,11 @@ describe("Initialization", () => {
 
   test("Api Key", () => {
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "0",
+    });
 
     // Then
     expect(inspector.apiKey).toBe("apiKey");
@@ -31,7 +35,11 @@ describe("Initialization", () => {
 
   test("Empty api key", () => {
     try {
-      new AvoInspector("   ", AvoInspectorEnv.Prod, "0");
+      new AvoInspector({
+        apiKey: "   ",
+        env: AvoInspectorEnv.Prod,
+        version: "0",
+      });
       throw Error(
         "Avo Inspector should throw an error if init with empty api key"
       );
@@ -66,7 +74,11 @@ describe("Initialization", () => {
 
   test("Prod", () => {
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "0",
+    });
 
     // Then
     expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
@@ -74,7 +86,11 @@ describe("Initialization", () => {
 
   test("Dev", () => {
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Dev, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Dev,
+      version: "0",
+    });
 
     // Then
     expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
@@ -82,7 +98,11 @@ describe("Initialization", () => {
 
   test("Staging", () => {
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Staging, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Staging,
+      version: "0",
+    });
 
     // Then
     expect(inspector.environment).toBe(AvoInspectorEnv.Staging);
@@ -90,7 +110,11 @@ describe("Initialization", () => {
 
   test("Version", () => {
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "1");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "1",
+    });
 
     // Then
     expect(inspector.version).toBe("1");
@@ -112,7 +136,11 @@ describe("Initialization", () => {
 
   test("Empty version", () => {
     try {
-      new AvoInspector("api key", AvoInspectorEnv.Prod, " ");
+      new AvoInspector({
+        apiKey: "api key",
+        env: AvoInspectorEnv.Prod,
+        version: " ",
+      });
       throw Error(
         "Avo Inspector should throw an error if no version is provided"
       );

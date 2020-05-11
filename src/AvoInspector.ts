@@ -10,35 +10,44 @@ export class AvoInspector {
   apiKey: string;
   version: string;
 
-  constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
+  // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
+  constructor(options: {
+    apiKey: string;
+    env: AvoInspectorEnv;
+    version: string;
+  }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
-    if (env === null || env === undefined) {
+    if (options.env === null || options.env === undefined) {
       this.environment = AvoInspectorEnv.Dev;
       console.error(
         "[Avo Inspector] No environment provided. Defaulting to dev."
       );
     } else {
-      this.environment = env;
+      this.environment = options.env;
     }
 
-    if (apiKey === null || apiKey === undefined || apiKey.trim().length == 0) {
+    if (
+      options.apiKey === null ||
+      options.apiKey === undefined ||
+      options.apiKey.trim().length == 0
+    ) {
       throw new Error(
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
-      this.apiKey = apiKey;
+      this.apiKey = options.apiKey;
     }
 
     if (
-      version === null ||
-      version === undefined ||
-      version.trim().length == 0
+      options.version === null ||
+      options.version === undefined ||
+      options.version.trim().length == 0
     ) {
       throw new Error(
         "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
       );
     } else {
-      this.version = version;
+      this.version = options.version;
     }
 
     this.avoBatcher = new AvoBatcher();

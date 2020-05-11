@@ -23,7 +23,11 @@ describe("Sessions", () => {
 
   test("Inits with session tracker", () => {
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "0",
+    });
 
     // Then
     expect(inspector.sessionTracker).not.toBeNull();
@@ -172,7 +176,11 @@ describe("Sessions", () => {
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "0",
+    });
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
@@ -187,7 +195,11 @@ describe("Sessions", () => {
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "0",
+    });
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
@@ -202,7 +214,11 @@ describe("Sessions", () => {
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "0",
+    });
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
@@ -217,7 +233,11 @@ describe("Sessions", () => {
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: AvoInspectorEnv.Prod,
+      version: "0",
+    });
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
