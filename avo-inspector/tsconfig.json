@@ -1,15 +1,13 @@
 {
-    "compilerOptions": {
-      "module": "commonjs",
-      "target": "es2015",
-      "declaration": true,
-      "outDir": "./dist",
-      "baseUrl": "./src",
-    },
-    "include": [
-      "src/**/*"
-    ],
-    "exclude": [
-      "src/**/*.test.ts"
-    ]
-  }
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2015",
+    "declaration": true,
+    "outDir": "./dist",
+    "baseUrl": "./src",
+    "strict": true,
+    "noImplicitAny": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts"]
+}
