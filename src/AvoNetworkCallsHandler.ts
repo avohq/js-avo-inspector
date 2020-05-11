@@ -24,7 +24,7 @@ export interface EventSchemaBody extends BaseBody {
   eventName: string;
   eventProperties: Array<{
     propertyName: string;
-    propertyValue: string;
+    propertyType: string;
     children?: any;
   }>;
 }
@@ -64,14 +64,14 @@ export class AvoNetworkCallsHandler {
     eventName: string,
     eventProperties: Array<{
       propertyName: string;
-      propertyValue: string;
+      propertyType: string;
       children?: any;
     }>
   ): EventSchemaBody {
     let eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
-    (eventSchemaBody.eventName = eventName),
-      (eventSchemaBody.eventProperties = eventProperties);
+    eventSchemaBody.eventName = eventName;
+    eventSchemaBody.eventProperties = eventProperties;
     return eventSchemaBody;
   }
 

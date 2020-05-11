@@ -10,7 +10,7 @@ class EmptyMockAvoBatcher {
     eventName: string,
     schema: Array<{
       propertyName: string;
-      propertyValue: string;
+      propertyType: string;
       children?: any;
     }>
   ): void {}

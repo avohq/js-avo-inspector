@@ -103,7 +103,7 @@ export class AvoInspector {
     [propName: string]: any;
   }): Array<{
     propertyName: string;
-    propertyValue: string;
+    propertyType: string;
     children?: any;
   }> {
     this.sessionTracker.startOrProlongSession(Date.now());

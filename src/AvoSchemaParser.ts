@@ -7,7 +7,7 @@ export class AvoSchemaParser {
     [propName: string]: any;
   }): Array<{
     propertyName: string;
-    propertyValue: string;
+    propertyType: string;
     children?: any;
   }> {
     if (eventProperties === null || eventProperties === undefined) {
@@ -28,11 +28,11 @@ export class AvoSchemaParser {
 
             let mappedEntry: {
               propertyName: string;
-              propertyValue: string;
+              propertyType: string;
               children?: any;
             } = {
               propertyName: key,
-              propertyValue: this.getPropValueType(val),
+              propertyType: this.getPropValueType(val),
             };
 
             if (typeof val === "object" && val != null) {

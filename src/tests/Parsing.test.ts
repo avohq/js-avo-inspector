@@ -28,23 +28,23 @@ describe("Parsing", () => {
     });
     let res = inspector.extractSchema(eventProperties);
 
-    expect(res[0].propertyValue).toBe("boolean");
-    expect(res[1].propertyValue).toBe("int");
-    expect(res[2].propertyValue).toBe("string");
-    expect(res[3].propertyValue).toBe("float");
-    expect(res[4].propertyValue).toBe("null");
-    expect(res[5].propertyValue).toBe("null");
-    expect(res[6].propertyValue).toBe("object");
+    expect(res[0].propertyType).toBe("boolean");
+    expect(res[1].propertyType).toBe("int");
+    expect(res[2].propertyType).toBe("string");
+    expect(res[3].propertyType).toBe("float");
+    expect(res[4].propertyType).toBe("null");
+    expect(res[5].propertyType).toBe("null");
+    expect(res[6].propertyType).toBe("object");
     expect(res[6].children).toMatchObject([
-      { propertyName: "an", propertyValue: "string" },
+      { propertyName: "an", propertyType: "string" },
     ]);
 
-    expect(res[7].propertyValue).toBe("list");
+    expect(res[7].propertyType).toBe("list");
     expect(res[7].children).toMatchObject([
       "string",
       [
-        { propertyName: "obj in list", propertyValue: "boolean" },
-        { propertyName: "int field", propertyValue: "int" },
+        { propertyName: "obj in list", propertyType: "boolean" },
+        { propertyName: "int field", propertyType: "int" },
       ],
       ["string"],
     ]);

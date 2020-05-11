@@ -12,7 +12,7 @@ export interface AvoBatcherType {
     eventName: string,
     schema: Array<{
       propertyName: string;
-      propertyValue: string;
+      propertyType: string;
       children?: any;
     }>
   ): void;
@@ -44,7 +44,7 @@ export class AvoBatcher {
     eventName: string,
     schema: Array<{
       propertyName: string;
-      propertyValue: string;
+      propertyType: string;
       children?: any;
     }>
   ): void {
