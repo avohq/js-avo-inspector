@@ -83,6 +83,9 @@ export class AvoBatcher {
     xmlhttp.open("POST", AvoBatcher.trackingEndpoint, true);
     xmlhttp.setRequestHeader("Content-Type", "text/plain");
     xmlhttp.send(JSON.stringify(this.events));
+    xmlhttp.onload = () => {
+      // XXX TODO parse response and apply sampling rate
+    };
     this.events = [];
     this.saveEvents();
     this.sending = false;
