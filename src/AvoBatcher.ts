@@ -27,7 +27,7 @@ export class AvoBatcher {
     }>
   ): void {
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("POST", AvoBatcher.trackingEndpoint);
+    xmlhttp.open("POST", AvoBatcher.trackingEndpoint, true);
     xmlhttp.setRequestHeader("Content-Type", "text/plain");
     xmlhttp.send(
       JSON.stringify({
