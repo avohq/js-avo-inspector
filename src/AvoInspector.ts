@@ -75,14 +75,17 @@ export class AvoInspector {
     this.avoBatcher.trackEventSchema(eventName, eventSchema);
   }
 
-  trackSchema(eventName: string, eventSchema: { [propName: string]: string }) {
+  trackSchema(
+    eventName: string,
+    eventSchema: { [propName: string]: string }
+  ): void {
     console.log(
       "Inspected event: " + eventName + ": " + JSON.stringify(eventSchema)
     );
     this.sessionTracker.startOrProlongSession(Date.now());
   }
 
-  enableLogging(enable: Boolean) {}
+  enableLogging(enable: boolean) {}
 
   extractSchema(eventProperties: {
     [propName: string]: any;
@@ -95,7 +98,7 @@ export class AvoInspector {
     return new AvoSchemaParser().extractSchema(eventProperties);
   }
 
-  setBatchSize(newBatchSize: Number) {}
+  setBatchSize(newBatchSize: number): void {}
 
-  setBatchFlushSeconds(newBatchFlushSeconds: Number) {}
+  setBatchFlushSeconds(newBatchFlushSeconds: number): void {}
 }
