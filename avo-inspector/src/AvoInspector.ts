@@ -1,9 +1,11 @@
 import { AvoInspectorEnv } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
 import { AvoSessionTracker } from "./AvoSessionTracker";
+import { AvoBatcher } from "./AvoBatcher";
 
 export class AvoInspector {
   environment: AvoInspectorEnv;
+  avoBatcher: AvoBatcher;
   sessionTracker: AvoSessionTracker;
   apiKey: string;
   version: string;
@@ -39,7 +41,8 @@ export class AvoInspector {
       this.version = version;
     }
 
-    this.sessionTracker = new AvoSessionTracker({ startSession: () => {} });
+    this.avoBatcher = new AvoBatcher();
+    this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
 
     let inspector = this;
     window.onload = function () {
@@ -50,12 +53,13 @@ export class AvoInspector {
   trackSchemaFromEvent(
     eventName: string,
     eventProperties: { [propName: string]: any }
-  ): { [propName: string]: string } {
+  ): void {
     console.log(
       "Inspected event: " + eventName + ": " + JSON.stringify(eventProperties)
     );
+    let eventSchema = this.extractSchema(eventProperties);
     this.sessionTracker.startOrProlongSession(Date.now());
-    return { prop: "unknown" };
+    this.avoBatcher.trackEventSchema(eventName, eventSchema);
   }
 
   trackSchema(eventName: string, eventSchema: { [propName: string]: string }) {
