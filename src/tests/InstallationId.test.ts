@@ -1,9 +1,14 @@
 import { AvoInstallationId } from "../AvoInstallationId";
+import LocalStorage from "../LocalStorage";
 
 describe("InstallationId", () => {
+  beforeAll(() => {
+    LocalStorage.clear();
+  });
+
   test("Creates installation id if not present", () => {
     // Given
-    window.localStorage.removeItem(AvoInstallationId.cacheKey);
+    LocalStorage.removeItem(AvoInstallationId.cacheKey);
 
     // When
     let installationId = AvoInstallationId.getInstallationId();
@@ -14,10 +19,7 @@ describe("InstallationId", () => {
 
   test("Reuses installation id if present", () => {
     // Given
-    window.localStorage.setItem(
-      AvoInstallationId.cacheKey,
-      JSON.stringify("test-installation-id")
-    );
+    LocalStorage.setItem(AvoInstallationId.cacheKey, "test-installation-id");
     AvoInstallationId.installationId = null;
 
     // When

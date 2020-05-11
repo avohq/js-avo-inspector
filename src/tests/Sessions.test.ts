@@ -1,8 +1,13 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoSessionTracker } from "../AvoSessionTracker";
+import LocalStorage from "../LocalStorage";
 
 describe("Sessions", () => {
+  beforeAll(() => {
+    LocalStorage.clear();
+  });
+
   test("Inits with session tracker", () => {
     // When
     let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
@@ -13,8 +18,8 @@ describe("Sessions", () => {
 
   test("Inits with timestamp 0 and a session id", () => {
     // Given
-    window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
 
     // When
     let sessionTracker = new AvoSessionTracker({ startSession: () => {} });
@@ -26,8 +31,8 @@ describe("Sessions", () => {
 
   test("Starts new session when no session recorded", () => {
     // Given
-    window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
     const callMoment = Date.now();
 
@@ -46,11 +51,11 @@ describe("Sessions", () => {
   test("Starts new session when time between session calls is greater than time between sessions", () => {
     // Given
     const callMoment = Date.now();
-    window.localStorage.setItem(
+    LocalStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
       JSON.stringify(callMoment - 5 * 60 * 1000 - 1)
     );
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
 
     // When
@@ -68,11 +73,11 @@ describe("Sessions", () => {
   test("Not starts new session when time between session calls is smaller than time between sessions", () => {
     // Given
     const callMoment = Date.now();
-    window.localStorage.setItem(
+    LocalStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
       JSON.stringify(callMoment - 5 * 60 * 1000 + 1)
     );
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
 
     // When
@@ -90,11 +95,11 @@ describe("Sessions", () => {
   test("Not starts new session when time between individual session calls is smaller than time between sessions but combined is greater", () => {
     // Given
     const callMoment = Date.now();
-    window.localStorage.setItem(
+    LocalStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
       JSON.stringify(callMoment - 5 * 60 * 1000 + 1)
     );
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
 
     // When
@@ -115,8 +120,8 @@ describe("Sessions", () => {
   test("Parses saved timestamp properly", () => {
     // Given
     const callMoment = Date.now();
-    window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
 
     // When
@@ -151,8 +156,8 @@ describe("Sessions", () => {
 
   test("Session started on trackSchemaFromEvent", () => {
     // Given
-    window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
     let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -166,8 +171,8 @@ describe("Sessions", () => {
 
   test("Session started on trackSchema", () => {
     // Given
-    window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
     let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -181,8 +186,8 @@ describe("Sessions", () => {
 
   test("Session started on extractSchema", () => {
     // Given
-    window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
     let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -196,8 +201,8 @@ describe("Sessions", () => {
 
   test("Session started on window.onload", () => {
     // Given
-    window.localStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-    window.localStorage.removeItem(AvoSessionTracker.idCacheKey);
+    LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+    LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
     let mockBatcher = { startSession: jest.fn() };
     let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);

@@ -1,7 +1,12 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import LocalStorage from "../LocalStorage";
 
 describe("Initialization", () => {
+  beforeAll(() => {
+    LocalStorage.clear();
+  });
+
   test("Api Key", () => {
     // When
     let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Prod, "0");

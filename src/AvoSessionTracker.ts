@@ -1,6 +1,7 @@
 //import Cookies from 'universal-cookie';
 import AvoGuid from "./AvoGuid";
 import { AvoBatcher } from "./AvoBatcher";
+import LocalStorage from "./LocalStorage";
 
 export class AvoSessionTracker {
   static sessionId: null | string;
@@ -15,14 +16,14 @@ export class AvoSessionTracker {
   private avoBatcher: AvoBatcher;
 
   constructor(avoBatcher: AvoBatcher) {
-    let maybeLastSessionTimestamp = window.localStorage.getItem(
+    let maybeLastSessionTimestamp = LocalStorage.getItem<number>(
       AvoSessionTracker.lastSessionTimestampKey
     );
     if (
       maybeLastSessionTimestamp !== null &&
       maybeLastSessionTimestamp !== undefined
     ) {
-      this._lastSessionTimestamp = JSON.parse(maybeLastSessionTimestamp); //this.cookies.get(AvoSessionTracker.lastSessionTimestampKey);
+      this._lastSessionTimestamp = maybeLastSessionTimestamp; //this.cookies.get(AvoSessionTracker.lastSessionTimestampKey);
       if (isNaN(this._lastSessionTimestamp)) {
         this._lastSessionTimestamp = 0;
       }
@@ -30,14 +31,14 @@ export class AvoSessionTracker {
       this._lastSessionTimestamp = 0;
     }
 
-    let maybeSessionId = window.localStorage.getItem(
+    let maybeSessionId = LocalStorage.getItem<string>(
       AvoSessionTracker.idCacheKey
     ); //this.cookies.get(AvoSessionTracker.idCacheKey);
 
     if (maybeSessionId === null || maybeSessionId === undefined) {
       this.updateSessionId();
     } else {
-      AvoSessionTracker.sessionId = JSON.parse(maybeSessionId);
+      AvoSessionTracker.sessionId = maybeSessionId;
     }
 
     this.avoBatcher = avoBatcher;
@@ -53,17 +54,17 @@ export class AvoSessionTracker {
 
     this._lastSessionTimestamp = atTime;
     //this.cookies.set(AvoSessionTracker.lastSessionTimestampKey, this.lastSessionTimestamp);
-    window.localStorage.setItem(
+    LocalStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      JSON.stringify(this._lastSessionTimestamp)
+      this._lastSessionTimestamp
     );
   }
 
   private updateSessionId() {
     AvoSessionTracker.sessionId = AvoGuid.newGuid();
-    window.localStorage.setItem(
+    LocalStorage.setItem(
       AvoSessionTracker.idCacheKey,
-      JSON.stringify(AvoSessionTracker.sessionId)
+      AvoSessionTracker.sessionId
     ); //this.cookies.set(AvoSessionTracker.idCacheKey, AvoSessionTracker.sessionId);
   }
 
