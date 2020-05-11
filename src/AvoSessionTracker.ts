@@ -1,6 +1,6 @@
 //import Cookies from 'universal-cookie';
 import AvoGuid from "./AvoGuid";
-import { AvoBatcher } from "./AvoBatcher";
+import { AvoBatcherType } from "./AvoBatcher";
 import LocalStorage from "./LocalStorage";
 
 export class AvoSessionTracker {
@@ -13,9 +13,9 @@ export class AvoSessionTracker {
   get sessionLengthMillis(): number {
     return this._sessionLengthMillis;
   }
-  private avoBatcher: AvoBatcher;
+  private avoBatcher: AvoBatcherType;
 
-  constructor(avoBatcher: AvoBatcher) {
+  constructor(avoBatcher: AvoBatcherType) {
     let maybeLastSessionTimestamp = LocalStorage.getItem<number>(
       AvoSessionTracker.lastSessionTimestampKey
     );

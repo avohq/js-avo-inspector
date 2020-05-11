@@ -1,3 +1,16 @@
+export interface AvoBatcherType {
+  startSession(): void;
+
+  trackEventSchema(
+    eventName: string,
+    schema: Array<{
+      propertyName: string;
+      propertyValue: string;
+      children?: any;
+    }>
+  ): void;
+}
+
 export class AvoBatcher {
   private static avoInspectorBatchKey = "avo_inspector_batch_key";
 
