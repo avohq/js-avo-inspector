@@ -21,7 +21,7 @@ export class AvoSessionTracker {
       maybeLastSessionTimestamp !== null &&
       maybeLastSessionTimestamp !== undefined
     ) {
-      this._lastSessionTimestamp = parseInt(maybeLastSessionTimestamp, 10); //this.cookies.get(AvoSessionTracker.lastSessionTimestampKey);
+      this._lastSessionTimestamp = JSON.parse(maybeLastSessionTimestamp); //this.cookies.get(AvoSessionTracker.lastSessionTimestampKey);
       if (isNaN(this._lastSessionTimestamp)) {
         this._lastSessionTimestamp = 0;
       }
@@ -29,15 +29,14 @@ export class AvoSessionTracker {
       this._lastSessionTimestamp = 0;
     }
 
-    AvoSessionTracker.sessionId = window.localStorage.getItem(
+    let maybeSessionId = window.localStorage.getItem(
       AvoSessionTracker.idCacheKey
     ); //this.cookies.get(AvoSessionTracker.idCacheKey);
 
-    if (
-      AvoSessionTracker.sessionId === null ||
-      AvoSessionTracker.sessionId === undefined
-    ) {
+    if (maybeSessionId === null || maybeSessionId === undefined) {
       this.updateSessionId();
+    } else {
+      AvoSessionTracker.sessionId = JSON.parse(maybeSessionId);
     }
 
     this.avoBatcher = avoBatcher;
@@ -55,7 +54,7 @@ export class AvoSessionTracker {
     //this.cookies.set(AvoSessionTracker.lastSessionTimestampKey, this.lastSessionTimestamp);
     window.localStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      this._lastSessionTimestamp.toString()
+      JSON.stringify(this._lastSessionTimestamp)
     );
   }
 
@@ -63,7 +62,7 @@ export class AvoSessionTracker {
     AvoSessionTracker.sessionId = AvoGuid.newGuid();
     window.localStorage.setItem(
       AvoSessionTracker.idCacheKey,
-      AvoSessionTracker.sessionId
+      JSON.stringify(AvoSessionTracker.sessionId)
     ); //this.cookies.set(AvoSessionTracker.idCacheKey, AvoSessionTracker.sessionId);
   }
 
