@@ -1,6 +1,6 @@
-function isArray(obj: any): boolean {
+let isArray = (obj: any): boolean => {
   return Object.prototype.toString.call(obj) === "[object Array]";
-}
+};
 
 export class AvoSchemaParser {
   extractSchema(eventProperties: {
@@ -14,14 +14,12 @@ export class AvoSchemaParser {
       return [];
     }
 
-    let inspector = this;
-
-    let mapping = function (object: any) {
+    let mapping = (object: any) => {
       if (isArray(object)) {
         let list = object.map((x: any) => {
           return mapping(x);
         });
-        return inspector.removeDuplicates(list);
+        return this.removeDuplicates(list);
       } else if (typeof object === "object") {
         let mappedResult: any = [];
         for (var key in object) {
@@ -34,7 +32,7 @@ export class AvoSchemaParser {
               children?: any;
             } = {
               propertyName: key,
-              propertyValue: inspector.getPropValueType(val),
+              propertyValue: this.getPropValueType(val),
             };
 
             if (typeof val === "object" && val != null) {
@@ -47,7 +45,7 @@ export class AvoSchemaParser {
 
         return mappedResult;
       } else {
-        return inspector.getPropValueType(object);
+        return this.getPropValueType(object);
       }
     };
 
@@ -61,7 +59,7 @@ export class AvoSchemaParser {
     var primitives: any = { boolean: {}, number: {}, string: {} };
     var objects: Array<any> = [];
 
-    return array.filter(function (item: any) {
+    return array.filter((item: any) => {
       var type: string = typeof item;
       if (type in primitives) {
         return primitives[type].hasOwnProperty(item)

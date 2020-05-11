@@ -4,15 +4,26 @@ import { AvoBatcherType } from "./AvoBatcher";
 import LocalStorage from "./LocalStorage";
 
 export class AvoSessionTracker {
-  static sessionId: null | string;
+  private static _sessionId: null | string;
+  static get sessionId(): string {
+    if (AvoSessionTracker._sessionId == null) {
+      throw new Error(
+        "no sessionId set, Avo Inspector not correctly initialized"
+      );
+    }
+    return AvoSessionTracker._sessionId;
+  }
+
   private _lastSessionTimestamp: number;
   get lastSessionTimestamp(): number {
     return this._lastSessionTimestamp;
   }
+
   private _sessionLengthMillis: number = 5 * 60 * 1000;
   get sessionLengthMillis(): number {
     return this._sessionLengthMillis;
   }
+
   private avoBatcher: AvoBatcherType;
 
   constructor(avoBatcher: AvoBatcherType) {
@@ -38,7 +49,7 @@ export class AvoSessionTracker {
     if (maybeSessionId === null || maybeSessionId === undefined) {
       this.updateSessionId();
     } else {
-      AvoSessionTracker.sessionId = maybeSessionId;
+      AvoSessionTracker._sessionId = maybeSessionId;
     }
 
     this.avoBatcher = avoBatcher;
@@ -61,7 +72,7 @@ export class AvoSessionTracker {
   }
 
   private updateSessionId(): void {
-    AvoSessionTracker.sessionId = AvoGuid.newGuid();
+    AvoSessionTracker._sessionId = AvoGuid.newGuid();
     LocalStorage.setItem(
       AvoSessionTracker.idCacheKey,
       AvoSessionTracker.sessionId
@@ -71,6 +82,7 @@ export class AvoSessionTracker {
   static get lastSessionTimestampKey(): string {
     return "AvoInspectorSessionTimestamp";
   }
+
   static get idCacheKey(): string {
     return "AvoInspectorSessionId";
   }

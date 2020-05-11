@@ -1,3 +1,10 @@
+import {
+  SessionStartedBody,
+  EventSchemaBody,
+  AvoNetworkCallsHandler,
+} from "./AvoNetworkCallsHandler";
+import LocalStorage from "./LocalStorage";
+
 export interface AvoBatcherType {
   startSession(): void;
 
@@ -16,7 +23,22 @@ export class AvoBatcher {
 
   private static trackingEndpoint = "https://api.avo.app/inspector/v1/track";
 
-  startSession(): void {}
+  private events: Array<SessionStartedBody | EventSchemaBody> = [];
+
+  private networkCallsHandler: AvoNetworkCallsHandler;
+  private uploadScheduled: boolean = false;
+  private batchPeriod: number = 1000;
+  private sending: boolean = false;
+
+  constructor(networkCallsHandler: AvoNetworkCallsHandler) {
+    this.networkCallsHandler = networkCallsHandler;
+  }
+
+  startSession(): void {
+    this.events.push(this.networkCallsHandler.bodyForSessionStartedCall());
+    this.saveEvents();
+    this.sendEvents();
+  }
 
   trackEventSchema(
     eventName: string,
@@ -26,26 +48,47 @@ export class AvoBatcher {
       children?: any;
     }>
   ): void {
+    this.events.push(
+      this.networkCallsHandler.bodyForEventSchemaCall(eventName, schema)
+    );
+    this.saveEvents();
+    this.sendEvents();
+  }
+
+  private saveEvents(): void {
+    LocalStorage.setItem(AvoBatcher.cacheKey, this.events);
+  }
+
+  private sendEvents(): void {
+    if (this.uploadScheduled) {
+      return;
+    }
+
+    this.uploadScheduled = true;
+    setTimeout(() => {
+      this.uploadScheduled = false;
+      this.postEvents();
+    }, this.batchPeriod);
+  }
+
+  private postEvents(): void {
+    if (this.sending) {
+      return;
+    }
+    if (this.events.length === 0) {
+      return;
+    }
+    this.sending = true;
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoBatcher.trackingEndpoint, true);
     xmlhttp.setRequestHeader("Content-Type", "text/plain");
-    xmlhttp.send(
-      JSON.stringify({
-        type: "event",
-        eventName: eventName,
-        eventProperties: schema,
-      })
-    );
+    xmlhttp.send(JSON.stringify(this.events));
+    this.events = [];
+    this.saveEvents();
+    this.sending = false;
   }
 
-  private checkIfBatchNeedsToBeSent(): boolean {
-    // check if batch is ready
-    return true;
-  }
-
-  private postAllAvailableEvents(): void {
-    // XHR post to api.avo.app?
-    // this will require CORS
-    // is there a nicer way to do this?
+  static get cacheKey(): string {
+    return "AvoInspectorEvents";
   }
 }

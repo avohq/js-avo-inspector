@@ -2,6 +2,10 @@ import { AvoInspectorEnv } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
 import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoBatcher } from "./AvoBatcher";
+import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
+import { AvoInstallationId } from "./AvoInstallationId";
+
+let libVersion = require("../package.json").version;
 
 export class AvoInspector {
   environment: AvoInspectorEnv;
@@ -15,6 +19,7 @@ export class AvoInspector {
     apiKey: string;
     env: AvoInspectorEnv;
     version: string;
+    appName?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (options.env === null || options.env === undefined) {
@@ -50,14 +55,21 @@ export class AvoInspector {
       this.version = options.version;
     }
 
-    this.avoBatcher = new AvoBatcher();
+    let avoNetworkCallsHandler = new AvoNetworkCallsHandler(
+      this.apiKey,
+      this.environment.toString(),
+      options.appName || "",
+      this.version,
+      libVersion,
+      AvoInstallationId.getInstallationId()
+    );
+    this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
 
-    let inspector = this;
     window.addEventListener(
       "load",
-      function () {
-        inspector.sessionTracker.startOrProlongSession(Date.now());
+      () => {
+        this.sessionTracker.startOrProlongSession(Date.now());
       },
       false
     );
