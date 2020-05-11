@@ -6,6 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "parcel src/index.ts",
+    "test": "jest",
     "build": "tsc --emitDeclarationOnly && parcel build src/index.ts"
   },
   "repository": {
