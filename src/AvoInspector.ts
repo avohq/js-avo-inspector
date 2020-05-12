@@ -1,4 +1,4 @@
-import { AvoInspectorEnv } from "./AvoInspectorEnv";
+import { AvoInspectorEnv, AvoInspectorEnvValueType } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
 import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoBatcher } from "./AvoBatcher";
@@ -8,7 +8,7 @@ import { AvoInstallationId } from "./AvoInstallationId";
 let libVersion = require("../package.json").version;
 
 export class AvoInspector {
-  environment: AvoInspectorEnv;
+  environment: AvoInspectorEnvValueType;
   avoBatcher: AvoBatcher;
   sessionTracker: AvoSessionTracker;
   apiKey: string;
@@ -16,23 +16,23 @@ export class AvoInspector {
 
   private static _batchSize = 30;
   static get batchSize() {
-      return this._batchSize;
+    return this._batchSize;
   }
 
   private static _batchFlushSeconds = 30;
   static get batchFlushSeconds() {
-      return this._batchFlushSeconds;
+    return this._batchFlushSeconds;
   }
 
   private static _shouldLog = false;
   static get shouldLog() {
-      return this._shouldLog;
+    return this._shouldLog;
   }
 
   // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
   constructor(options: {
     apiKey: string;
-    env: AvoInspectorEnv;
+    env: AvoInspectorEnvValueType;
     version: string;
     appName?: string;
   }) {

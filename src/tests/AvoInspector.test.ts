@@ -84,6 +84,18 @@ describe("Initialization", () => {
     expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
   });
 
+  test("Prod string", () => {
+    // When
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: "prod",
+      version: "0",
+    });
+
+    // Then
+    expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
+  });
+
   test("Dev", () => {
     // When
     let inspector = new AvoInspector({
@@ -96,11 +108,35 @@ describe("Initialization", () => {
     expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
   });
 
+  test("Dev string", () => {
+    // When
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: "dev",
+      version: "0",
+    });
+
+    // Then
+    expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
+  });
+
   test("Staging", () => {
     // When
     let inspector = new AvoInspector({
       apiKey: "apiKey",
       env: AvoInspectorEnv.Staging,
+      version: "0",
+    });
+
+    // Then
+    expect(inspector.environment).toBe(AvoInspectorEnv.Staging);
+  });
+
+  test("Staging string", () => {
+    // When
+    let inspector = new AvoInspector({
+      apiKey: "apiKey",
+      env: "staging",
       version: "0",
     });
 
