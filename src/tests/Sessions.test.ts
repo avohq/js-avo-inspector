@@ -4,9 +4,9 @@ import { AvoSessionTracker } from "../AvoSessionTracker";
 import LocalStorage from "../LocalStorage";
 
 class EmptyMockAvoBatcher {
-  startSession(): void {}
+  handleSessionStarted(): void {}
 
-  trackEventSchema(
+  handleTrackSchema(
     eventName: string,
     schema: Array<{
       propertyName: string;
@@ -50,7 +50,7 @@ describe("Sessions", () => {
     // Given
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
     const callMoment = Date.now();
 
     // When
@@ -62,7 +62,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
     expect(AvoSessionTracker.sessionId).not.toBeNull();
     expect(AvoSessionTracker.sessionId).not.toBe(prevSessionId);
-    expect(mockBatcher.startSession.mock.calls.length).toBe(1);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);
   });
 
   test("Starts new session when time between session calls is greater than time between sessions", () => {
@@ -73,7 +73,7 @@ describe("Sessions", () => {
       callMoment - 5 * 60 * 1000 - 1
     );
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -84,7 +84,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
     expect(AvoSessionTracker.sessionId).not.toBeNull();
     expect(AvoSessionTracker.sessionId).not.toBe(prevSessionId);
-    expect(mockBatcher.startSession.mock.calls.length).toBe(1);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);
   });
 
   test("Not starts new session when time between session calls is smaller than time between sessions", () => {
@@ -95,7 +95,7 @@ describe("Sessions", () => {
       callMoment - 5 * 60 * 1000 + 1
     );
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -106,7 +106,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
     expect(AvoSessionTracker.sessionId).not.toBeNull();
     expect(AvoSessionTracker.sessionId).toBe(prevSessionId);
-    expect(mockBatcher.startSession.mock.calls.length).toBe(0);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(0);
   });
 
   test("Not starts new session when time between individual session calls is smaller than time between sessions but combined is greater", () => {
@@ -117,7 +117,7 @@ describe("Sessions", () => {
       callMoment - 5 * 60 * 1000 + 1
     );
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -131,7 +131,7 @@ describe("Sessions", () => {
     );
     expect(AvoSessionTracker.sessionId).not.toBeNull();
     expect(AvoSessionTracker.sessionId).toBe(prevSessionId);
-    expect(mockBatcher.startSession.mock.calls.length).toBe(0);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(0);
   });
 
   test("Parses saved timestamp properly", () => {
@@ -139,7 +139,7 @@ describe("Sessions", () => {
     const callMoment = Date.now();
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -162,7 +162,7 @@ describe("Sessions", () => {
 
   test("Default session length is 5 mins", () => {
     // Given
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -175,7 +175,7 @@ describe("Sessions", () => {
     // Given
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
     let inspector = new AvoInspector({
       apiKey: "apiKey",
       env: AvoInspectorEnv.Prod,
@@ -187,14 +187,14 @@ describe("Sessions", () => {
     inspector.trackSchemaFromEvent("Test event", {});
 
     // Then
-    expect(mockBatcher.startSession.mock.calls.length).toBe(1);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);
   });
 
   test("Session started on trackSchema", () => {
     // Given
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
     let inspector = new AvoInspector({
       apiKey: "apiKey",
       env: AvoInspectorEnv.Prod,
@@ -206,14 +206,14 @@ describe("Sessions", () => {
     inspector.trackSchema("Test event", {});
 
     // Then
-    expect(mockBatcher.startSession.mock.calls.length).toBe(1);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);
   });
 
   test("Session started on extractSchema", () => {
     // Given
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
     let inspector = new AvoInspector({
       apiKey: "apiKey",
       env: AvoInspectorEnv.Prod,
@@ -225,14 +225,14 @@ describe("Sessions", () => {
     inspector.extractSchema({});
 
     // Then
-    expect(mockBatcher.startSession.mock.calls.length).toBe(1);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);
   });
 
   test("Session started on window.onload", () => {
     // Given
     LocalStorage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
     LocalStorage.removeItem(AvoSessionTracker.idCacheKey);
-    let mockBatcher = { startSession: jest.fn(), trackEventSchema: jest.fn() };
+    let mockBatcher = { handleSessionStarted: jest.fn(), handleTrackSchema: jest.fn() };
     let inspector = new AvoInspector({
       apiKey: "apiKey",
       env: AvoInspectorEnv.Prod,
@@ -246,6 +246,6 @@ describe("Sessions", () => {
     window.dispatchEvent(loadEvent);
 
     // Then
-    expect(mockBatcher.startSession.mock.calls.length).toBe(1);
+    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);
   });
 });

@@ -4,14 +4,9 @@ import * as Inspector from "avo-inspector";
 
 function App() {
   let inspector = new Inspector.AvoInspector({
-    apiKey: "apiKey",
+    apiKey: "9dSNFguPbR9kc3tsb6S8",
     env: Inspector.AvoInspectorEnv.Dev,
     version: "0",
-  });
-  inspector.trackSchemaFromEvent("Ts Event Name", {
-    prop0: true,
-    prop1: 1,
-    prop2: "str",
   });
   // inspector.trackSchema("Ts Event Name", {
   //   prop0: new Inspector.AvoType.Int(),
@@ -20,8 +15,14 @@ function App() {
   // });
   inspector.enableLogging(true);
   inspector.extractSchema({ prop0: true, prop1: 1, prop2: "str" });
-  inspector.setBatchSize(10);
+  inspector.setBatchSize(1);
   inspector.setBatchFlushSeconds(5);
+
+  inspector.trackSchemaFromEvent("Ts Test Event", {
+    prop0: true,
+    prop1: 1,
+    prop2: "str",
+  });
 
   return (
     <div className="App">

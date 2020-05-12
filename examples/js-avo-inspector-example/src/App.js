@@ -9,8 +9,8 @@ function App() {
     "prop2": new Inspector.AvoType.Null() });
   inspector.enableLogging(true);
   inspector.extractSchema({ "prop0": true, "prop1": 1, "prop2": "str" });
-  inspector.setBatchSize(10);
-  inspector.setBatchFlushSeconds(5);
+//  inspector.setBatchSize(10);
+//  inspector.setBatchFlushSeconds(5);
 
   return (
     <div className="App">

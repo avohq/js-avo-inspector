@@ -3,12 +3,13 @@ import {
   EventSchemaBody,
   AvoNetworkCallsHandler,
 } from "./AvoNetworkCallsHandler";
+import { AvoInspector } from "./AvoInspector"
 import LocalStorage from "./LocalStorage";
 
 export interface AvoBatcherType {
-  startSession(): void;
+  handleSessionStarted(): void;
 
-  trackEventSchema(
+  handleTrackSchema(
     eventName: string,
     schema: Array<{
       propertyName: string;
@@ -18,29 +19,29 @@ export interface AvoBatcherType {
   ): void;
 }
 
-export class AvoBatcher {
-  private static avoInspectorBatchKey = "avo_inspector_batch_key";
-
-  private static trackingEndpoint = "https://api.avo.app/inspector/v1/track";
+export class AvoBatcher implements AvoBatcherType {
 
   private events: Array<SessionStartedBody | EventSchemaBody> = [];
 
+  private batchFlushAttemptTimestamp: number;
+
   private networkCallsHandler: AvoNetworkCallsHandler;
-  private uploadScheduled: boolean = false;
-  private batchPeriod: number = 1000;
-  private sending: boolean = false;
 
   constructor(networkCallsHandler: AvoNetworkCallsHandler) {
     this.networkCallsHandler = networkCallsHandler;
+
+    this.batchFlushAttemptTimestamp = Date.now();
   }
 
-  startSession(): void {
+  handleSessionStarted(): void {
     this.events.push(this.networkCallsHandler.bodyForSessionStartedCall());
-    this.saveEvents();
-    this.sendEvents();
+
+    this.checkIfBatchNeedsToBeSent();
+ //   this.saveEvents();
+ //   this.sendEvents();
   }
 
-  trackEventSchema(
+  handleTrackSchema(
     eventName: string,
     schema: Array<{
       propertyName: string;
@@ -51,14 +52,39 @@ export class AvoBatcher {
     this.events.push(
       this.networkCallsHandler.bodyForEventSchemaCall(eventName, schema)
     );
-    this.saveEvents();
-    this.sendEvents();
+
+    this.checkIfBatchNeedsToBeSent();
+ //   this.saveEvents();
+ //   this.sendEvents();
   }
+
+  private checkIfBatchNeedsToBeSent() {
+    const batchSize = this.events.length;
+    const now = Date.now();
+    const timeSinceLastFlushAttempt = now - this.batchFlushAttemptTimestamp;
+
+    const sendBySize = (batchSize % AvoInspector.batchSize) == 0;
+    const sendByTime = timeSinceLastFlushAttempt >= AvoInspector.batchFlushSeconds * 1000;
+
+    const avoBatcher = this;
+    if (sendBySize || sendByTime) {
+        this.batchFlushAttemptTimestamp = now;
+        const sendingEvents: Array<SessionStartedBody | EventSchemaBody> = avoBatcher.events;
+        avoBatcher.events = [];
+        this.networkCallsHandler.callInspectorWithBatchBody(this.events, function(error: string | null): any {
+            if (error != null) {
+              avoBatcher.events = avoBatcher.events.concat(sendingEvents);
+            } 
+            avoBatcher.saveEvents();
+        });
+    }
+}
 
   private saveEvents(): void {
     LocalStorage.setItem(AvoBatcher.cacheKey, this.events);
   }
 
+  /*
   private sendEvents(): void {
     if (this.uploadScheduled) {
       return;
@@ -70,26 +96,7 @@ export class AvoBatcher {
       this.postEvents();
     }, this.batchPeriod);
   }
-
-  private postEvents(): void {
-    if (this.sending) {
-      return;
-    }
-    if (this.events.length === 0) {
-      return;
-    }
-    this.sending = true;
-    let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("POST", AvoBatcher.trackingEndpoint, true);
-    xmlhttp.setRequestHeader("Content-Type", "text/plain");
-    xmlhttp.send(JSON.stringify(this.events));
-    xmlhttp.onload = () => {
-      // XXX TODO parse response and apply sampling rate
-    };
-    this.events = [];
-    this.saveEvents();
-    this.sending = false;
-  }
+  */
 
   static get cacheKey(): string {
     return "AvoInspectorEvents";

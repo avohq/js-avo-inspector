@@ -14,6 +14,16 @@ export class AvoInspector {
   apiKey: string;
   version: string;
 
+  private static _batchSize = 30;
+  static get batchSize() {
+      return this._batchSize;
+  }
+
+  private static _batchFlushSeconds = 30;
+  static get batchFlushSeconds() {
+      return this._batchFlushSeconds;
+  }
+
   // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
   constructor(options: {
     apiKey: string;
@@ -24,7 +34,7 @@ export class AvoInspector {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (options.env === null || options.env === undefined) {
       this.environment = AvoInspectorEnv.Dev;
-      console.error(
+      console.warn(
         "[Avo Inspector] No environment provided. Defaulting to dev."
       );
     } else {
@@ -84,7 +94,7 @@ export class AvoInspector {
     );
     let eventSchema = this.extractSchema(eventProperties);
     this.sessionTracker.startOrProlongSession(Date.now());
-    this.avoBatcher.trackEventSchema(eventName, eventSchema);
+    this.avoBatcher.handleTrackSchema(eventName, eventSchema);
   }
 
   trackSchema(
@@ -110,7 +120,11 @@ export class AvoInspector {
     return new AvoSchemaParser().extractSchema(eventProperties);
   }
 
-  setBatchSize(newBatchSize: number): void {}
+  setBatchSize(newBatchSize: number): void {
+    AvoInspector._batchSize = newBatchSize;
+  }
 
-  setBatchFlushSeconds(newBatchFlushSeconds: number): void {}
+  setBatchFlushSeconds(newBatchFlushSeconds: number): void {
+    AvoInspector._batchFlushSeconds = newBatchFlushSeconds;
+  }
 }

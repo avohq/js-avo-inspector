@@ -7,13 +7,14 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch Program",
+            "name": "Launch Ts Example",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/dist/index.js",
+            "program": "${workspaceFolder}/examples/ts-avo-inspector-example/src/App.tsx",
+            "preLaunchTask": "tsc: build - tsconfig.json",
             "outFiles": [
-                "${workspaceFolder}/**/*.js"
+                "${workspaceFolder}/examples/ts-avo-inspector-example/out/**/*.js"
             ]
         },
         {

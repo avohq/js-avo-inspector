@@ -37,6 +37,10 @@ export class AvoNetworkCallsHandler {
   private libVersion: string;
   private installationId: string;
   private samplingRate: number = 1.0;
+  private sending: boolean = false;
+  //private uploadScheduled: boolean = false;
+
+  private static trackingEndpoint = "https://api.avo.app/inspector/v1/track";
 
   constructor(
     apiKey: string,
@@ -52,6 +56,35 @@ export class AvoNetworkCallsHandler {
     this.appVersion = appVersion;
     this.libVersion = libVersion;
     this.installationId = installationId;
+  }
+
+  callInspectorWithBatchBody(events: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
+    if (this.sending) {
+      return;
+    }
+    if (events.length === 0) {
+      return;
+    }
+    this.sending = true;
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
+    xmlhttp.setRequestHeader("Content-Type", "text/plain");
+    xmlhttp.send(JSON.stringify(events));
+    xmlhttp.onload = () => {
+      if (xmlhttp.status != 200) {
+        onCompleted(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`);
+      } else {
+        let responseObj = xmlhttp.response;
+        onCompleted(null);
+      }
+    };
+    xmlhttp.onerror = () => {
+      onCompleted("Request failed");
+    };
+    xmlhttp.ontimeout = () => {
+      onCompleted("Request timed out");
+    }
+    this.sending = false;
   }
 
   bodyForSessionStartedCall(): SessionStartedBody {

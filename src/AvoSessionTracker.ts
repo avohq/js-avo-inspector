@@ -1,4 +1,3 @@
-//import Cookies from 'universal-cookie';
 import AvoGuid from "./AvoGuid";
 import { AvoBatcherType } from "./AvoBatcher";
 import LocalStorage from "./LocalStorage";
@@ -8,7 +7,7 @@ export class AvoSessionTracker {
   static get sessionId(): string {
     if (AvoSessionTracker._sessionId == null) {
       throw new Error(
-        "no sessionId set, Avo Inspector not correctly initialized"
+        "no sessionId set, Avo Inspector was not initialized correctly"
       );
     }
     return AvoSessionTracker._sessionId;
@@ -34,7 +33,7 @@ export class AvoSessionTracker {
       maybeLastSessionTimestamp !== null &&
       maybeLastSessionTimestamp !== undefined
     ) {
-      this._lastSessionTimestamp = maybeLastSessionTimestamp; //this.cookies.get(AvoSessionTracker.lastSessionTimestampKey);
+      this._lastSessionTimestamp = maybeLastSessionTimestamp;
       if (isNaN(this._lastSessionTimestamp)) {
         this._lastSessionTimestamp = 0;
       }
@@ -44,7 +43,7 @@ export class AvoSessionTracker {
 
     let maybeSessionId = LocalStorage.getItem<string>(
       AvoSessionTracker.idCacheKey
-    ); //this.cookies.get(AvoSessionTracker.idCacheKey);
+    );
 
     if (maybeSessionId === null || maybeSessionId === undefined) {
       this.updateSessionId();
@@ -60,11 +59,10 @@ export class AvoSessionTracker {
 
     if (timeSinceLastSession > this._sessionLengthMillis) {
       this.updateSessionId();
-      this.avoBatcher.startSession();
+      this.avoBatcher.handleSessionStarted();
     }
 
     this._lastSessionTimestamp = atTime;
-    //this.cookies.set(AvoSessionTracker.lastSessionTimestampKey, this.lastSessionTimestamp);
     LocalStorage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
       this._lastSessionTimestamp
@@ -76,7 +74,7 @@ export class AvoSessionTracker {
     LocalStorage.setItem(
       AvoSessionTracker.idCacheKey,
       AvoSessionTracker.sessionId
-    ); //this.cookies.set(AvoSessionTracker.idCacheKey, AvoSessionTracker.sessionId);
+    );
   }
 
   static get lastSessionTimestampKey(): string {
