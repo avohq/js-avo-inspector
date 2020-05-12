@@ -102,13 +102,17 @@ export class AvoInspector {
     eventName: string,
     eventProperties: { [propName: string]: any }
   ): void {
-    if (AvoInspector.shouldLog) {
-      console.log(
-        "Avo Inspector: supplied event " + eventName + " with params " + JSON.stringify(eventProperties)
-      );
+    try {
+      if (AvoInspector.shouldLog) {
+        console.log(
+          "Avo Inspector: supplied event " + eventName + " with params " + JSON.stringify(eventProperties)
+        );
+      }
+      let eventSchema = this.extractSchema(eventProperties);
+      this.trackSchema(eventName, eventSchema);
+    } catch(e) {
+      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
     }
-    let eventSchema = this.extractSchema(eventProperties);
-    this.trackSchema(eventName, eventSchema);
   }
 
   trackSchema(
@@ -119,8 +123,12 @@ export class AvoInspector {
       children?: any;
     }>
   ): void {
-    this.sessionTracker.startOrProlongSession(Date.now());
-    this.avoBatcher.handleTrackSchema(eventName, eventSchema);
+    try {
+      this.sessionTracker.startOrProlongSession(Date.now());
+      this.avoBatcher.handleTrackSchema(eventName, eventSchema);
+    } catch(e) {
+      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    }
   }
 
   enableLogging(enable: boolean) {
@@ -134,8 +142,13 @@ export class AvoInspector {
     propertyType: string;
     children?: any;
   }> {
-    this.sessionTracker.startOrProlongSession(Date.now());
-    return new AvoSchemaParser().extractSchema(eventProperties);
+    try {
+      this.sessionTracker.startOrProlongSession(Date.now());
+      return new AvoSchemaParser().extractSchema(eventProperties);
+    } catch(e) {
+      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+      return [];
+    }
   }
 
   setBatchSize(newBatchSize: number): void {
