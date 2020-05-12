@@ -78,6 +78,10 @@ export class AvoBatcher implements AvoBatcherType {
         this.networkCallsHandler.callInspectorWithBatchBody(sendingEvents, function(error: string | null): any {
             if (error != null) {
               avoBatcher.events = avoBatcher.events.concat(sendingEvents);
+
+              if (AvoInspector.shouldLog) {
+                console.log("Avo Inspector: batch sending failed: " + error + ". We will attempt to send your schemas with next batch");
+              }
             } 
             avoBatcher.saveEvents();
         });

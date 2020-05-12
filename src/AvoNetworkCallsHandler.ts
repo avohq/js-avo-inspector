@@ -1,6 +1,6 @@
 import AvoGuid from "./AvoGuid";
 import { AvoSessionTracker } from "./AvoSessionTracker";
-import { AvoInspector } from "AvoInspector";
+import { AvoInspector } from "./AvoInspector";
 
 export interface BaseBody {
   apiKey: string;
@@ -67,6 +67,13 @@ export class AvoNetworkCallsHandler {
       return;
     }
 
+    if (Math.random() > this.samplingRate) {
+      if (AvoInspector.shouldLog) {
+        console.log("Avo Inspector: Last event schema dropped due to sampling rate.");
+      }
+      return;
+    }
+
     this.sending = true;
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
@@ -76,7 +83,11 @@ export class AvoNetworkCallsHandler {
       if (xmlhttp.status != 200) {
         onCompleted(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`);
       } else {
-        let responseObj = xmlhttp.response;
+        const samplingRate = JSON.parse(xmlhttp.response).samplingRate;
+        if (samplingRate !== undefined) {
+          this.samplingRate = samplingRate;
+        }
+
         onCompleted(null);
       }
     };

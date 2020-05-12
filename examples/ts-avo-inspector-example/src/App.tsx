@@ -25,7 +25,6 @@ function App() {
   return (
     <div className="App">
       <form onSubmit={(e) => {
-        console.log(e.target)
         inspector.trackSchemaFromEvent(eventName, {
           [propName]: propValue,
         }); 

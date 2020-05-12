@@ -24,6 +24,11 @@ export class AvoInspector {
       return this._batchFlushSeconds;
   }
 
+  private static _shouldLog = false;
+  static get shouldLog() {
+      return this._shouldLog;
+  }
+
   // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
   constructor(options: {
     apiKey: string;
@@ -107,7 +112,9 @@ export class AvoInspector {
     this.sessionTracker.startOrProlongSession(Date.now());
   }
 
-  enableLogging(enable: boolean) {}
+  enableLogging(enable: boolean) {
+    AvoInspector._shouldLog = enable;
+  }
 
   extractSchema(eventProperties: {
     [propName: string]: any;
