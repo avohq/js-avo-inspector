@@ -14,9 +14,9 @@ export class AvoSchemaParser {
         });
     }
     
-    public extractSchema(eventProperties: { [propName: string] : any}): string {
+    public extractSchema(eventProperties: { [propName: string] : any}): Array<any> {
         if (eventProperties == null) {
-            return "";
+            return [];
         }
 
         let inspector = this;
@@ -53,7 +53,7 @@ export class AvoSchemaParser {
 
         var mappedEventProps = mapping(eventProperties);
 
-        return JSON.stringify(mappedEventProps);
+        return mappedEventProps;
     }
 
     private getPropValueType(propValue: any): string {

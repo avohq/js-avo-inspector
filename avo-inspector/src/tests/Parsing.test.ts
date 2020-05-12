@@ -9,8 +9,8 @@ describe('Parsing', () => {
     "prop6": { "an": "object" }, "prop7": ["a", "list", {"obj in list": true, "int field": 1}, ["another", "list"]] };
 
     // When
-    let inspector = new AvoInspector("apiKey", AvoInspectorEnv.Dev, "0");
-    let res = JSON.parse(inspector.extractSchema(eventProperties));
+    let inspector = new AvoInspector("apiKey", "test app", AvoInspectorEnv.Dev, "0");
+    let res = inspector.extractSchema(eventProperties);
 
     expect(res[0]["propertyValue"]).toBe("boolean");
     expect(res[1]["propertyValue"]).toBe("int");

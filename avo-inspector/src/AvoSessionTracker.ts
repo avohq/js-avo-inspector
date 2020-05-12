@@ -1,5 +1,6 @@
 //import Cookies from 'universal-cookie';
 import AvoGuid from './AvoGuid';
+import AvoBatcher from './AvoBatcher';
 
 export class AvoSessionTracker {
     static sessionId: string;
@@ -7,9 +8,9 @@ export class AvoSessionTracker {
     get lastSessionTimestamp(): number { return this._lastSessionTimestamp }
     private _sessionLengthMillis: number = 5 * 60 * 1000;
     get sessionLengthMillis(): number { return this._sessionLengthMillis }
-    private avoBatcher;
+    private avoBatcher: AvoBatcher;
 
-    constructor(avoBatcher) {
+    constructor(avoBatcher: AvoBatcher) {
         this._lastSessionTimestamp = parseInt(window.localStorage.getItem(AvoSessionTracker.lastSessionTimestampKey)); //this.cookies.get(AvoSessionTracker.lastSessionTimestampKey);
         AvoSessionTracker.sessionId = window.localStorage.getItem(AvoSessionTracker.idCacheKey); //this.cookies.get(AvoSessionTracker.idCacheKey);
         if (this._lastSessionTimestamp === null || this._lastSessionTimestamp === undefined || isNaN(this._lastSessionTimestamp)) {
@@ -28,7 +29,7 @@ export class AvoSessionTracker {
 
         if (timeSinceLastSession > this._sessionLengthMillis) {
             this.updateSessionId();
-            this.avoBatcher.startSession();
+            this.avoBatcher.handleSessionStarted();
         }
 
         this._lastSessionTimestamp = atTime;
