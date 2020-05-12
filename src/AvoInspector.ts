@@ -70,6 +70,14 @@ export class AvoInspector {
       this.version = options.version;
     }
 
+    if (this.environment === AvoInspectorEnv.Dev) {
+      AvoInspector._batchFlushSeconds = 1;
+      AvoInspector._shouldLog = true;
+    } else {
+      AvoInspector._batchFlushSeconds = 30;
+      AvoInspector._shouldLog = false;
+    }
+
     let avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
       this.environment.toString(),
