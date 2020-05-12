@@ -1,5 +1,6 @@
 import AvoGuid from "./AvoGuid";
 import { AvoSessionTracker } from "./AvoSessionTracker";
+import { AvoInspector } from "AvoInspector";
 
 export interface BaseBody {
   apiKey: string;
@@ -38,7 +39,6 @@ export class AvoNetworkCallsHandler {
   private installationId: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
-  //private uploadScheduled: boolean = false;
 
   private static trackingEndpoint = "https://api.avo.app/inspector/v1/track";
 
@@ -60,11 +60,13 @@ export class AvoNetworkCallsHandler {
 
   callInspectorWithBatchBody(events: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
     if (this.sending) {
+      onCompleted("Batch sending cancelled because another batch sending is in progress. Your events will be sent with next batch.");
       return;
     }
     if (events.length === 0) {
       return;
     }
+
     this.sending = true;
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);

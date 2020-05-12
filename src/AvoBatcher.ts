@@ -31,14 +31,19 @@ export class AvoBatcher implements AvoBatcherType {
     this.networkCallsHandler = networkCallsHandler;
 
     this.batchFlushAttemptTimestamp = Date.now();
+
+    let savedEvents: Array<SessionStartedBody | EventSchemaBody> | null = LocalStorage.getItem(AvoBatcher.cacheKey);
+    if (savedEvents !== null) {
+      this.events = savedEvents;
+      this.checkIfBatchNeedsToBeSent();
+    }
   }
 
   handleSessionStarted(): void {
     this.events.push(this.networkCallsHandler.bodyForSessionStartedCall());
+    this.saveEvents();
 
     this.checkIfBatchNeedsToBeSent();
- //   this.saveEvents();
- //   this.sendEvents();
   }
 
   handleTrackSchema(
@@ -52,10 +57,9 @@ export class AvoBatcher implements AvoBatcherType {
     this.events.push(
       this.networkCallsHandler.bodyForEventSchemaCall(eventName, schema)
     );
+    this.saveEvents();
 
     this.checkIfBatchNeedsToBeSent();
- //   this.saveEvents();
- //   this.sendEvents();
   }
 
   private checkIfBatchNeedsToBeSent() {
@@ -71,32 +75,23 @@ export class AvoBatcher implements AvoBatcherType {
         this.batchFlushAttemptTimestamp = now;
         const sendingEvents: Array<SessionStartedBody | EventSchemaBody> = avoBatcher.events;
         avoBatcher.events = [];
-        this.networkCallsHandler.callInspectorWithBatchBody(this.events, function(error: string | null): any {
+        this.networkCallsHandler.callInspectorWithBatchBody(sendingEvents, function(error: string | null): any {
             if (error != null) {
               avoBatcher.events = avoBatcher.events.concat(sendingEvents);
             } 
             avoBatcher.saveEvents();
         });
-    }
+    };
 }
 
   private saveEvents(): void {
-    LocalStorage.setItem(AvoBatcher.cacheKey, this.events);
-  }
-
-  /*
-  private sendEvents(): void {
-    if (this.uploadScheduled) {
-      return;
+    if (this.events.length > 1000) {
+      const extraElements = this.events.length - 1000;
+      this.events.splice(0, extraElements);
     }
 
-    this.uploadScheduled = true;
-    setTimeout(() => {
-      this.uploadScheduled = false;
-      this.postEvents();
-    }, this.batchPeriod);
+    LocalStorage.setItem(AvoBatcher.cacheKey, this.events);
   }
-  */
 
   static get cacheKey(): string {
     return "AvoInspectorEvents";

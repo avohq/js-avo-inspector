@@ -19,7 +19,6 @@
     "noEmit": true,
     "jsx": "react",
     "outDir": "out",
-    "sourceMap": true
   },
   "include": [
     "src"

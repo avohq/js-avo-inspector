@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "./App.css";
 import * as Inspector from "avo-inspector";
 
@@ -8,37 +8,40 @@ function App() {
     env: Inspector.AvoInspectorEnv.Dev,
     version: "0",
   });
-  // inspector.trackSchema("Ts Event Name", {
-  //   prop0: new Inspector.AvoType.Int(),
-  //   prop1: new Inspector.AvoType.Float(),
-  //   prop2: new Inspector.AvoType.Null(),
-  // });
+
   inspector.enableLogging(true);
   inspector.extractSchema({ prop0: true, prop1: 1, prop2: "str" });
-  inspector.setBatchSize(1);
+  inspector.setBatchSize(10);
   inspector.setBatchFlushSeconds(5);
 
-  inspector.trackSchemaFromEvent("Ts Test Event", {
-    prop0: true,
-    prop1: 1,
-    prop2: "str",
-  });
+  var eventName = ""
+  var propName = ""
+  var propValue = ""
+
+  const handleEventNameChange = (event: { target: { value: React.SetStateAction<string>; }; }) => eventName = event.target.value.toString();
+  const handlePropNameChange = (event: { target: { value: React.SetStateAction<string>; }; }) => propName = event.target.value.toString();
+  const handlePropValueChange = (event: { target: { value: React.SetStateAction<string>; }; }) => propValue = event.target.value.toString();
 
   return (
     <div className="App">
-      <form>
+      <form onSubmit={(e) => {
+        console.log(e.target)
+        inspector.trackSchemaFromEvent(eventName, {
+          [propName]: propValue,
+        }); 
+        e.preventDefault();}}>
         <label>
           Event name:
-          <input type="text" name="name" />
+          <input type="text" name="name" onChange={handleEventNameChange} />
         </label>
         <div>
           <label>
             Prop name:
-            <input type="text" name="name" />
+            <input type="text" name="name" onChange={handlePropNameChange} />
           </label>
           <label>
             Prop value:
-            <input type="text" name="name" />
+            <input type="text" name="name"  onChange={handlePropValueChange}/>
           </label>
           <input type="submit" value="Send event" />
         </div>
