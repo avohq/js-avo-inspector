@@ -203,7 +203,7 @@ describe("Sessions", () => {
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
-    inspector.trackSchema("Test event", {});
+    inspector.trackSchema("Test event", []);
 
     // Then
     expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);

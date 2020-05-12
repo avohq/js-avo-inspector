@@ -94,22 +94,25 @@ export class AvoInspector {
     eventName: string,
     eventProperties: { [propName: string]: any }
   ): void {
-    console.log(
-      "Inspected event: " + eventName + ": " + JSON.stringify(eventProperties)
-    );
+    if (AvoInspector.shouldLog) {
+      console.log(
+        "Avo Inspector: supplied event " + eventName + " with params " + JSON.stringify(eventProperties)
+      );
+    }
     let eventSchema = this.extractSchema(eventProperties);
-    this.sessionTracker.startOrProlongSession(Date.now());
-    this.avoBatcher.handleTrackSchema(eventName, eventSchema);
+    this.trackSchema(eventName, eventSchema);
   }
 
   trackSchema(
     eventName: string,
-    eventSchema: { [propName: string]: string }
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+    }>
   ): void {
-    console.log(
-      "Inspected event: " + eventName + ": " + JSON.stringify(eventSchema)
-    );
     this.sessionTracker.startOrProlongSession(Date.now());
+    this.avoBatcher.handleTrackSchema(eventName, eventSchema);
   }
 
   enableLogging(enable: boolean) {

@@ -59,6 +59,12 @@ export class AvoBatcher implements AvoBatcherType {
     );
     this.saveEvents();
 
+    if (AvoInspector.shouldLog) {
+      console.log(
+        "Avo Inspector: saved event " + eventName + " with schema " + JSON.stringify(schema)
+      );
+    }
+  
     this.checkIfBatchNeedsToBeSent();
   }
 
@@ -82,7 +88,11 @@ export class AvoBatcher implements AvoBatcherType {
               if (AvoInspector.shouldLog) {
                 console.log("Avo Inspector: batch sending failed: " + error + ". We will attempt to send your schemas with next batch");
               }
-            } 
+            } else {
+              if (AvoInspector.shouldLog) {
+                console.log("Avo Inspector: batch sent successfully.");
+              }
+            }
             avoBatcher.saveEvents();
         });
     };

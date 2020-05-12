@@ -69,9 +69,22 @@ export class AvoNetworkCallsHandler {
 
     if (Math.random() > this.samplingRate) {
       if (AvoInspector.shouldLog) {
-        console.log("Avo Inspector: Last event schema dropped due to sampling rate.");
+        console.log("Avo Inspector: last event schema dropped due to sampling rate.");
       }
       return;
+    }
+
+    if (AvoInspector.shouldLog) {
+      events.forEach(
+        function (event) {
+          if (event.type === "sessionStarted") {
+            console.log("Avo Inspector: sending session started event.");
+          } else if (event.type === "event") {
+            let schemaEvent: EventSchemaBody = event;
+            console.log("Avo Inspector: sending event " + schemaEvent.eventName + " with schema " + JSON.stringify(schemaEvent.eventProperties));
+          }
+        }
+      )
     }
 
     this.sending = true;
