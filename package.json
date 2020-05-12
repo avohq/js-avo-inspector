@@ -33,7 +33,10 @@
     "web",
     "analytics",
     "avo",
-    "react"
+    "react",
+    "react-native",
+    "node",
+    "javascript"
   ],
   "author": "Avo (https://www.avo.app)",
   "license": "MIT",
@@ -41,9 +44,6 @@
     "url": "https://github.com/avohq/web-avo-inspector/issues"
   },
   "homepage": "https://github.com/avohq/web-avo-inspector#readme",
-  "dependencies": {
-    "universal-cookie": "4.0.3"
-  },
   "devDependencies": {
     "@babel/core": "7.9.0",
     "@types/jest": "25.2.1",
