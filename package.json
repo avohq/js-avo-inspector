@@ -1,14 +1,18 @@
 {
   "name": "avo-inspector",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "",
-  "main": "dist/index.js",
+  "browser": "dist/index.js",
+  "react-native": "dist-native/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc --emitDeclarationOnly && parcel build src/index.ts",
+    "build": "tsc --emitDeclarationOnly && BROWSER=1 parcel build src/index.ts",
+    "build-native": "tsc --outDir dist-native",
     "dev": "parcel src/index.ts",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "commit": "git-cz",
+    "release": "release-it"
   },
   "repository": {
     "type": "git",
@@ -52,8 +56,24 @@
     "babel-preset-react": "6.24.1",
     "jest": "^25.4.0",
     "parcel-bundler": "1.12.4",
+    "parcel-plugin-externals": "0.4.0",
     "prettier": "2.0.5",
     "ts-jest": "25.4.0",
-    "typescript": "^3.8.3"
+    "typescript": "^3.8.3",
+    "commitizen": "3.0.5",
+    "conventional-changelog-cli": "2.0.11",
+    "cz-conventional-changelog": "2.1.0",
+    "eslint": "^6.8.0",
+    "eslint-plugin-react": "^7.18.0",
+    "prettier-eslint": "^9.0.1",
+    "release-it": "8.2.0"
+  },
+  "externals": [
+    "react-native"
+  ],
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
   }
 }

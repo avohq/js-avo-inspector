@@ -4,7 +4,7 @@ import * as Inspector from "avo-inspector";
 
 function App() {
   let inspector = new Inspector.AvoInspector({
-    apiKey: "9dSNFguPbR9kc3tsb6S8",
+    apiKey: "8tiVTQOjyyMMGoxZQ5MY",
     env: Inspector.AvoInspectorEnv.Dev,
     version: "0",
   });

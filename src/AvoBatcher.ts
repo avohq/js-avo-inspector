@@ -4,7 +4,6 @@ import {
   AvoNetworkCallsHandler,
 } from "./AvoNetworkCallsHandler";
 import { AvoInspector } from "./AvoInspector"
-import LocalStorage from "./LocalStorage";
 
 export interface AvoBatcherType {
   handleSessionStarted(): void;
@@ -32,11 +31,12 @@ export class AvoBatcher implements AvoBatcherType {
 
     this.batchFlushAttemptTimestamp = Date.now();
 
-    let savedEvents: Array<SessionStartedBody | EventSchemaBody> | null = LocalStorage.getItem(AvoBatcher.cacheKey);
-    if (savedEvents !== null) {
-      this.events = savedEvents;
-      this.checkIfBatchNeedsToBeSent();
-    }
+    AvoInspector.avoStorage.getItemAsync<Array<SessionStartedBody | EventSchemaBody> | null>(AvoBatcher.cacheKey).then((savedEvents) => {
+      if (savedEvents !== null) {
+        this.events = this.events.concat(savedEvents);
+        this.checkIfBatchNeedsToBeSent();
+      }
+    });
   }
 
   handleSessionStarted(): void {
@@ -104,7 +104,7 @@ export class AvoBatcher implements AvoBatcherType {
       this.events.splice(0, extraElements);
     }
 
-    LocalStorage.setItem(AvoBatcher.cacheKey, this.events);
+    AvoInspector.avoStorage.setItem(AvoBatcher.cacheKey, this.events);
   }
 
   static get cacheKey(): string {

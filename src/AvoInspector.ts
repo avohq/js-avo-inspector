@@ -3,7 +3,7 @@ import { AvoSchemaParser } from "./AvoSchemaParser";
 import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoBatcher } from "./AvoBatcher";
 import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
-import { AvoInstallationId } from "./AvoInstallationId";
+import { AvoStorage } from "./AvoStorage";
 
 let libVersion = require("../package.json").version;
 
@@ -13,6 +13,8 @@ export class AvoInspector {
   sessionTracker: AvoSessionTracker;
   apiKey: string;
   version: string;
+
+  static avoStorage: AvoStorage;
 
   private static _batchSize = 30;
   static get batchSize() {
@@ -78,24 +80,33 @@ export class AvoInspector {
       AvoInspector._shouldLog = false;
     }
 
+    AvoInspector.avoStorage = new AvoStorage();
+
     let avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion,
-      AvoInstallationId.getInstallationId()
+      libVersion
     );
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
-
-    window.addEventListener(
-      "load",
-      () => {
+    
+    try {
+      if (process.env.BROWSER) {
+        window.addEventListener(
+          "load",
+          () => {
+            this.sessionTracker.startOrProlongSession(Date.now());
+          },
+          false
+        );
+      } else {
         this.sessionTracker.startOrProlongSession(Date.now());
-      },
-      false
-    );
+      }
+    } catch(e) {
+      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    }
   }
 
   trackSchemaFromEvent(
