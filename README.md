@@ -5,7 +5,7 @@
 # Avo documentation
 
 This is a quick start guide.
-For more information about the Inspector project please read [Avo documentation](https://www.avo.app/docs/inspector/sdk/web).
+For more information about the Inspector project please read [Avo documentation](https://www.avo.app/docs/inspector/sdk/js).
 
 # Installation
 
@@ -46,7 +46,7 @@ inspector.enableLogging(true);
 # Sending event schemas
 
 Whenever you send tracking event call one of the following methods:
-Read more in the [Avo documentation](https://www.avo.app/docs/inspector/sdk/web#event-tracking)
+Read more in the [Avo documentation](https://www.avo.app/docs/inspector/sdk/js#event-tracking)
 
 ### 1.
 
