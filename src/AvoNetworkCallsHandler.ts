@@ -1,6 +1,7 @@
 import AvoGuid from "./AvoGuid";
 import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoInspector } from "./AvoInspector";
+import { AvoInstallationId } from "./AvoInstallationId";
 
 export interface BaseBody {
   apiKey: string;
@@ -36,7 +37,6 @@ export class AvoNetworkCallsHandler {
   private appName: string;
   private appVersion: string;
   private libVersion: string;
-  private installationId: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
 
@@ -48,14 +48,12 @@ export class AvoNetworkCallsHandler {
     appName: string,
     appVersion: string,
     libVersion: string,
-    installationId: string
   ) {
     this.apiKey = apiKey;
     this.envName = envName;
     this.appName = appName;
     this.appVersion = appVersion;
     this.libVersion = libVersion;
-    this.installationId = installationId;
   }
 
   callInspectorWithBatchBody(events: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
@@ -143,7 +141,7 @@ export class AvoNetworkCallsHandler {
       env: this.envName,
       libPlatform: "web",
       messageId: AvoGuid.newGuid(),
-      trackingId: this.installationId,
+      trackingId: AvoInstallationId.getInstallationId(),
       createdAt: new Date().toISOString(),
       sessionId: AvoSessionTracker.sessionId,
       samplingRate: this.samplingRate,

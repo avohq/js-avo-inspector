@@ -3,8 +3,11 @@ import './App.css';
 import * as Inspector from 'avo-inspector';
 
 function App() {
-  let inspector = new Inspector.AvoInspector("apiKey", Inspector.AvoInspectorEnv.Dev);
+  let inspector = new Inspector.AvoInspector({
+    apiKey: "key", env: "dev", version: "1.0.0", appName: "My App"
+  });
   inspector.trackSchemaFromEvent("Js Event Name", {"prop0": "str", "prop1": true, "prop2": 10});
+  
   inspector.trackSchema("Js Event Name", { "prop0": new Inspector.AvoType.Int(), "prop1": new Inspector.AvoType.List(), 
     "prop2": new Inspector.AvoType.Null() });
   inspector.enableLogging(true);

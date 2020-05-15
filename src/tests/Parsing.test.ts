@@ -2,6 +2,8 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 describe("Parsing", () => {
+  process.env.BROWSER = "1";
+
   test("Event parsing", () => {
     // Given
     let eventProperties = {

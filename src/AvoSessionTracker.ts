@@ -1,20 +1,52 @@
 import AvoGuid from "./AvoGuid";
 import { AvoBatcherType } from "./AvoBatcher";
-import LocalStorage from "./LocalStorage";
+import { AvoInspector } from "./AvoInspector";
 
 export class AvoSessionTracker {
-  private static _sessionId: null | string;
+  private static _sessionId: null | string = null;
   static get sessionId(): string {
-    if (AvoSessionTracker._sessionId == null) {
-      throw new Error(
-        "no sessionId set, Avo Inspector was not initialized correctly"
-      );
+    if (AvoSessionTracker._sessionId === null) {
+      if (!AvoInspector.avoStorage.initialized) {
+        return "unknown";
+      }
+
+      let maybeSessionId: string | null = null;
+      try {
+        maybeSessionId = AvoInspector.avoStorage.getItem<string>(
+          AvoSessionTracker.idCacheKey
+        );
+      } catch (e) {
+        console.error("Avo Inspector: something went wrong. Please report to support@avo.app.", e);
+      }
+
+      if ((maybeSessionId === null || maybeSessionId === undefined)) {
+        AvoSessionTracker._sessionId = this.updateSessionId();
+      } else {
+        AvoSessionTracker._sessionId = maybeSessionId;
+      }
     }
     return AvoSessionTracker._sessionId;
   }
 
-  private _lastSessionTimestamp: number;
+  private _lastSessionTimestamp: number | null = null;
   get lastSessionTimestamp(): number {
+    if (this._lastSessionTimestamp === null || this._lastSessionTimestamp === 0) {
+      let maybeLastSessionTimestamp = AvoInspector.avoStorage.getItem<number>(
+        AvoSessionTracker.lastSessionTimestampKey
+      );
+      if (
+        maybeLastSessionTimestamp !== null &&
+        maybeLastSessionTimestamp !== undefined
+      ) {
+        this._lastSessionTimestamp = maybeLastSessionTimestamp;
+        if (isNaN(this._lastSessionTimestamp)) {
+          this._lastSessionTimestamp = 0;
+        }
+      } else {
+        this._lastSessionTimestamp = 0;
+      }
+    }
+
     return this._lastSessionTimestamp;
   }
 
@@ -26,55 +58,37 @@ export class AvoSessionTracker {
   private avoBatcher: AvoBatcherType;
 
   constructor(avoBatcher: AvoBatcherType) {
-    let maybeLastSessionTimestamp = LocalStorage.getItem<number>(
-      AvoSessionTracker.lastSessionTimestampKey
-    );
-    if (
-      maybeLastSessionTimestamp !== null &&
-      maybeLastSessionTimestamp !== undefined
-    ) {
-      this._lastSessionTimestamp = maybeLastSessionTimestamp;
-      if (isNaN(this._lastSessionTimestamp)) {
-        this._lastSessionTimestamp = 0;
-      }
-    } else {
-      this._lastSessionTimestamp = 0;
-    }
-
-    let maybeSessionId = LocalStorage.getItem<string>(
-      AvoSessionTracker.idCacheKey
-    );
-
-    if (maybeSessionId === null || maybeSessionId === undefined) {
-      this.updateSessionId();
-    } else {
-      AvoSessionTracker._sessionId = maybeSessionId;
-    }
-
     this.avoBatcher = avoBatcher;
   }
 
   startOrProlongSession(atTime: number): void {
-    const timeSinceLastSession = atTime - this._lastSessionTimestamp;
+    AvoInspector.avoStorage.runOnInit(() => {
+      const timeSinceLastSession = atTime - this.lastSessionTimestamp;
 
-    if (timeSinceLastSession > this._sessionLengthMillis) {
-      this.updateSessionId();
-      this.avoBatcher.handleSessionStarted();
-    }
+      if (timeSinceLastSession > this._sessionLengthMillis) {
+        AvoSessionTracker.updateSessionId();
+        this.avoBatcher.handleSessionStarted();
+      }
 
-    this._lastSessionTimestamp = atTime;
-    LocalStorage.setItem(
-      AvoSessionTracker.lastSessionTimestampKey,
-      this._lastSessionTimestamp
-    );
+      this._lastSessionTimestamp = atTime;
+      AvoInspector.avoStorage.setItem(
+        AvoSessionTracker.lastSessionTimestampKey,
+        this._lastSessionTimestamp
+      );
+    });
   }
 
-  private updateSessionId(): void {
+  private static updateSessionId(): string {
     AvoSessionTracker._sessionId = AvoGuid.newGuid();
-    LocalStorage.setItem(
-      AvoSessionTracker.idCacheKey,
-      AvoSessionTracker.sessionId
-    );
+    try {
+      AvoInspector.avoStorage.setItem(
+        AvoSessionTracker.idCacheKey,
+        AvoSessionTracker.sessionId
+      );
+    } catch (e) {
+      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    }
+    return AvoSessionTracker._sessionId;
   }
 
   static get lastSessionTimestampKey(): string {

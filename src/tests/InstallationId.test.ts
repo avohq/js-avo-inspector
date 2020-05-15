@@ -1,14 +1,22 @@
 import { AvoInstallationId } from "../AvoInstallationId";
-import LocalStorage from "../LocalStorage";
+import { AvoStorage } from "../AvoStorage";
+import { AvoInspector } from "../AvoInspector";
+import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 describe("InstallationId", () => {
+
+  process.env.BROWSER = "1";
+  let storage = new AvoStorage();
+  
   beforeAll(() => {
-    LocalStorage.clear();
+    storage.removeItem(AvoInstallationId.cacheKey);
+
+    new AvoInspector({apiKey: "test", env: AvoInspectorEnv.Dev, version: "0"});
   });
 
   test("Creates installation id if not present", () => {
     // Given
-    LocalStorage.removeItem(AvoInstallationId.cacheKey);
+    storage.removeItem(AvoInstallationId.cacheKey);
 
     // When
     let installationId = AvoInstallationId.getInstallationId();
@@ -19,7 +27,7 @@ describe("InstallationId", () => {
 
   test("Reuses installation id if present", () => {
     // Given
-    LocalStorage.setItem(AvoInstallationId.cacheKey, "test-installation-id");
+    storage.setItem(AvoInstallationId.cacheKey, "test-installation-id");
     AvoInstallationId.installationId = null;
 
     // When

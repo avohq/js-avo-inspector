@@ -1,5 +1,5 @@
 import AvoGuid from "./AvoGuid";
-import LocalStorage from "./LocalStorage";
+import { AvoInspector } from "./AvoInspector";
 
 export class AvoInstallationId {
   static installationId: null | string = null;
@@ -9,12 +9,16 @@ export class AvoInstallationId {
       return AvoInstallationId.installationId;
     }
 
-    let maybeInstallationId = LocalStorage.getItem<string>(
+    if (!AvoInspector.avoStorage.initialized) {
+      return "unknown";
+    }
+
+    let maybeInstallationId = AvoInspector.avoStorage.getItem<string>(
       AvoInstallationId.cacheKey
     );
     if (maybeInstallationId === null || maybeInstallationId === undefined) {
       AvoInstallationId.installationId = AvoGuid.newGuid();
-      LocalStorage.setItem(
+      AvoInspector.avoStorage.setItem(
         AvoInstallationId.cacheKey,
         AvoInstallationId.installationId
       );

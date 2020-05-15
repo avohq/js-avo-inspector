@@ -1,11 +1,9 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
-import LocalStorage from "../LocalStorage";
 
 describe("Initialization", () => {
-  beforeAll(() => {
-    LocalStorage.clear();
-  });
+
+  process.env.BROWSER = "1";
 
   test("Api Key", () => {
     // When
