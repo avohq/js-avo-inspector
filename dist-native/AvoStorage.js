@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 class AvoStorage {
     constructor() {
@@ -101,27 +92,35 @@ class AvoStorage {
         }
     }
     getItemAsync(key) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let maybeItem;
-            if (process.env.BROWSER) {
-                maybeItem = window.localStorage.getItem(key);
-            }
-            else {
-                if (this.Platform.OS === 'ios') {
-                    const Settings = this.reactNative.Settings;
-                    maybeItem = Settings.get(key);
-                }
-                else if (this.Platform.OS === 'android') {
-                    maybeItem = yield this.AsyncStorage.getItem(key);
-                }
-            }
+        let maybeItem;
+        if (process.env.BROWSER) {
+            maybeItem = window.localStorage.getItem(key);
             if (maybeItem !== null && maybeItem !== undefined) {
-                return JSON.parse(maybeItem);
+                return Promise.resolve(JSON.parse(maybeItem));
             }
             else {
-                return null;
+                return Promise.resolve(null);
             }
-        });
+        }
+        else {
+            if (this.Platform.OS === 'ios') {
+                const Settings = this.reactNative.Settings;
+                maybeItem = Settings.get(key);
+                if (maybeItem !== null && maybeItem !== undefined) {
+                    return Promise.resolve(JSON.parse(maybeItem));
+                }
+                else {
+                    return Promise.resolve(null);
+                }
+            }
+            else if (this.Platform.OS === 'android') {
+                maybeItem = this.AsyncStorage.getItem(key);
+                return maybeItem.then(JSON.parse(maybeItem));
+            }
+            else {
+                return Promise.resolve(null);
+            }
+        }
     }
 }
 exports.AvoStorage = AvoStorage;

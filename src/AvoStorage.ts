@@ -42,22 +42,30 @@ export class AvoStorage {
     }
   }
 
-  async getItemAsync<T>(key: string): Promise<T | null> {
+  getItemAsync<T>(key: string): Promise<T | null> {
     let maybeItem;
     if (process.env.BROWSER) {
       maybeItem = window.localStorage.getItem(key);
+      if (maybeItem !== null && maybeItem !== undefined) {
+        return Promise.resolve(JSON.parse(maybeItem));
+      } else {
+        return Promise.resolve(null);
+      }
     } else {
       if (this.Platform.OS === 'ios') {
         const Settings = this.reactNative.Settings;
         maybeItem = Settings.get(key);
+        if (maybeItem !== null && maybeItem !== undefined) {
+          return Promise.resolve(JSON.parse(maybeItem));
+        } else {
+          return Promise.resolve(null);
+        }
       } else if (this.Platform.OS === 'android') {
-        maybeItem = await this.AsyncStorage.getItem(key)
+        maybeItem = this.AsyncStorage.getItem(key);
+        return maybeItem.then(JSON.parse(maybeItem));
+      } else {
+        return Promise.resolve(null);
       }
-    }
-    if (maybeItem !== null && maybeItem !== undefined) {
-      return JSON.parse(maybeItem);
-    } else {
-      return null;
     }
   }
 
