@@ -2,6 +2,7 @@
   "name": "avo-inspector",
   "version": "1.0.1",
   "description": "",
+  "main": "dist/index.js",
   "browser": "dist/index.js",
   "react-native": "dist-native/index.js",
   "types": "dist/index.d.ts",
