@@ -91,21 +91,27 @@ export class AvoInspector {
     );
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
-    
+
     try {
       if (process.env.BROWSER) {
-        window.addEventListener(
-          "load",
-          () => {
-            this.sessionTracker.startOrProlongSession(Date.now());
-          },
-          false
-        );
+        // XXX make node/browser split clearer
+        if (typeof window !== "undefined") {
+          window.addEventListener(
+            "load",
+            () => {
+              this.sessionTracker.startOrProlongSession(Date.now());
+            },
+            false
+          );
+        }
       } else {
         this.sessionTracker.startOrProlongSession(Date.now());
       }
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
+        e
+      );
     }
   }
 
@@ -116,13 +122,19 @@ export class AvoInspector {
     try {
       if (AvoInspector.shouldLog) {
         console.log(
-          "Avo Inspector: supplied event " + eventName + " with params " + JSON.stringify(eventProperties)
+          "Avo Inspector: supplied event " +
+            eventName +
+            " with params " +
+            JSON.stringify(eventProperties)
         );
       }
       let eventSchema = this.extractSchema(eventProperties);
       this.trackSchema(eventName, eventSchema);
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
+        e
+      );
     }
   }
 
@@ -137,8 +149,11 @@ export class AvoInspector {
     try {
       this.sessionTracker.startOrProlongSession(Date.now());
       this.avoBatcher.handleTrackSchema(eventName, eventSchema);
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
+        e
+      );
     }
   }
 
@@ -156,8 +171,11 @@ export class AvoInspector {
     try {
       this.sessionTracker.startOrProlongSession(Date.now());
       return new AvoSchemaParser().extractSchema(eventProperties);
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
+        e
+      );
       return [];
     }
   }
