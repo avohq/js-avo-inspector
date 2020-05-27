@@ -11,14 +11,16 @@ class AvoStorage {
         this.getItem = (key) => {
             let maybeItem;
             if (process.env.BROWSER) {
-                maybeItem = window.localStorage.getItem(key);
+                if (typeof window !== "undefined") {
+                    maybeItem = window.localStorage.getItem(key);
+                }
             }
             else {
-                if (this.Platform.OS === 'ios') {
+                if (this.Platform.OS === "ios") {
                     const Settings = this.reactNative.Settings;
                     maybeItem = Settings.get(key);
                 }
-                else if (this.Platform.OS === 'android') {
+                else if (this.Platform.OS === "android") {
                     maybeItem = this.data[key];
                 }
             }
@@ -31,14 +33,16 @@ class AvoStorage {
         };
         this.setItem = (key, value) => {
             if (process.env.BROWSER) {
-                window.localStorage.setItem(key, JSON.stringify(value));
+                if (typeof window !== "undefined") {
+                    window.localStorage.setItem(key, JSON.stringify(value));
+                }
             }
             else {
-                if (this.Platform.OS === 'ios') {
+                if (this.Platform.OS === "ios") {
                     const Settings = this.reactNative.Settings;
                     Settings.set({ [key]: JSON.stringify(value) });
                 }
-                else if (this.Platform.OS === 'android') {
+                else if (this.Platform.OS === "android") {
                     this.AsyncStorage.setItem(key, JSON.stringify(value));
                     this.data[key] = JSON.stringify(value);
                 }
@@ -46,14 +50,16 @@ class AvoStorage {
         };
         this.removeItem = (key) => {
             if (process.env.BROWSER) {
-                window.localStorage.removeItem(key);
+                if (typeof window !== "undefined") {
+                    window.localStorage.removeItem(key);
+                }
             }
             else {
-                if (this.Platform.OS === 'ios') {
+                if (this.Platform.OS === "ios") {
                     const Settings = this.reactNative.Settings;
                     Settings.set({ [key]: null });
                 }
-                else if (this.Platform.OS === 'android') {
+                else if (this.Platform.OS === "android") {
                     this.AsyncStorage.removeItem(key);
                     this.data[key] = null;
                 }
@@ -63,9 +69,9 @@ class AvoStorage {
             this.reactNative = require("react-native");
             this.Platform = this.reactNative.Platform;
             this.AsyncStorage = this.reactNative.AsyncStorage;
-            if (this.Platform.OS === 'android') {
+            if (this.Platform.OS === "android") {
                 this.AsyncStorage.getAllKeys().then((keys) => this.AsyncStorage.multiGet(keys).then((keyVals) => {
-                    keyVals.forEach(keyVal => {
+                    keyVals.forEach((keyVal) => {
                         let key = keyVal[0];
                         this.data[key] = keyVal[1];
                     });
@@ -94,16 +100,21 @@ class AvoStorage {
     getItemAsync(key) {
         let maybeItem;
         if (process.env.BROWSER) {
-            maybeItem = window.localStorage.getItem(key);
-            if (maybeItem !== null && maybeItem !== undefined) {
-                return Promise.resolve(JSON.parse(maybeItem));
+            if (typeof window !== "undefined") {
+                maybeItem = window.localStorage.getItem(key);
+                if (maybeItem !== null && maybeItem !== undefined) {
+                    return Promise.resolve(JSON.parse(maybeItem));
+                }
+                else {
+                    return Promise.resolve(null);
+                }
             }
             else {
                 return Promise.resolve(null);
             }
         }
         else {
-            if (this.Platform.OS === 'ios') {
+            if (this.Platform.OS === "ios") {
                 const Settings = this.reactNative.Settings;
                 maybeItem = Settings.get(key);
                 if (maybeItem !== null && maybeItem !== undefined) {
@@ -113,7 +124,7 @@ class AvoStorage {
                     return Promise.resolve(null);
                 }
             }
-            else if (this.Platform.OS === 'android') {
+            else if (this.Platform.OS === "android") {
                 maybeItem = this.AsyncStorage.getItem(key);
                 return maybeItem.then(JSON.parse(maybeItem));
             }
