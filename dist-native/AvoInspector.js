@@ -48,9 +48,12 @@ class AvoInspector {
         this.sessionTracker = new AvoSessionTracker_1.AvoSessionTracker(this.avoBatcher);
         try {
             if (process.env.BROWSER) {
-                window.addEventListener("load", () => {
-                    this.sessionTracker.startOrProlongSession(Date.now());
-                }, false);
+                // XXX make node/browser split clearer
+                if (typeof window !== "undefined") {
+                    window.addEventListener("load", () => {
+                        this.sessionTracker.startOrProlongSession(Date.now());
+                    }, false);
+                }
             }
             else {
                 this.sessionTracker.startOrProlongSession(Date.now());
@@ -72,7 +75,10 @@ class AvoInspector {
     trackSchemaFromEvent(eventName, eventProperties) {
         try {
             if (AvoInspector.shouldLog) {
-                console.log("Avo Inspector: supplied event " + eventName + " with params " + JSON.stringify(eventProperties));
+                console.log("Avo Inspector: supplied event " +
+                    eventName +
+                    " with params " +
+                    JSON.stringify(eventProperties));
             }
             let eventSchema = this.extractSchema(eventProperties);
             this.trackSchema(eventName, eventSchema);
