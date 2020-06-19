@@ -1,30 +1,17 @@
+import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
 import { AvoSessionTracker } from "../AvoSessionTracker";
 import { AvoStorage } from "../AvoStorage";
 
-class EmptyMockAvoBatcher {
-  handleSessionStarted(): void {}
-
-  handleTrackSchema(
-    eventName: string,
-    schema: Array<{
-      propertyName: string;
-      propertyType: string;
-      children?: any;
-    }>
-  ): void {}
-}
+jest.mock("../AvoBatcher");
+jest.mock("../AvoNetworkCallsHandler");
 
 const defaultOptions = {
   apiKey: "apiKey",
   env: AvoInspectorEnv.Prod,
   version: "0",
-};
-
-const mockBatcher = {
-  handleSessionStarted: jest.fn(),
-  handleTrackSchema: jest.fn(),
 };
 
 const sessionTimeMs = 5 * 60 * 1000;
@@ -33,6 +20,8 @@ describe("Sessions", () => {
   process.env.BROWSER = "1";
 
   const storage = new AvoStorage();
+  const networkHandler = new AvoNetworkCallsHandler("key", "dev", "", "1", "1");
+  const mockBatcher = new AvoBatcher(networkHandler);
 
   afterEach(() => {
     jest.clearAllMocks();
@@ -53,7 +42,8 @@ describe("Sessions", () => {
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
     // When
-    let sessionTracker = new AvoSessionTracker(new EmptyMockAvoBatcher());
+    // @ts-ignore
+    let sessionTracker = new AvoSessionTracker(new AvoBatcher());
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
@@ -76,7 +66,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
     expect(AvoSessionTracker.sessionId).not.toBeNull();
     expect(AvoSessionTracker.sessionId).not.toBe(prevSessionId);
-    expect(mockBatcher.handleSessionStarted.mock.calls.length).toBe(1);
+    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
   });
 
   test("Starts new session when time between session calls is greater than time between sessions", () => {
