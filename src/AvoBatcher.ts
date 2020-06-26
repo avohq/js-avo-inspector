@@ -3,7 +3,7 @@ import {
   EventSchemaBody,
   AvoNetworkCallsHandler,
 } from "./AvoNetworkCallsHandler";
-import { AvoInspector } from "./AvoInspector"
+import { AvoInspector } from "./AvoInspector";
 
 export interface AvoBatcherType {
   handleSessionStarted(): void;
