@@ -4,86 +4,86 @@ import * as Inspector from "avo-inspector";
 import "./App.css";
 
 const inspector = new Inspector.AvoInspector({
-    apiKey: "key",
-    env: Inspector.AvoInspectorEnv.Dev,
-    version: "1.0.0",
-    appName: "Demo App",
+  apiKey: "XXX",
+  env: Inspector.AvoInspectorEnv.Dev,
+  version: "1.0.0",
+  appName: "Demo App",
 });
 
 const App = () => {
-    const [schema, setSchema] = useState({
-        eventName: "",
-        propName: "",
-        propValue: "",
+  const [schema, setSchema] = useState({
+    eventName: "",
+    propName: "",
+    propValue: "",
+  });
+
+  const { eventName, propName, propValue } = schema;
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    if (value === " ") return;
+
+    setSchema({
+      ...schema,
+      [name]: value,
     });
+  };
 
-    const { eventName, propName, propValue } = schema;
+  const handleSubmit = (event) => {
+    event.preventDefault();
 
-    const handleChange = (event) => {
-        const { name, value } = event.target;
+    if (eventName === "" || propName === "" || propValue === "") return;
 
-        if (value === " ") return;
+    inspector.trackSchemaFromEvent(eventName, { [propName]: propValue });
+    setSchema({
+      eventName: "",
+      propName: "",
+      propValue: "",
+    });
+  };
 
-        setSchema({
-            ...schema,
-            [name]: value,
-        });
-    };
+  return (
+    <div className="App">
+      <h1>Avo Inspector JavaScript app</h1>
 
-    const handleSubmit = (event) => {
-        event.preventDefault();
+      <form className="App-inspector-form" onSubmit={handleSubmit}>
+        <label>
+          Event Name:
+          <input
+            type="text"
+            name="eventName"
+            value={eventName}
+            onChange={handleChange}
+          />
+        </label>
 
-        if (eventName === "" || propName === "" || propValue === "") return;
+        <label>
+          Prop Name:
+          <input
+            type="text"
+            name="propName"
+            value={propName}
+            onChange={handleChange}
+          />
+        </label>
 
-        inspector.trackSchemaFromEvent(eventName, { [propName]: propValue });
-        setSchema({
-            eventName: "",
-            propName: "",
-            propValue: "",
-        });
-    };
+        <label>
+          Prop Value:
+          <input
+            type="text"
+            name="propValue"
+            value={propValue}
+            onChange={handleChange}
+          />
+        </label>
 
-    return (
-        <div className="App">
-            <h1>Avo Inspector JavaScript app</h1>
-
-            <form className="App-inspector-form" onSubmit={handleSubmit}>
-                <label>
-                    Event Name:
-                    <input
-                        type="text"
-                        name="eventName"
-                        value={eventName}
-                        onChange={handleChange}
-                    />
-                </label>
-
-                <label>
-                    Prop Name:
-                    <input
-                        type="text"
-                        name="propName"
-                        value={propName}
-                        onChange={handleChange}
-                    />
-                </label>
-
-                <label>
-                    Prop Value:
-                    <input
-                        type="text"
-                        name="propValue"
-                        value={propValue}
-                        onChange={handleChange}
-                    />
-                </label>
-
-                <button className="App-button" type="submit">
-                    Track Schema From Event
-                </button>
-            </form>
-        </div>
-    );
+        <button className="App-button" type="submit">
+          Track Schema From Event
+        </button>
+      </form>
+    </div>
+  );
 };
 
 export default App;

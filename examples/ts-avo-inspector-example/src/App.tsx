@@ -4,10 +4,10 @@ import * as Inspector from "avo-inspector";
 import "./App.css";
 
 const inspector = new Inspector.AvoInspector({
-  apiKey: "key",
+  apiKey: "XXX",
   env: Inspector.AvoInspectorEnv.Dev,
   version: "1.0.0",
-  appName: "My App",
+  appName: "Demo App",
 });
 
 const App = () => {
