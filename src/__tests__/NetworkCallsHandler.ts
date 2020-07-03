@@ -1,29 +1,18 @@
 import AvoGuid from "../AvoGuid";
 import { AvoInstallationId } from "../AvoInstallationId";
-import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoNetworkCallsHandler, BaseBody } from "../AvoNetworkCallsHandler";
 import { AvoSessionTracker } from "../AvoSessionTracker";
+
 import xhrMock from "../__mocks__/xhr";
 
+import {
+  defaultOptions,
+  mockedReturns,
+  requestMsg,
+  trackingEndpoint,
+} from "./constants";
+
 const inspectorVersion = process.env.npm_package_version || "";
-
-const trackingEndpoint = "https://api.avo.app/inspector/v1/track";
-const defaultOptions = {
-  apiKey: "apiKey",
-  env: AvoInspectorEnv.Dev,
-  version: "1",
-};
-
-const mockedReturns = {
-  INSTALLATION_ID: "avo-instalation-id",
-  GUID: "generated-guid",
-  SESSION_ID: "session-id",
-};
-
-const request = {
-  ERROR: "Request failed",
-  TIMEOUT: "Request timed out",
-};
 
 describe("NetworkCallsHandler", () => {
   process.env.BROWSER = "1";
@@ -57,7 +46,7 @@ describe("NetworkCallsHandler", () => {
       env,
       "",
       version,
-      inspectorVersion
+      inspectorVersion,
     );
 
     baseBody = {
@@ -94,7 +83,7 @@ describe("NetworkCallsHandler", () => {
 
     const body = networkHandler.bodyForEventSchemaCall(
       eventName,
-      eventProperties
+      eventProperties,
     );
 
     expect(body).toEqual({
@@ -120,7 +109,7 @@ describe("NetworkCallsHandler", () => {
     const sessionStartedBody = networkHandler.bodyForSessionStartedCall();
     const eventBody = networkHandler.bodyForEventSchemaCall(
       eventName,
-      eventProperties
+      eventProperties,
     );
 
     const events = [sessionStartedBody, eventBody];
@@ -132,7 +121,7 @@ describe("NetworkCallsHandler", () => {
 
     expect(xhrMock.setRequestHeader).toBeCalledWith(
       "Content-Type",
-      "text/plain"
+      "text/plain",
     );
 
     expect(xhrMock.send).toBeCalledTimes(1);
@@ -181,7 +170,7 @@ describe("NetworkCallsHandler", () => {
     xhrErrorMock.onerror();
 
     expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith(request.ERROR);
+    expect(customCallback).toBeCalledWith(requestMsg.ERROR);
   });
 
   test("Custom callback is called ontimeout", () => {
@@ -195,6 +184,6 @@ describe("NetworkCallsHandler", () => {
     xhrErrorMock.ontimeout();
 
     expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith(request.TIMEOUT);
+    expect(customCallback).toBeCalledWith(requestMsg.TIMEOUT);
   });
 });
