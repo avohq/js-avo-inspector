@@ -1,18 +1,13 @@
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
-import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
+
+import { defaultOptions } from "./constants";
 
 const inspectorVersion = process.env.npm_package_version || "";
 
 jest.mock("../AvoBatcher");
 jest.mock("../AvoStorage");
-
-const defaultOptions = {
-  apiKey: "apiKey",
-  env: AvoInspectorEnv.Dev,
-  version: "1",
-};
 
 describe("Batcher", () => {
   process.env.BROWSER = "1";
@@ -25,7 +20,7 @@ describe("Batcher", () => {
     env,
     "",
     version,
-    inspectorVersion
+    inspectorVersion,
   );
 
   beforeAll(() => {
@@ -54,14 +49,12 @@ describe("Batcher", () => {
       },
     ];
 
-    // TODO: add children prop
-
     inspector.trackSchema("event name", schema);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
       eventName,
-      schema
+      schema,
     );
   });
 
@@ -81,7 +74,7 @@ describe("Batcher", () => {
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
       eventName,
-      schema
+      schema,
     );
   });
 

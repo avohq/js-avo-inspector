@@ -8,7 +8,7 @@ describe("Avo Storage", () => {
   const key = "avoKey";
   const value = "avoValue";
 
-  test("Set and get item", () => {
+  test("Sets and gets item", () => {
     storage.setItem(key, value);
 
     const item = storage.getItem(key);
@@ -16,7 +16,7 @@ describe("Avo Storage", () => {
     expect(item).toBe(value);
   });
 
-  test("Delete item", () => {
+  test("Deletes item", () => {
     storage.removeItem(key);
 
     const item = storage.getItem(key);
