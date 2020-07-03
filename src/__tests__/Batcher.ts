@@ -1,21 +1,11 @@
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
-import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
 import { AvoStorage } from "../AvoStorage";
 
+import { defaultOptions, networkCallTypes } from "./constants";
+
 const inspectorVersion = process.env.npm_package_version || "";
-
-const defaultOptions = {
-  apiKey: "apiKey",
-  env: AvoInspectorEnv.Dev,
-  version: "1",
-};
-
-const networkCallTypes = {
-  EVENT: "exceed",
-  SESSION_STARTED: "sessionStarted",
-};
 
 describe("Batcher", () => {
   let checkBatchSpy: jest.SpyInstance<any, unknown[]>;
@@ -31,18 +21,18 @@ describe("Batcher", () => {
     env,
     "",
     version,
-    inspectorVersion
+    inspectorVersion,
   );
 
   beforeAll(() => {
     checkBatchSpy = jest.spyOn(
       AvoBatcher.prototype as any,
-      "checkIfBatchNeedsToBeSent"
+      "checkIfBatchNeedsToBeSent",
     );
 
     inspectorCallSpy = jest.spyOn(
       AvoNetworkCallsHandler.prototype as any,
-      "callInspectorWithBatchBody"
+      "callInspectorWithBatchBody",
     );
   });
 
@@ -61,8 +51,10 @@ describe("Batcher", () => {
     expect(events).not.toBeNull();
 
     // @ts-ignore
+    // FIXME: expects Object or null
     expect(events.length).toEqual(1);
     // @ts-ignore
+    // FIXME: expects Object or null
     expect(events[0].type === networkCallTypes.SESSION_STARTED);
   });
 
@@ -112,7 +104,7 @@ describe("Batcher", () => {
   test("Events are retrieved from Storage on init", async () => {
     const getItemAsyncSpy = jest.spyOn(
       AvoStorage.prototype as any,
-      "getItemAsync"
+      "getItemAsync",
     );
 
     await new AvoInspector(defaultOptions);
@@ -181,8 +173,8 @@ describe("Batcher", () => {
       .spyOn(Date, "now")
       .mockImplementation(() =>
         now.setMilliseconds(
-          now.getMilliseconds() + AvoInspector.batchFlushSeconds * 1000 - 1
-        )
+          now.getMilliseconds() + AvoInspector.batchFlushSeconds * 1000 - 1,
+        ),
       );
 
     inspector.avoBatcher.handleTrackSchema("event name", []);
@@ -201,8 +193,8 @@ describe("Batcher", () => {
       .spyOn(Date, "now")
       .mockImplementation(() =>
         now.setMilliseconds(
-          now.getMilliseconds() + AvoInspector.batchFlushSeconds * 1000
-        )
+          now.getMilliseconds() + AvoInspector.batchFlushSeconds * 1000,
+        ),
       );
 
     await inspector.avoBatcher.handleTrackSchema("event name", []);
