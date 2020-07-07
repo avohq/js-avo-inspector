@@ -30,7 +30,7 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-inspector-node-modules-${{ hashFiles('yarn.lock') }}
-        restore-keys: |
+          restore-keys: |
             ${{ runner.os }}-inspector-node-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install yarn dependencies
