@@ -1,0 +1,45 @@
+name: Avo Inspector
+
+on:
+  pull_request:
+    types: [opened, reopened, unlocked, synchronize]
+    paths:
+      - 'src/**'
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node version
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Set up Node cache for Avo Inspector
+        uses: actions/cache@v1
+        id: yarn-cache-avo-inspector
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-inspector-node-modules-${{ hashFiles('yarn.lock') }}
+        restore-keys: |
+            ${{ runner.os }}-inspector-node-modules-${{ hashFiles('yarn.lock') }}
+
+      - name: Install yarn dependencies
+        if: steps.yarn-cache-avo-inspector.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile --network-timeout 1000000
+
+      - name: Build Avo Inspector package
+        run: yarn build
+
+      - name: Test
+        run: |
+          yarn test dist/ --silent
