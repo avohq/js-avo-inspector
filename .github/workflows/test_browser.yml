@@ -40,6 +40,10 @@ jobs:
       - name: Build Avo Inspector package
         run: yarn build
 
-      - name: Test
+      - name: Test Source
         run: |
-          yarn test dist/ --silent
+          yarn test:browser src/ --silent
+
+      - name: Test Build
+        run: |
+          yarn test:browser /dist --silent
