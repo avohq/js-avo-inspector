@@ -11,6 +11,7 @@
     "build-native": "tsc --outDir dist-native",
     "dev": "parcel src/index.ts",
     "test": "jest",
+    "test:browser": "BROWSER=1 jest",
     "typecheck": "tsc --noEmit",
     "commit": "git-cz",
     "release": "release-it"

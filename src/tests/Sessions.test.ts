@@ -9,16 +9,15 @@ jest.mock("../AvoBatcher");
 jest.mock("../AvoNetworkCallsHandler");
 
 const defaultOptions = {
-  apiKey: "apiKey",
+  apiKey: "api-key-xxx",
   env: AvoInspectorEnv.Prod,
   version: "0",
 };
 
+// TODO: Reuse in class implementation and test
 const sessionTimeMs = 5 * 60 * 1000;
 
 describe("Sessions", () => {
-  process.env.BROWSER = "1";
-
   const storage = new AvoStorage();
   const networkHandler = new AvoNetworkCallsHandler("key", "dev", "", "1", "1");
   const mockBatcher = new AvoBatcher(networkHandler);
@@ -27,6 +26,64 @@ describe("Sessions", () => {
     jest.clearAllMocks();
 
     storage.removeItem(AvoSessionTracker.idCacheKey);
+  });
+
+  test("Session started on window.onload", () => {
+    // Given
+    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+
+    let inspector = new AvoInspector(defaultOptions);
+    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
+
+    // When
+    let loadEvent = document.createEvent("Event");
+    loadEvent.initEvent("load", false, false);
+    window.dispatchEvent(loadEvent);
+
+    // Then
+    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
+  });
+
+  test("Session started on trackSchemaFromEvent", () => {
+    // Given
+    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+
+    let inspector = new AvoInspector(defaultOptions);
+    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
+
+    // When
+    inspector.trackSchemaFromEvent("Test event", {});
+
+    // Then
+    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
+  });
+
+  test("Session started on trackSchema", () => {
+    // Given
+    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+
+    let inspector = new AvoInspector(defaultOptions);
+    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
+
+    // When
+    inspector.trackSchema("Test event", []);
+
+    // Then
+    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
+  });
+
+  test("Session started on extractSchema", () => {
+    // Given
+    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+
+    let inspector = new AvoInspector(defaultOptions);
+    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
+
+    // When
+    inspector.extractSchema({});
+
+    // Then
+    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
   });
 
   test("Inits with session tracker", () => {
@@ -75,7 +132,7 @@ describe("Sessions", () => {
 
     storage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      callMoment - sessionTimeMs - 1
+      callMoment - sessionTimeMs - 1,
     );
 
     // When
@@ -97,7 +154,7 @@ describe("Sessions", () => {
 
     storage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      callMoment - sessionTimeMs + 1
+      callMoment - sessionTimeMs + 1,
     );
 
     // When
@@ -118,7 +175,7 @@ describe("Sessions", () => {
 
     storage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      callMoment - sessionTimeMs + 1
+      callMoment - sessionTimeMs + 1,
     );
 
     // When
@@ -130,7 +187,7 @@ describe("Sessions", () => {
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(
-      callMoment + sessionTimeMs
+      callMoment + sessionTimeMs,
     );
     expect(AvoSessionTracker.sessionId).toBe(prevSessionId);
     expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(0);
@@ -169,65 +226,5 @@ describe("Sessions", () => {
 
     // Then
     expect(sessionTracker.sessionLengthMillis).toBe(sessionTimeMs);
-  });
-
-  test("Session started on trackSchemaFromEvent", () => {
-    // Given
-    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-
-    let inspector = new AvoInspector(defaultOptions);
-    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
-
-    // When
-    inspector.trackSchemaFromEvent("Test event", {});
-
-    // Then
-    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
-  });
-
-  test("Session started on trackSchema", () => {
-    // Given
-    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-
-    let inspector = new AvoInspector(defaultOptions);
-    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
-
-    // When
-    inspector.trackSchema("Test event", []);
-
-    // Then
-    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
-  });
-
-  test("Session started on extractSchema", () => {
-    // Given
-    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-
-    let inspector = new AvoInspector(defaultOptions);
-    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
-
-    // When
-    inspector.extractSchema({});
-
-    // Then
-    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
-  });
-
-  test("Session started on window.onload", () => {
-    // Given
-    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-
-    let inspector = new AvoInspector(defaultOptions);
-    inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
-
-    // When
-    let loadEvent = document.createEvent("Event");
-    loadEvent.initEvent("load", false, false);
-    window.dispatchEvent(loadEvent);
-
-    // Then
-    // TODO fix this. Working only in debug mode?
-    mockBatcher.handleSessionStarted();
-    expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(1);
   });
 });

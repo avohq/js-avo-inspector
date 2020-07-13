@@ -4,12 +4,11 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 describe("InstallationId", () => {
-  process.env.BROWSER = "1";
   const storage = new AvoStorage();
 
   beforeAll(() => {
     new AvoInspector({
-      apiKey: "test",
+      apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Dev,
       version: "0",
     });
