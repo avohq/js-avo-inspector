@@ -174,8 +174,7 @@ describe("Initialization", () => {
     expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
   });
 
-  // TODO: is other environmets supported
-  test("Other environment is set", () => {
+  test("Environment other than Dev, Staging, Prod falls back to Dev", () => {
     // When
     const env = "test";
 
@@ -187,7 +186,7 @@ describe("Initialization", () => {
     });
 
     // Then
-    expect(inspector.environment).toBe(env);
+    expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
   });
 
   test("Version is set", () => {
