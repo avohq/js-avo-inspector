@@ -39,7 +39,10 @@ export class AvoInspector {
     appName?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
-    if (options.env === null || options.env === undefined) {
+    
+    if (options.env === null || options.env === undefined || 
+      //@ts-ignore
+      options.env === "") {
       this.environment = AvoInspectorEnv.Dev;
       console.warn(
         "[Avo Inspector] No environment provided. Defaulting to dev."

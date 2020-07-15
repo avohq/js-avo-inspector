@@ -87,9 +87,6 @@ describe("Initialization", () => {
   });
 
   test("Dev environment is used when empty string is used", () => {
-    // FIXME: empty string is set as env
-    return;
-
     // Given
     const env = "";
 
