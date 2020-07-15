@@ -7,7 +7,7 @@
   "react-native": "dist-native/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && BROWSER=1 parcel build src/index.ts",
+    "build": "tsc --emitDeclarationOnly && BROWSER=1 parcel build src/index.ts",
     "build-native": "tsc --outDir dist-native",
     "dev": "parcel src/index.ts",
     "test": "jest",

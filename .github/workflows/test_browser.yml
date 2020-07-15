@@ -43,7 +43,3 @@ jobs:
       - name: Test Source
         run: |
           yarn test:browser src/ --silent
-
-      - name: Test Build
-        run: |
-          yarn test:browser /dist --silent

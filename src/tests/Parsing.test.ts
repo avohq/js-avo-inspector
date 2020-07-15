@@ -128,7 +128,7 @@ describe("Schema Parsing", () => {
     expect(res[0].propertyType).toBe(types.BOOL);
     expect(res[1].propertyType).toBe(types.INT);
     expect(res[2].propertyType).toBe(types.STRING);
-    expect(res[3].propertyType).toBe(types.INT); // FIXME: int returned?
+    expect(res[3].propertyType).toBe(types.INT);
     expect(res[4].propertyType).toBe(types.NULL);
     expect(res[5].propertyType).toBe(types.NULL);
 
