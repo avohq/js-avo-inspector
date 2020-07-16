@@ -1,103 +1,111 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
+const error = {
+  API_KEY:
+    "[Avo Inspector] No API key provided. Inspector can't operate without API key.",
+  VERSION:
+    "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic.",
+};
+
 describe("Initialization", () => {
+  test("Api Key is set", () => {
+    // Given
+    const apiKey = "api-key-xxx";
 
-  process.env.BROWSER = "1";
-
-  test("Api Key", () => {
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
       env: AvoInspectorEnv.Prod,
       version: "0",
+      apiKey,
     });
 
     // Then
-    expect(inspector.apiKey).toBe("apiKey");
+    expect(inspector.apiKey).toBe(apiKey);
   });
 
-  // XXX TODO does not compile, make a .js test against this behavior
-  // test("Undefined api key", () => {
-  //   try {
-  //     new AvoInspector(undefined, AvoInspectorEnv.Prod, "0");
-  //     throw Error(
-  //       "Avo Inspector should throw an error if init without api key"
-  //     );
-  //   } catch (e) {
-  //     expect(e.message).toMatch(
-  //       "[Avo Inspector] No API key provided. Inspector can't operate without API key."
-  //     );
-  //   }
-  // });
+  test("Error is thrown when Api Key is not set", () => {
+    // Given
+    // @ts-ignore
+    let apiKey;
 
-  test("Empty api key", () => {
-    try {
+    // Then
+    expect(() => {
       new AvoInspector({
-        apiKey: "   ",
         env: AvoInspectorEnv.Prod,
         version: "0",
+        // @ts-ignore
+        apiKey,
       });
-      throw Error(
-        "Avo Inspector should throw an error if init with empty api key"
-      );
-    } catch (e) {
-      expect(e.message).toMatch(
-        "[Avo Inspector] No API key provided. Inspector can't operate without API key."
-      );
-    }
+    }).toThrow(error.API_KEY);
   });
 
-  // XXX TODO does not compile, make a .js test against this behavior
-  // test("Null api key", () => {
-  //   try {
-  //     new AvoInspector(null, AvoInspectorEnv.Prod, "0");
-  //     throw Error(
-  //       "Avo Inspector should throw an error if init with null api key"
-  //     );
-  //   } catch (e) {
-  //     expect(e.message).toMatch(
-  //       "[Avo Inspector] No API key provided. Inspector can't operate without API key."
-  //     );
-  //   }
-  // });
+  test("Error is thrown when empty Api Key is used", () => {
+    // Given
+    const apiKey = " ";
 
-  // XXX TODO does not compile, make a .js test against this behavior
-  // test("No Env", () => {
-  //   // When
-  //   let inspector = new AvoInspector("apiKey", undefined, "0");
-  //   // Then
-  //   expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
-  // });
+    // Then
+    expect(() => {
+      new AvoInspector({
+        env: AvoInspectorEnv.Prod,
+        version: "0",
+        apiKey,
+      });
+    }).toThrow(error.API_KEY);
+  });
 
-  test("Prod", () => {
+  test("Error is thrown when Api Key is set to null", () => {
+    // Given
+    const apiKey = null;
+
+    // Then
+    expect(() => {
+      new AvoInspector({
+        env: AvoInspectorEnv.Prod,
+        version: "0",
+        // @ts-ignore
+        apiKey,
+      });
+    }).toThrow(error.API_KEY);
+  });
+
+  test("Dev environment is used when env is not provided", () => {
+    // Given
+    // @ts-ignore
+    let env;
+
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
-      env: AvoInspectorEnv.Prod,
+      apiKey: "api-key-xxx",
       version: "0",
+      // @ts-ignore
+      env,
     });
 
     // Then
-    expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
+    expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
   });
 
-  test("Prod string", () => {
+  test("Dev environment is used when empty string is used", () => {
+    // Given
+    const env = "";
+
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
-      env: "prod",
+      apiKey: "api-key-xxx",
       version: "0",
+      // @ts-ignore
+      env,
     });
 
     // Then
-    expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
+    expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
   });
 
-  test("Dev", () => {
+  test("Dev env is set using AvoInspectorEnv", () => {
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
+      apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Dev,
       version: "0",
     });
@@ -106,10 +114,10 @@ describe("Initialization", () => {
     expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
   });
 
-  test("Dev string", () => {
+  test("Dev environment is set using string", () => {
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
+      apiKey: "api-key-xxx",
       env: "dev",
       version: "0",
     });
@@ -118,10 +126,10 @@ describe("Initialization", () => {
     expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
   });
 
-  test("Staging", () => {
+  test("Staging env is set using AvoInspectorEnv", () => {
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
+      apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Staging,
       version: "0",
     });
@@ -130,10 +138,10 @@ describe("Initialization", () => {
     expect(inspector.environment).toBe(AvoInspectorEnv.Staging);
   });
 
-  test("Staging string", () => {
+  test("Staging environment is set using string", () => {
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
+      apiKey: "api-key-xxx",
       env: "staging",
       version: "0",
     });
@@ -142,60 +150,101 @@ describe("Initialization", () => {
     expect(inspector.environment).toBe(AvoInspectorEnv.Staging);
   });
 
-  test("Version", () => {
+  test("Prod env is set using AvoInspectorEnv", () => {
     // When
     let inspector = new AvoInspector({
-      apiKey: "apiKey",
+      apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Prod,
-      version: "1",
+      version: "0",
     });
 
     // Then
-    expect(inspector.version).toBe("1");
+    expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
   });
 
-  // XXX TODO does not compile, make a .js test against this behavior
-  // test("Undefined version", () => {
-  //   try {
-  //     new AvoInspector("api key", AvoInspectorEnv.Prod, undefined);
-  //     throw Error(
-  //       "Avo Inspector should throw an error if no version is provided"
-  //     );
-  //   } catch (e) {
-  //     expect(e.message).toMatch(
-  //       "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
-  //     );
-  //   }
-  // });
+  test("Prod environment is set using string", () => {
+    // When
+    let inspector = new AvoInspector({
+      apiKey: "api-key-xxx",
+      env: "prod",
+      version: "0",
+    });
 
-  test("Empty version", () => {
-    try {
+    // Then
+    expect(inspector.environment).toBe(AvoInspectorEnv.Prod);
+  });
+
+  test("Environment other than Dev, Staging, Prod falls back to Dev", () => {
+    // When
+    const env = "test";
+
+    let inspector = new AvoInspector({
+      apiKey: "api-key-xxx",
+      version: "0",
+      // @ts-ignore
+      env,
+    });
+
+    // Then
+    expect(inspector.environment).toBe(AvoInspectorEnv.Dev);
+  });
+
+  test("Version is set", () => {
+    const version = "1";
+
+    // When
+    let inspector = new AvoInspector({
+      apiKey: "api-key-xxx",
+      env: AvoInspectorEnv.Prod,
+      version,
+    });
+
+    // Then
+    expect(inspector.version).toBe(version);
+  });
+
+  test("Error is thrown when version is not set", () => {
+    // Given
+    // @ts-ignore
+    let version;
+
+    // Then
+    expect(() => {
       new AvoInspector({
-        apiKey: "api key",
+        apiKey: "api-key-xxx",
         env: AvoInspectorEnv.Prod,
-        version: " ",
+        // @ts-ignore
+        version,
       });
-      throw Error(
-        "Avo Inspector should throw an error if no version is provided"
-      );
-    } catch (e) {
-      expect(e.message).toMatch(
-        "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
-      );
-    }
+    }).toThrow(error.VERSION);
   });
 
-  // XXX TODO does not compile, make a .js test against this behavior
-  // test("Null version", () => {
-  //   try {
-  //     new AvoInspector("api key", AvoInspectorEnv.Prod, null);
-  //     throw Error(
-  //       "Avo Inspector should throw an error if no version is provided"
-  //     );
-  //   } catch (e) {
-  //     expect(e.message).toMatch(
-  //       "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
-  //     );
-  //   }
-  // });
+  test("Error is thrown when version is set to empty string", () => {
+    // Given
+    const version = " ";
+
+    // Then
+    expect(() => {
+      new AvoInspector({
+        apiKey: "api-key-xxx",
+        env: AvoInspectorEnv.Prod,
+        version,
+      });
+    }).toThrow(error.VERSION);
+  });
+
+  test("Error is thrown when version is set to null", () => {
+    // Given
+    const version = null;
+
+    // Then
+    expect(() => {
+      new AvoInspector({
+        apiKey: "api-key-xxx",
+        env: AvoInspectorEnv.Prod,
+        // @ts-ignore
+        version,
+      });
+    }).toThrow(error.VERSION);
+  });
 });

@@ -4,14 +4,28 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 describe("InstallationId", () => {
+  const storage = new AvoStorage();
 
-  process.env.BROWSER = "1";
-  let storage = new AvoStorage();
-  
   beforeAll(() => {
-    storage.removeItem(AvoInstallationId.cacheKey);
+    new AvoInspector({
+      apiKey: "api-key-xxx",
+      env: AvoInspectorEnv.Dev,
+      version: "0",
+    });
+  });
 
-    new AvoInspector({apiKey: "test", env: AvoInspectorEnv.Dev, version: "0"});
+  test(`cacheKey equal to "AvoInstallationId"`, () => {
+    expect(AvoInstallationId.cacheKey).toEqual("AvoInstallationId");
+  });
+
+  test("Sets installationId on AvoInspector init", () => {
+    // Given
+
+    // When
+    let installationId = AvoInstallationId.getInstallationId();
+
+    // Then
+    expect(installationId).not.toBeNull();
   });
 
   test("Creates installation id if not present", () => {
@@ -27,6 +41,8 @@ describe("InstallationId", () => {
 
   test("Reuses installation id if present", () => {
     // Given
+    const newId = "test-installation-id";
+
     storage.setItem(AvoInstallationId.cacheKey, "test-installation-id");
     AvoInstallationId.installationId = null;
 
@@ -34,6 +50,6 @@ describe("InstallationId", () => {
     let installationId = AvoInstallationId.getInstallationId();
 
     // Then
-    expect(installationId).toBe("test-installation-id");
+    expect(installationId).toBe(newId);
   });
 });
