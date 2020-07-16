@@ -5,7 +5,9 @@ import { AvoBatcher } from "./AvoBatcher";
 import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
 
-let libVersion = require("../package.json").version;
+import { isValueEmpty } from "./utils";
+
+const libVersion = require("../package.json").version;
 
 export class AvoInspector {
   environment: AvoInspectorEnvValueType;
@@ -39,34 +41,31 @@ export class AvoInspector {
     appName?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
-    if (options.env === null || options.env === undefined) {
+    if (isValueEmpty(options.env)) {
       this.environment = AvoInspectorEnv.Dev;
       console.warn(
-        "[Avo Inspector] No environment provided. Defaulting to dev."
+        "[Avo Inspector] No environment provided. Defaulting to dev.",
+      );
+    } else if (Object.values(AvoInspectorEnv).indexOf(options.env) === -1) {
+      this.environment = AvoInspectorEnv.Dev;
+      console.warn(
+        "[Avo Inspector] Unsupported environment provided. Defaulting to dev. Supported environments - Dev, Staging, Prod.",
       );
     } else {
       this.environment = options.env;
     }
 
-    if (
-      options.apiKey === null ||
-      options.apiKey === undefined ||
-      options.apiKey.trim().length == 0
-    ) {
+    if (isValueEmpty(options.apiKey)) {
       throw new Error(
-        "[Avo Inspector] No API key provided. Inspector can't operate without API key."
+        "[Avo Inspector] No API key provided. Inspector can't operate without API key.",
       );
     } else {
       this.apiKey = options.apiKey;
     }
 
-    if (
-      options.version === null ||
-      options.version === undefined ||
-      options.version.trim().length == 0
-    ) {
+    if (isValueEmpty(options.version)) {
       throw new Error(
-        "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
+        "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic.",
       );
     } else {
       this.version = options.version;
@@ -87,7 +86,7 @@ export class AvoInspector {
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion
+      libVersion,
     );
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
@@ -101,7 +100,7 @@ export class AvoInspector {
             () => {
               this.sessionTracker.startOrProlongSession(Date.now());
             },
-            false
+            false,
           );
         }
       } else {
@@ -110,14 +109,14 @@ export class AvoInspector {
     } catch (e) {
       console.error(
         "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e
+        e,
       );
     }
   }
 
   trackSchemaFromEvent(
     eventName: string,
-    eventProperties: { [propName: string]: any }
+    eventProperties: { [propName: string]: any },
   ): void {
     try {
       if (AvoInspector.shouldLog) {
@@ -125,7 +124,7 @@ export class AvoInspector {
           "Avo Inspector: supplied event " +
             eventName +
             " with params " +
-            JSON.stringify(eventProperties)
+            JSON.stringify(eventProperties),
         );
       }
       let eventSchema = this.extractSchema(eventProperties);
@@ -133,7 +132,7 @@ export class AvoInspector {
     } catch (e) {
       console.error(
         "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e
+        e,
       );
     }
   }
@@ -144,7 +143,7 @@ export class AvoInspector {
       propertyName: string;
       propertyType: string;
       children?: any;
-    }>
+    }>,
   ): void {
     try {
       this.sessionTracker.startOrProlongSession(Date.now());
@@ -152,7 +151,7 @@ export class AvoInspector {
     } catch (e) {
       console.error(
         "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e
+        e,
       );
     }
   }
@@ -174,7 +173,7 @@ export class AvoInspector {
     } catch (e) {
       console.error(
         "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e
+        e,
       );
       return [];
     }

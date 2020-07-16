@@ -13,16 +13,13 @@ const types = {
 };
 
 describe("Schema Parsing", () => {
-  process.env.BROWSER = "1";
-
   const inspector = new AvoInspector({
-    apiKey: "apiKey",
+    apiKey: "api-key-xxx",
     env: AvoInspectorEnv.Dev,
     version: "0",
   });
 
   test("Empty array returned if eventProperties are not set", () => {
-    // TODO: JS specific
     // @ts-ignore
     const schema = inspector.extractSchema();
 
@@ -111,7 +108,7 @@ describe("Schema Parsing", () => {
     ]);
   });
 
-  test("Empty and falsy values are handled", () => {
+  test("Empty and falsy values are set correctly", () => {
     // Given
     const eventProperties = {
       prop0: false,
@@ -131,7 +128,7 @@ describe("Schema Parsing", () => {
     expect(res[0].propertyType).toBe(types.BOOL);
     expect(res[1].propertyType).toBe(types.INT);
     expect(res[2].propertyType).toBe(types.STRING);
-    expect(res[3].propertyType).toBe(types.INT); // FIXME: int returned?
+    expect(res[3].propertyType).toBe(types.INT);
     expect(res[4].propertyType).toBe(types.NULL);
     expect(res[5].propertyType).toBe(types.NULL);
 
