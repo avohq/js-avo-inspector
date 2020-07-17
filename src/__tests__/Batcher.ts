@@ -172,7 +172,7 @@ describe("Batcher", () => {
       .spyOn(Date, "now")
       .mockImplementation(() =>
         now.setMilliseconds(
-          now.getMilliseconds() + AvoInspector.batchFlushSeconds * 1000 - 1,
+          now.getMilliseconds() + (AvoInspector.batchFlushSeconds - 1) * 1000,
         ),
       );
 
