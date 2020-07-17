@@ -1,8 +1,6 @@
 import { AvoStorage } from "../AvoStorage";
 
 describe("Avo Storage", () => {
-  process.env.BROWSER = "1";
-
   const storage = new AvoStorage();
 
   const key = "avoKey";

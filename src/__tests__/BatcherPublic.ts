@@ -10,8 +10,6 @@ jest.mock("../AvoBatcher");
 jest.mock("../AvoStorage");
 
 describe("Batcher", () => {
-  process.env.BROWSER = "1";
-
   let inspector: AvoInspector;
 
   const { apiKey, env, version } = defaultOptions;

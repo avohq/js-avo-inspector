@@ -6,6 +6,7 @@
 /coverage
 
 /dist
+/dist-native
 /build
 /.cache
 

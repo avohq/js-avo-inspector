@@ -3,15 +3,13 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
 import { AvoStorage } from "../AvoStorage";
 
-import { defaultOptions, networkCallTypes } from "./constants";
+import { defaultOptions, networkCallType } from "./constants";
 
 const inspectorVersion = process.env.npm_package_version || "";
 
 describe("Batcher", () => {
   let checkBatchSpy: jest.SpyInstance<any, unknown[]>;
   let inspectorCallSpy: jest.SpyInstance<any, unknown[]>;
-
-  process.env.BROWSER = "1";
 
   const { apiKey, env, version } = defaultOptions;
 
@@ -50,12 +48,13 @@ describe("Batcher", () => {
 
     expect(events).not.toBeNull();
 
-    // @ts-ignore
     // FIXME: expects Object or null
+    // @ts-ignore
     expect(events.length).toEqual(1);
-    // @ts-ignore
+
     // FIXME: expects Object or null
-    expect(events[0].type === networkCallTypes.SESSION_STARTED);
+    // @ts-ignore
+    expect(events[0].type === networkCallType.SESSION_STARTED);
   });
 
   test("handleTrackSchema adds event to storage", () => {
@@ -71,7 +70,7 @@ describe("Batcher", () => {
     // @ts-ignore
     expect(events.length).toEqual(1);
     // @ts-ignore
-    expect(events[0].type === networkCallTypes.EVENT);
+    expect(events[0].type === networkCallType.EVENT);
   });
 
   test("checkIfBatchNeedsToBeSent is called on Batcher initialization", async () => {
