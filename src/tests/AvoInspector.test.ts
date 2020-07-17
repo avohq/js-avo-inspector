@@ -1,12 +1,7 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
-const error = {
-  API_KEY:
-    "[Avo Inspector] No API key provided. Inspector can't operate without API key.",
-  VERSION:
-    "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic.",
-};
+import { error } from "../__tests__/constants";
 
 describe("Initialization", () => {
   test("Api Key is set", () => {

@@ -1,17 +1,14 @@
 import { AvoInstallationId } from "../AvoInstallationId";
 import { AvoStorage } from "../AvoStorage";
 import { AvoInspector } from "../AvoInspector";
-import { AvoInspectorEnv } from "../AvoInspectorEnv";
+
+import { defaultOptions } from "../__tests__/constants";
 
 describe("InstallationId", () => {
   const storage = new AvoStorage();
 
   beforeAll(() => {
-    new AvoInspector({
-      apiKey: "api-key-xxx",
-      env: AvoInspectorEnv.Dev,
-      version: "0",
-    });
+    new AvoInspector(defaultOptions);
   });
 
   test(`cacheKey equal to "AvoInstallationId"`, () => {

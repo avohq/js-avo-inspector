@@ -1,25 +1,26 @@
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
-import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
 import { AvoSessionTracker } from "../AvoSessionTracker";
 import { AvoStorage } from "../AvoStorage";
 
+import { defaultOptions, sessionTimeMs } from "../__tests__/constants";
+const inspectorVersion = process.env.npm_package_version || "";
+
 jest.mock("../AvoBatcher");
 jest.mock("../AvoNetworkCallsHandler");
 
-const defaultOptions = {
-  apiKey: "api-key-xxx",
-  env: AvoInspectorEnv.Prod,
-  version: "0",
-};
-
-// TODO: Reuse in class implementation and test
-const sessionTimeMs = 5 * 60 * 1000;
-
 describe("Sessions", () => {
+  const { apiKey, env, version } = defaultOptions;
+
   const storage = new AvoStorage();
-  const networkHandler = new AvoNetworkCallsHandler("key", "dev", "", "1", "1");
+  const networkHandler = new AvoNetworkCallsHandler(
+    apiKey,
+    env,
+    "",
+    version,
+    inspectorVersion,
+  );
   const mockBatcher = new AvoBatcher(networkHandler);
 
   afterEach(() => {
