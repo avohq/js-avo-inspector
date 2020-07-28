@@ -47,7 +47,7 @@ describe("Batcher", () => {
       },
     ];
 
-    inspector.trackSchema("event name", schema);
+    inspector.trackSchema(eventName, schema);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(

@@ -1,6 +1,6 @@
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
-import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
+import { AvoNetworkCallsHandler, EventSchemaBody, SessionStartedBody } from "../AvoNetworkCallsHandler";
 import { AvoStorage } from "../AvoStorage";
 
 import { defaultOptions, networkCallType } from "./constants";
@@ -48,11 +48,9 @@ describe("Batcher", () => {
 
     expect(events).not.toBeNull();
 
-    // FIXME: expects Object or null
     // @ts-ignore
     expect(events.length).toEqual(1);
 
-    // FIXME: expects Object or null
     // @ts-ignore
     expect(events[0].type === networkCallType.SESSION_STARTED);
   });
@@ -100,13 +98,13 @@ describe("Batcher", () => {
     expect(checkBatchSpy).toHaveBeenCalledTimes(1);
   });
 
-  test("Events are retrieved from Storage on init", async () => {
+  test("Events are retrieved from Storage on init", () => {
     const getItemAsyncSpy = jest.spyOn(
       AvoStorage.prototype as any,
       "getItemAsync",
     );
 
-    await new AvoInspector(defaultOptions);
+    new AvoInspector(defaultOptions);
 
     expect(getItemAsyncSpy).toHaveBeenCalledTimes(1);
     expect(getItemAsyncSpy).toHaveBeenCalledWith(AvoBatcher.cacheKey);
@@ -205,5 +203,45 @@ describe("Batcher", () => {
     expect(inspectorCallSpy).toHaveBeenCalledWith(events, expect.any(Function));
 
     dateNowSpy.mockRestore();
+  });
+
+  test("Only latest 1000 events are stored in the storage", (done) => {
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    const eventLimit = 1000;
+    let events:Array<SessionStartedBody | EventSchemaBody> = [];
+
+    for (let i = 0; i < eventLimit + 1; i++) {
+      events.push(
+        networkHandler.bodyForEventSchemaCall(`event-name-${i}`, [
+          { propertyName: `prop0`, propertyType: "string" },
+        ])
+      );
+    }
+
+    AvoInspector.avoStorage.setItem(AvoBatcher.cacheKey, events);
+
+    const inspector = new AvoInspector(defaultOptions);
+
+    setTimeout(() => {
+      const setItemsSpy = jest.spyOn(
+        AvoStorage.prototype as any,
+        "setItem",
+      );
+
+      inspector.avoBatcher.handleSessionStarted();
+
+      const savedEvents = AvoInspector.avoStorage.getItem<Array<SessionStartedBody | EventSchemaBody>>(AvoBatcher.cacheKey);
+
+      if (savedEvents !== null && savedEvents.length > 0) {
+        events.push(savedEvents[savedEvents.length - 1]);
+      }
+      events.splice(0, 2);
+      
+      expect(setItemsSpy).toHaveBeenCalledTimes(1);
+      expect(setItemsSpy).toHaveBeenCalledWith(AvoBatcher.cacheKey, events);
+
+      done();
+    }, 1000);
   });
 });
