@@ -12,11 +12,11 @@ For more information about the Inspector project please read [Avo documentation]
 The library is distributed with npm
 
 ```
-    npm i avo-inspector
+    npm i react-native-avo-inspector
 ```
 or
 ```
-    yarn add avo-inspector
+    yarn add react-native-avo-inspector
 ```
 
 # Initialization
