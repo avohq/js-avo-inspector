@@ -68,7 +68,7 @@ export class AvoStorage {
         }
       } else if (this.Platform.OS === "android") {
         maybeItem = this.AsyncStorage.getItem(key);
-        return maybeItem.then(JSON.parse(maybeItem));
+        return maybeItem.then((storedItem: string | null) => { storedItem != null ? JSON.parse(storedItem) : null });
       } else {
         return Promise.resolve(null);
       }
