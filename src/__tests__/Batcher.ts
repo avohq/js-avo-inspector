@@ -60,6 +60,25 @@ describe("Batcher", () => {
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
+    inspector.avoBatcher.handleSessionStarted();
+    inspector.avoBatcher.handleTrackSchema("event name", []);
+
+    const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+
+    if (events !== null) {
+      expect(events.length).toEqual(2);
+      expect(events[0].type === networkCallType.SESSION_STARTED);
+      expect(events[1].type === networkCallType.EVENT);
+    }
+  });
+
+  test("handleTrackSchema adds event to storage", () => {
+    const inspector = new AvoInspector(defaultOptions);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
     inspector.avoBatcher.handleTrackSchema("event name", []);
     const events = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
@@ -209,7 +228,7 @@ describe("Batcher", () => {
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
     const eventLimit = 1000;
-    let events:Array<SessionStartedBody | EventSchemaBody> = [];
+    let events:(SessionStartedBody | EventSchemaBody)[] = [];
 
     for (let i = 0; i < eventLimit + 1; i++) {
       events.push(
@@ -231,7 +250,9 @@ describe("Batcher", () => {
 
       inspector.avoBatcher.handleSessionStarted();
 
-      const savedEvents = AvoInspector.avoStorage.getItem<Array<SessionStartedBody | EventSchemaBody>>(AvoBatcher.cacheKey);
+      const savedEvents = AvoInspector.avoStorage.getItem<(EventSchemaBody | SessionStartedBody)[]>(AvoBatcher.cacheKey);
+
+      expect(savedEvents).not.toBeNull();
 
       if (savedEvents !== null && savedEvents.length > 0) {
         events.push(savedEvents[savedEvents.length - 1]);
