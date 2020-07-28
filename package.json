@@ -1,6 +1,6 @@
 {
-  "name": "avo-inspector",
-  "version": "1.0.5",
+  "name": "react-native-avo-inspector",
+  "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
