@@ -23,7 +23,7 @@ describe("Avo Storage", () => {
     expect(item).toBe(value);
   });
 
-  test("Returns null if key does not exist", async () => {
+  test("Returns null if key does not exist", () => {
     storage.removeItem(key);
 
     const item = storage.getItem(key);
