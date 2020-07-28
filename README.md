@@ -1,4 +1,4 @@
-# Avo Inspector
+# Avo Inspector For React Native
 
 [![npm version](https://badge.fury.io/js/react-native-avo-inspector.svg)](https://badge.fury.io/js/react-native-avo-inspector)
 
