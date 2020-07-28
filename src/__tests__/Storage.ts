@@ -14,6 +14,23 @@ describe("Avo Storage", () => {
     expect(item).toBe(value);
   });
 
+  test("Gets item asynchronously", async () => {
+    storage.removeItem(key);
+    storage.setItem(key, value);
+
+    const item = await storage.getItemAsync(key);
+
+    expect(item).toBe(value);
+  });
+
+  test("Returns null if key does not exist", async () => {
+    storage.removeItem(key);
+
+    const item = storage.getItem(key);
+
+    expect(item).toBeNull();
+  });
+
   test("Deletes item", () => {
     storage.removeItem(key);
 
