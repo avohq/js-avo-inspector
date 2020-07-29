@@ -1,23 +1,8 @@
 import { AvoInspector } from "../AvoInspector";
-import { AvoInspectorEnv } from "../AvoInspectorEnv";
-
-const types = {
-  STRING: "string",
-  INT: "int",
-  OBJECT: "object",
-  FLOAT: "float",
-  LIST: "list",
-  BOOL: "boolean",
-  NULL: "null",
-  UNKNOWN: "unknown",
-};
+import { defaultOptions, type } from "../__tests__/constants";
 
 describe("Schema Parsing", () => {
-  const inspector = new AvoInspector({
-    apiKey: "api-key-xxx",
-    env: AvoInspectorEnv.Dev,
-    version: "0",
-  });
+  const inspector = new AvoInspector(defaultOptions);
 
   test("Empty array returned if eventProperties are not set", () => {
     // @ts-ignore
@@ -56,36 +41,36 @@ describe("Schema Parsing", () => {
       expect(propertyName).toBe(`prop${index}`);
     });
 
-    expect(res[0].propertyType).toBe(types.BOOL);
-    expect(res[1].propertyType).toBe(types.INT);
-    expect(res[2].propertyType).toBe(types.STRING);
-    expect(res[3].propertyType).toBe(types.FLOAT);
-    expect(res[4].propertyType).toBe(types.NULL);
-    expect(res[5].propertyType).toBe(types.NULL);
+    expect(res[0].propertyType).toBe(type.BOOL);
+    expect(res[1].propertyType).toBe(type.INT);
+    expect(res[2].propertyType).toBe(type.STRING);
+    expect(res[3].propertyType).toBe(type.FLOAT);
+    expect(res[4].propertyType).toBe(type.NULL);
+    expect(res[5].propertyType).toBe(type.NULL);
 
-    expect(res[6].propertyType).toBe(types.OBJECT);
+    expect(res[6].propertyType).toBe(type.OBJECT);
     expect(res[6].children).toMatchObject([
       {
         propertyName: "an",
-        propertyType: types.STRING,
+        propertyType: type.STRING,
       },
     ]);
 
-    expect(res[7].propertyType).toBe(types.LIST);
+    expect(res[7].propertyType).toBe(type.LIST);
     expect(res[7].children).toMatchObject([
-      types.STRING,
+      type.STRING,
       [
         {
           propertyName: "obj in list",
-          propertyType: types.BOOL,
+          propertyType: type.BOOL,
         },
         {
           propertyName: "int field",
-          propertyType: types.INT,
+          propertyType: type.INT,
         },
       ],
-      [types.STRING],
-      [types.INT],
+      [type.STRING],
+      [type.INT],
     ]);
   });
 
@@ -99,12 +84,12 @@ describe("Schema Parsing", () => {
     const res = inspector.extractSchema(eventProperties);
 
     // Then
-    expect(res[0].propertyType).toBe(types.LIST);
+    expect(res[0].propertyType).toBe(type.LIST);
     expect(res[0].children).toMatchObject([
-      types.STRING,
-      types.BOOL,
-      types.INT,
-      types.FLOAT,
+      type.STRING,
+      type.BOOL,
+      type.INT,
+      type.FLOAT,
     ]);
   });
 
@@ -125,17 +110,17 @@ describe("Schema Parsing", () => {
     const res = inspector.extractSchema(eventProperties);
 
     // Then
-    expect(res[0].propertyType).toBe(types.BOOL);
-    expect(res[1].propertyType).toBe(types.INT);
-    expect(res[2].propertyType).toBe(types.STRING);
-    expect(res[3].propertyType).toBe(types.INT);
-    expect(res[4].propertyType).toBe(types.NULL);
-    expect(res[5].propertyType).toBe(types.NULL);
+    expect(res[0].propertyType).toBe(type.BOOL);
+    expect(res[1].propertyType).toBe(type.INT);
+    expect(res[2].propertyType).toBe(type.STRING);
+    expect(res[3].propertyType).toBe(type.INT);
+    expect(res[4].propertyType).toBe(type.NULL);
+    expect(res[5].propertyType).toBe(type.NULL);
 
-    expect(res[6].propertyType).toBe(types.OBJECT);
+    expect(res[6].propertyType).toBe(type.OBJECT);
     expect(res[6].children).toMatchObject([]);
 
-    expect(res[7].propertyType).toBe(types.LIST);
+    expect(res[7].propertyType).toBe(type.LIST);
     expect(res[7].children).toMatchObject([]);
   });
 });

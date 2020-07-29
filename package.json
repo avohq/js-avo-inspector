@@ -26,8 +26,9 @@
       "^.+\\.[t]sx?$": "ts-jest"
     },
     "testPathIgnorePatterns": [
-      "node_modules",
-      "examples"
+      "constants",
+      "examples",
+      "node_modules"
     ],
     "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
     "moduleFileExtensions": [
