@@ -100,8 +100,7 @@ describe("Sessions", () => {
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
     // When
-    // @ts-ignore
-    let sessionTracker = new AvoSessionTracker(new AvoBatcher());
+    let sessionTracker = new AvoSessionTracker(new AvoBatcher(networkHandler));
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(0);

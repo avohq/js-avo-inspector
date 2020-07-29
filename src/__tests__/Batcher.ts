@@ -44,15 +44,14 @@ describe("Batcher", () => {
 
     inspector.avoBatcher.handleSessionStarted();
 
-    const events = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+    const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
     expect(events).not.toBeNull();
 
-    // @ts-ignore
-    expect(events.length).toEqual(1);
-
-    // @ts-ignore
-    expect(events[0].type === networkCallType.SESSION_STARTED);
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect(events[0].type === networkCallType.SESSION_STARTED);
+    }
   });
 
   test("handleTrackSchema adds event to storage", () => {
@@ -80,14 +79,14 @@ describe("Batcher", () => {
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
     inspector.avoBatcher.handleTrackSchema("event name", []);
-    const events = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+    const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
     expect(events).not.toBeNull();
 
-    // @ts-ignore
-    expect(events.length).toEqual(1);
-    // @ts-ignore
-    expect(events[0].type === networkCallType.EVENT);
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect(events[0].type === networkCallType.EVENT);
+    }
   });
 
   test("checkIfBatchNeedsToBeSent is called on Batcher initialization", async () => {
