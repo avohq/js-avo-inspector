@@ -15,7 +15,6 @@ import {
 const inspectorVersion = process.env.npm_package_version || "";
 
 describe("NetworkCallsHandler", () => {
-  process.env.BROWSER = "1";
   const { apiKey, env, version } = defaultOptions;
   const appName = "";
 
