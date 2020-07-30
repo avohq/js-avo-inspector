@@ -1,41 +1,89 @@
-import React from 'react';
-import './App.css';
-import * as Inspector from 'avo-inspector';
+import React, { useState } from "react";
+import * as Inspector from "avo-inspector";
 
-function App() {
-  let inspector = new Inspector.AvoInspector({
-    apiKey: "key", env: "dev", version: "1.0.0", appName: "My App"
+import "./App.css";
+
+const inspector = new Inspector.AvoInspector({
+  apiKey: "XXX",
+  env: Inspector.AvoInspectorEnv.Dev,
+  version: "1.0.0",
+  appName: "Demo App",
+});
+
+const App = () => {
+  const [schema, setSchema] = useState({
+    eventName: "",
+    propName: "",
+    propValue: "",
   });
-  inspector.trackSchemaFromEvent("Js Event Name", {"prop0": "str", "prop1": true, "prop2": 10});
-  
-  inspector.trackSchema("Js Event Name", { "prop0": new Inspector.AvoType.Int(), "prop1": new Inspector.AvoType.List(), 
-    "prop2": new Inspector.AvoType.Null() });
-  inspector.enableLogging(true);
-  inspector.extractSchema({ "prop0": true, "prop1": 1, "prop2": "str" });
-//  inspector.setBatchSize(10);
-//  inspector.setBatchFlushSeconds(5);
+
+  const { eventName, propName, propValue } = schema;
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    if (value === " ") return;
+
+    setSchema({
+      ...schema,
+      [name]: value,
+    });
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    if (eventName === "" || propName === "" || propValue === "") return;
+
+    inspector.trackSchemaFromEvent(eventName, { [propName]: propValue });
+    setSchema({
+      eventName: "",
+      propName: "",
+      propValue: "",
+    });
+  };
 
   return (
     <div className="App">
-      <form>
+      <h1>Avo Inspector JavaScript app</h1>
+
+      <form className="App-inspector-form" onSubmit={handleSubmit}>
         <label>
-          Event name:
-          <input type="text" name="name" />
+          Event Name:
+          <input
+            type="text"
+            name="eventName"
+            value={eventName}
+            onChange={handleChange}
+          />
         </label>
-          <div>
-          <label>
-            Prop name:
-            <input type="text" name="name" />
-          </label>
-          <label>
-            Prop value:
-            <input type="text" name="name" />
-          </label>
-          <input type="submit" value="Send event" />
-        </div>
+
+        <label>
+          Prop Name:
+          <input
+            type="text"
+            name="propName"
+            value={propName}
+            onChange={handleChange}
+          />
+        </label>
+
+        <label>
+          Prop Value:
+          <input
+            type="text"
+            name="propValue"
+            value={propValue}
+            onChange={handleChange}
+          />
+        </label>
+
+        <button className="App-button" type="submit">
+          Track Schema From Event
+        </button>
       </form>
     </div>
   );
-}
+};
 
 export default App;

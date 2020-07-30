@@ -75,7 +75,7 @@ export class AvoStorage {
     }
   }
 
-  getItem = <T>(key: string): T | null => {
+  getItem<T>(key: string): T | null {
     let maybeItem;
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
@@ -96,7 +96,7 @@ export class AvoStorage {
     }
   };
 
-  setItem = <T>(key: string, value: T): void => {
+  setItem<T>(key: string, value: T): void {
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(key, JSON.stringify(value));
@@ -112,7 +112,7 @@ export class AvoStorage {
     }
   };
 
-  removeItem = (key: string): void => {
+  removeItem(key: string): void {
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(key);

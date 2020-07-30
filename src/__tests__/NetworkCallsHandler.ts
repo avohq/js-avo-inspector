@@ -1,0 +1,188 @@
+import AvoGuid from "../AvoGuid";
+import { AvoInstallationId } from "../AvoInstallationId";
+import { AvoNetworkCallsHandler, BaseBody } from "../AvoNetworkCallsHandler";
+import { AvoSessionTracker } from "../AvoSessionTracker";
+
+import xhrMock from "../__mocks__/xhr";
+
+import {
+  defaultOptions,
+  mockedReturns,
+  requestMsg,
+  trackingEndpoint,
+} from "./constants";
+
+const inspectorVersion = process.env.npm_package_version || "";
+
+describe("NetworkCallsHandler", () => {
+  const { apiKey, env, version } = defaultOptions;
+  const appName = "";
+
+  let networkHandler: AvoNetworkCallsHandler;
+  let baseBody: BaseBody;
+
+  const customCallback = jest.fn();
+  const now = new Date();
+
+  beforeAll(() => {
+    // @ts-ignore
+    jest.spyOn(global, "Date").mockImplementation(() => now);
+
+    jest
+      .spyOn(AvoInstallationId as any, "getInstallationId")
+      .mockImplementation(() => mockedReturns.INSTALLATION_ID);
+
+    jest
+      .spyOn(AvoGuid as any, "newGuid")
+      .mockImplementation(() => mockedReturns.GUID);
+
+    jest
+      .spyOn(AvoSessionTracker as any, "sessionId", "get")
+      .mockImplementation(() => mockedReturns.SESSION_ID);
+
+    networkHandler = new AvoNetworkCallsHandler(
+      apiKey,
+      env,
+      "",
+      version,
+      inspectorVersion,
+    );
+
+    baseBody = {
+      apiKey,
+      appName,
+      appVersion: version,
+      libVersion: inspectorVersion,
+      env,
+      libPlatform: "web",
+      messageId: mockedReturns.GUID,
+      trackingId: mockedReturns.INSTALLATION_ID,
+      createdAt: new Date().toISOString(),
+      sessionId: mockedReturns.SESSION_ID,
+      samplingRate: 1.0,
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("bodyForSessionStartedCall returns base body + session started body used for session started", () => {
+    const body = networkHandler.bodyForSessionStartedCall();
+
+    expect(body).toEqual({
+      ...baseBody,
+      type: "sessionStarted",
+    });
+  });
+
+  test("bodyForEventSchemaCall returns base body + event schema used for event sending", () => {
+    const eventName = "event name";
+    const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
+
+    const body = networkHandler.bodyForEventSchemaCall(
+      eventName,
+      eventProperties,
+    );
+
+    expect(body).toEqual({
+      ...baseBody,
+      type: "event",
+      eventName,
+      eventProperties,
+    });
+  });
+
+  test("POST request is not sent if event list is empty", () => {
+    const events: any = [];
+
+    networkHandler.callInspectorWithBatchBody(events, customCallback);
+
+    expect(xhrMock.open).not.toBeCalled();
+  });
+
+  test("callInspectorWithBatchBody sends POST request", () => {
+    const eventName = "event name";
+    const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
+
+    const sessionStartedBody = networkHandler.bodyForSessionStartedCall();
+    const eventBody = networkHandler.bodyForEventSchemaCall(
+      eventName,
+      eventProperties,
+    );
+
+    const events = [sessionStartedBody, eventBody];
+
+    networkHandler.callInspectorWithBatchBody(events, customCallback);
+
+    expect(xhrMock.open).toBeCalledTimes(1);
+    expect(xhrMock.open).toBeCalledWith("POST", trackingEndpoint, true);
+
+    expect(xhrMock.setRequestHeader).toBeCalledWith(
+      "Content-Type",
+      "text/plain",
+    );
+
+    expect(xhrMock.send).toBeCalledTimes(1);
+    expect(xhrMock.send).toBeCalledWith(JSON.stringify(events));
+
+    xhrMock.onload();
+
+    expect(customCallback).toBeCalledTimes(1);
+    expect(customCallback).toBeCalledWith(null);
+  });
+
+  test("Custom callback is called when 200 OK", () => {
+    const sessionStartedBody = networkHandler.bodyForSessionStartedCall();
+    const events = [sessionStartedBody];
+
+    networkHandler.callInspectorWithBatchBody(events, customCallback);
+
+    xhrMock.onload();
+
+    expect(customCallback).toBeCalledTimes(1);
+    expect(customCallback).toBeCalledWith(null);
+  });
+
+  test("Custom callback is called with error when not 200 OK", () => {
+    const xhrErrorMock = require("../__mocks__/xhrError").default;
+
+    const sessionStartedBody = networkHandler.bodyForSessionStartedCall();
+    const events = [sessionStartedBody];
+
+    networkHandler.callInspectorWithBatchBody(events, customCallback);
+
+    xhrErrorMock.onload();
+
+    expect(customCallback).toBeCalledTimes(1);
+    expect(customCallback).toBeCalledWith("Error 400: Bad Request");
+  });
+
+  test("Custom callback is called onerror", () => {
+    const xhrErrorMock = require("../__mocks__/xhrError").default;
+
+    const sessionStartedBody = networkHandler.bodyForSessionStartedCall();
+    const events = [sessionStartedBody];
+
+    networkHandler.callInspectorWithBatchBody(events, customCallback);
+
+    xhrErrorMock.onerror();
+
+    expect(customCallback).toBeCalledTimes(1);
+    expect(customCallback).toBeCalledWith(requestMsg.ERROR);
+  });
+
+  test("Custom callback is called ontimeout", () => {
+    const xhrErrorMock = require("../__mocks__/xhrError").default;
+
+    const sessionStartedBody = networkHandler.bodyForSessionStartedCall();
+    const events = [sessionStartedBody];
+
+    networkHandler.callInspectorWithBatchBody(events, customCallback);
+
+    xhrErrorMock.ontimeout();
+
+    expect(customCallback).toBeCalledTimes(1);
+    expect(customCallback).toBeCalledWith(requestMsg.TIMEOUT);
+  });
+});
