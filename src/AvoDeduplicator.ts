@@ -1,0 +1,183 @@
+import { AvoSchemaParser } from "./AvoSchemaParser";
+import { deepEquals } from "./utils";
+
+export class AvoDeduplicator {
+  avoFunctionsEvents: { [time: number]: string } = {};
+  manualEvents: { [time: number]: string } = {};
+
+  avoFunctionsEventsParams: {
+    [eventName: string]: { [propName: string]: any };
+  } = {};
+  manualEventsParams: { [eventName: string]: { [propName: string]: any } } = {};
+
+  shouldRegisterEvent(
+    eventName: string,
+    params: { [propName: string]: any },
+    fromAvoFunction: boolean
+  ): boolean {
+    this.clearOldEvents();
+
+    if (fromAvoFunction) {
+      this.avoFunctionsEvents[Date.now()] = eventName;
+      this.avoFunctionsEventsParams[eventName] = params;
+    } else {
+      this.manualEvents[Date.now()] = eventName;
+      this.manualEventsParams[eventName] = params;
+    }
+
+    let checkInAvoFunctions = !fromAvoFunction;
+
+    return !this.hasSameEventAs(eventName, params, checkInAvoFunctions);
+  }
+
+  private hasSameEventAs(
+    eventName: string,
+    params: { [propName: string]: any },
+    checkInAvoFunctions: boolean
+  ): boolean {
+    let result = false;
+
+    if (checkInAvoFunctions) {
+      for (const otherEventName in this.avoFunctionsEventsParams) {
+        if (this.avoFunctionsEventsParams.hasOwnProperty(otherEventName)) {
+          if (otherEventName === eventName) {
+            const otherParams = this.avoFunctionsEventsParams[eventName];
+            if (deepEquals(params, otherParams)) {
+              result = true;
+              break;
+            }
+          }
+        }
+      }
+    } else {
+      for (const otherEventName in this.manualEventsParams) {
+        if (this.manualEventsParams.hasOwnProperty(otherEventName)) {
+          if (otherEventName === eventName) {
+            const otherParams = this.manualEventsParams[eventName];
+            if (deepEquals(params, otherParams)) {
+              result = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (result) {
+      delete this.avoFunctionsEventsParams[eventName];
+      delete this.manualEventsParams[eventName];
+    }
+
+    return result;
+  }
+
+  hasSeenEventParams(
+    params: { [propName: string]: any },
+    checkInAvoFunctions: boolean
+  ) {
+    let result = false;
+
+    if (checkInAvoFunctions) {
+      for (const otherEventName in this.avoFunctionsEventsParams) {
+        if (this.avoFunctionsEventsParams.hasOwnProperty(otherEventName)) {
+          const otherParams = this.avoFunctionsEventsParams[otherEventName];
+          if (deepEquals(params, otherParams)) {
+            result = true;
+            break;
+          }
+        }
+      }
+    } else {
+      for (const otherEventName in this.manualEventsParams) {
+        if (this.manualEventsParams.hasOwnProperty(otherEventName)) {
+          const otherParams = this.manualEventsParams[otherEventName];
+          if (deepEquals(params, otherParams)) {
+            result = true;
+            break;
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  shouldRegisterSchemaFromManually(
+    eventName: string,
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+    }>
+  ): boolean {
+    this.clearOldEvents();
+
+    return !this.hasSameShapeInAvoFunctionsAs(eventName, eventSchema);
+  }
+
+  private hasSameShapeInAvoFunctionsAs(
+    eventName: string,
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+    }>
+  ): boolean {
+    let result = false;
+
+    for (const otherEventName in this.avoFunctionsEventsParams) {
+      if (this.avoFunctionsEventsParams.hasOwnProperty(otherEventName)) {
+        if (otherEventName === eventName) {
+          const otherSchema = AvoSchemaParser.extractSchema(
+            this.avoFunctionsEventsParams[eventName]
+          );
+          if (deepEquals(eventSchema, otherSchema)) {
+            result = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (result) {
+      delete this.avoFunctionsEventsParams[eventName];
+    }
+
+    return result;
+  }
+
+  private clearOldEvents() {
+    const now = Date.now();
+    const msToConsiderOld = 300;
+
+    for (const time in this.avoFunctionsEvents) {
+      if (this.avoFunctionsEvents.hasOwnProperty(time)) {
+        const timestamp = Number(time) || 0;
+        if (now - timestamp > msToConsiderOld) {
+          const eventName = this.avoFunctionsEvents[time];
+          delete this.avoFunctionsEvents[time];
+          delete this.avoFunctionsEventsParams[eventName];
+        }
+      }
+    }
+
+    for (const time in this.manualEvents) {
+      if (this.manualEvents.hasOwnProperty(time)) {
+        const timestamp = Number(time) || 0;
+        if (now - timestamp > msToConsiderOld) {
+          const eventName = this.manualEvents[time];
+          delete this.manualEvents[time];
+          delete this.manualEventsParams[eventName];
+        }
+      }
+    }
+  }
+
+  private _clearEvents() {
+    this.avoFunctionsEvents = {};
+    this.manualEvents = {};
+
+    this.avoFunctionsEventsParams = {};
+    this.manualEventsParams = {};
+  }
+}
