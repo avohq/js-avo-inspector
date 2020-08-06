@@ -38,28 +38,12 @@ export class AvoDeduplicator {
     let result = false;
 
     if (checkInAvoFunctions) {
-      for (const otherEventName in this.avoFunctionsEventsParams) {
-        if (this.avoFunctionsEventsParams.hasOwnProperty(otherEventName)) {
-          if (otherEventName === eventName) {
-            const otherParams = this.avoFunctionsEventsParams[eventName];
-            if (deepEquals(params, otherParams)) {
-              result = true;
-              break;
-            }
-          }
-        }
+      if (this.lookForEventIn(eventName, params, this.avoFunctionsEventsParams)) {
+        result = true;
       }
     } else {
-      for (const otherEventName in this.manualEventsParams) {
-        if (this.manualEventsParams.hasOwnProperty(otherEventName)) {
-          if (otherEventName === eventName) {
-            const otherParams = this.manualEventsParams[eventName];
-            if (deepEquals(params, otherParams)) {
-              result = true;
-              break;
-            }
-          }
-        }
+      if (this.lookForEventIn(eventName, params, this.manualEventsParams)) {
+        result = true;
       }
     }
 
@@ -71,6 +55,23 @@ export class AvoDeduplicator {
     return result;
   }
 
+  private lookForEventIn(
+      eventName: string,
+      params: { [propName: string]: any }, 
+      eventsStorage: { [eventName: string]: { [propName: string]: any } }): boolean {
+    for (const otherEventName in eventsStorage) {
+      if (eventsStorage.hasOwnProperty(otherEventName)) {
+        if (otherEventName === eventName) {
+          const otherParams = eventsStorage[eventName];
+          if (otherParams && deepEquals(params, otherParams)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   hasSeenEventParams(
     params: { [propName: string]: any },
     checkInAvoFunctions: boolean
@@ -78,28 +79,30 @@ export class AvoDeduplicator {
     let result = false;
 
     if (checkInAvoFunctions) {
-      for (const otherEventName in this.avoFunctionsEventsParams) {
-        if (this.avoFunctionsEventsParams.hasOwnProperty(otherEventName)) {
-          const otherParams = this.avoFunctionsEventsParams[otherEventName];
-          if (deepEquals(params, otherParams)) {
-            result = true;
-            break;
-          }
-        }
+      if (this.lookForEventParamsIn(params, this.avoFunctionsEventsParams)) {
+        result = true;
       }
     } else {
-      for (const otherEventName in this.manualEventsParams) {
-        if (this.manualEventsParams.hasOwnProperty(otherEventName)) {
-          const otherParams = this.manualEventsParams[otherEventName];
-          if (deepEquals(params, otherParams)) {
-            result = true;
-            break;
-          }
-        }
+      if (this.lookForEventParamsIn(params, this.manualEventsParams)) {
+        result = true;
       }
     }
 
     return result;
+  }
+
+  private lookForEventParamsIn(
+    params: { [propName: string]: any }, 
+    eventsStorage: { [eventName: string]: { [propName: string]: any } }): boolean {
+      for (const otherEventName in eventsStorage) {
+        if (eventsStorage.hasOwnProperty(otherEventName)) {
+          const otherParams = eventsStorage[otherEventName];
+          if (otherParams && deepEquals(params, otherParams)) {
+            return true;
+          }
+        }
+      }
+    return false;
   }
 
   shouldRegisterSchemaFromManually(
@@ -125,18 +128,8 @@ export class AvoDeduplicator {
   ): boolean {
     let result = false;
 
-    for (const otherEventName in this.avoFunctionsEventsParams) {
-      if (this.avoFunctionsEventsParams.hasOwnProperty(otherEventName)) {
-        if (otherEventName === eventName) {
-          const otherSchema = AvoSchemaParser.extractSchema(
-            this.avoFunctionsEventsParams[eventName]
-          );
-          if (deepEquals(eventSchema, otherSchema)) {
-            result = true;
-            break;
-          }
-        }
-      }
+    if (this.lookForEventSchemaIn(eventName, eventSchema, this.avoFunctionsEventsParams)) {
+      result = true;
     }
 
     if (result) {
@@ -144,6 +137,30 @@ export class AvoDeduplicator {
     }
 
     return result;
+  }
+
+  private lookForEventSchemaIn(
+    eventName: string,
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+    }>, 
+    eventsStorage: { [eventName: string]: { [propName: string]: any } }): boolean {
+      for (const otherEventName in eventsStorage) {
+        if (eventsStorage.hasOwnProperty(otherEventName)) {
+          if (otherEventName === eventName) {
+            const otherSchema = AvoSchemaParser.extractSchema(
+              eventsStorage[eventName]
+            );
+            if (otherSchema && deepEquals(eventSchema, otherSchema)) {
+              return true;
+            }
+          }
+        }
+      }
+     
+    return false;
   }
 
   private clearOldEvents() {
@@ -173,6 +190,7 @@ export class AvoDeduplicator {
     }
   }
 
+  // used in tests
   private _clearEvents() {
     this.avoFunctionsEvents = {};
     this.manualEvents = {};
