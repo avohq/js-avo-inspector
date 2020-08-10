@@ -2062,10 +2062,8 @@ autoprefixer@^9.6.1:
     postcss "^7.0.26"
     postcss-value-parser "^4.0.2"
 
-avo-inspector@0.1.0:
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/avo-inspector/-/avo-inspector-0.1.0.tgz#edee72da8572fd3599264d36eaa281f9b188eda6"
-  integrity sha512-LKaveCveoLx6dQ/QGL5vgDEzz9YlewnVjNGZHYUCwIWWtlv3GCSwW8ZboWfLE5Q/yYXdImAER8g+rmzXn+MpkA==
+"avo-inspector@file:../..":
+  version "1.0.5"
 
 aws-sign2@~0.7.0:
   version "0.7.0"
