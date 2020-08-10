@@ -4,6 +4,10 @@ import { defaultOptions, type } from "../__tests__/constants";
 describe("Schema Parsing", () => {
   const inspector = new AvoInspector(defaultOptions);
 
+  beforeAll(() => {
+    inspector.enableLogging(false);
+  });
+
   test("Empty array returned if eventProperties are not set", () => {
     // @ts-ignore
     const schema = inspector.extractSchema();

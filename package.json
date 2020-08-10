@@ -28,7 +28,9 @@
     "testPathIgnorePatterns": [
       "constants",
       "examples",
-      "node_modules"
+      "node_modules",
+      "dist",
+      "dist-native"
     ],
     "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
     "moduleFileExtensions": [

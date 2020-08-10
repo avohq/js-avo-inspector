@@ -76,13 +76,14 @@ describe("NetworkCallsHandler", () => {
     });
   });
 
-  test("bodyForEventSchemaCall returns base body + event schema used for event sending", () => {
+  test("bodyForEventSchemaCall returns base body + event schema used for event sending from non avo functions", () => {
     const eventName = "event name";
     const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
 
     const body = networkHandler.bodyForEventSchemaCall(
       eventName,
       eventProperties,
+      null, null
     );
 
     expect(body).toEqual({
@@ -90,6 +91,33 @@ describe("NetworkCallsHandler", () => {
       type: "event",
       eventName,
       eventProperties,
+      avoFunction: false,
+      eventId: null,
+      eventHash: null
+    });
+  });
+
+  test("bodyForEventSchemaCall returns base body + event schema used for event sending from avo functions", () => {
+    const eventName = "event name";
+    const eventId = "event id";
+    const eventHash = "event hash";
+    const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
+
+    const body = networkHandler.bodyForEventSchemaCall(
+      eventName,
+      eventProperties,
+      eventId, 
+      eventHash
+    );
+
+    expect(body).toEqual({
+      ...baseBody,
+      type: "event",
+      eventName,
+      eventProperties,
+      avoFunction: true,
+      eventId,
+      eventHash
     });
   });
 
@@ -109,6 +137,7 @@ describe("NetworkCallsHandler", () => {
     const eventBody = networkHandler.bodyForEventSchemaCall(
       eventName,
       eventProperties,
+      null, null
     );
 
     const events = [sessionStartedBody, eventBody];

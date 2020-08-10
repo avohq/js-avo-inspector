@@ -34,6 +34,7 @@ describe("Sessions", () => {
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
     let inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
@@ -50,6 +51,7 @@ describe("Sessions", () => {
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
     let inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
@@ -64,6 +66,7 @@ describe("Sessions", () => {
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
     let inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
@@ -78,6 +81,7 @@ describe("Sessions", () => {
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
     let inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When

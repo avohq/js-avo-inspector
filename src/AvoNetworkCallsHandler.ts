@@ -29,6 +29,9 @@ export interface EventSchemaBody extends BaseBody {
     propertyType: string;
     children?: any;
   }>;
+  avoFunction: boolean;
+  eventId: string | null;
+  eventHash: string | null;
 }
 
 export class AvoNetworkCallsHandler {
@@ -164,12 +167,25 @@ export class AvoNetworkCallsHandler {
       propertyName: string;
       propertyType: string;
       children?: any;
-    }>
+    }>,
+    eventId: string | null,
+    eventHash: string | null
   ): EventSchemaBody {
     let eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
     eventSchemaBody.eventName = eventName;
     eventSchemaBody.eventProperties = eventProperties;
+
+    if (eventId != null) {
+      eventSchemaBody.avoFunction = true;
+      eventSchemaBody.eventId = eventId;
+      eventSchemaBody.eventHash = eventHash;
+    } else {
+      eventSchemaBody.avoFunction = false;
+      eventSchemaBody.eventId = null;
+      eventSchemaBody.eventHash = null;
+    }
+
     return eventSchemaBody;
   }
 

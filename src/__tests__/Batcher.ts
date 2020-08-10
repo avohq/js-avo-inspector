@@ -41,6 +41,7 @@ describe("Batcher", () => {
 
   test("handleSessionStarted adds event to storage", () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     inspector.avoBatcher.handleSessionStarted();
 
@@ -56,11 +57,12 @@ describe("Batcher", () => {
 
   test("handleTrackSchema adds event to storage", () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
     inspector.avoBatcher.handleSessionStarted();
-    inspector.avoBatcher.handleTrackSchema("event name", []);
+    inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
 
     const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
@@ -75,10 +77,11 @@ describe("Batcher", () => {
 
   test("handleTrackSchema adds event to storage", () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
-    inspector.avoBatcher.handleTrackSchema("event name", []);
+    inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
     const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
     expect(events).not.toBeNull();
@@ -92,7 +95,7 @@ describe("Batcher", () => {
   test("checkIfBatchNeedsToBeSent is called on Batcher initialization", async () => {
     const event = networkHandler.bodyForEventSchemaCall("name", [
       { propertyName: "prop0", propertyType: "string" },
-    ]);
+    ], "testEventId", "testEventHash");
 
     storage.setItem(AvoBatcher.cacheKey, [event]);
     await new AvoBatcher(networkHandler);
@@ -102,6 +105,7 @@ describe("Batcher", () => {
 
   test("checkIfBatchNeedsToBeSent is called on handleSessionStarted", () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     inspector.avoBatcher.handleSessionStarted();
 
@@ -110,10 +114,38 @@ describe("Batcher", () => {
 
   test("checkIfBatchNeedsToBeSent is called on handleTrackSchema", () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     inspector.avoBatcher.handleSessionStarted();
 
     expect(checkBatchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("Batcher saves events produced by AvoNetworkCallsHandler", async () => {
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    const schemaEvent = networkHandler.bodyForEventSchemaCall("name", [
+      { propertyName: "prop0", propertyType: "string" },
+    ], "testEventId", "testEventHash");
+    const sessionEvent = networkHandler.bodyForSessionStartedCall();
+
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    inspector.avoBatcher.handleTrackSchema("name", [
+      { propertyName: "prop0", propertyType: "string" },
+    ], "testEventId", "testEventHash");
+    inspector.avoBatcher.handleSessionStarted();
+
+    const events:(SessionStartedBody | EventSchemaBody)[] | null = storage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events != null) {
+      expect(events[0]).not.toBe(schemaEvent);
+      expect({...events[0], messageId: undefined, createdAt:undefined}).toStrictEqual({...schemaEvent, messageId: undefined, createdAt:undefined});
+      expect(events[1]).not.toBe(sessionEvent);
+      expect({...events[1], messageId: undefined, createdAt:undefined}).toStrictEqual({...sessionEvent, messageId: undefined, createdAt:undefined});
+    }
   });
 
   test("Events are retrieved from Storage on init", () => {
@@ -132,9 +164,10 @@ describe("Batcher", () => {
     const eventCount = AvoInspector.batchSize - 1;
 
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     [...Array(eventCount)].forEach(() => {
-      inspector.avoBatcher.handleTrackSchema("event name", []);
+      inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
     });
 
     expect(checkBatchSpy).toHaveBeenCalledTimes(eventCount);
@@ -145,9 +178,10 @@ describe("Batcher", () => {
     const eventCount = AvoInspector.batchSize;
 
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     [...Array(eventCount)].forEach(() => {
-      inspector.avoBatcher.handleTrackSchema("event name", []);
+      inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
     });
 
     const events = storage.getItem(AvoBatcher.cacheKey);
@@ -161,10 +195,11 @@ describe("Batcher", () => {
     const eventCount = AvoInspector.batchSize + 1;
 
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
     let events: any = [];
 
     [...Array(eventCount)].forEach((_, i) => {
-      inspector.avoBatcher.handleTrackSchema("event name", []);
+      inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
 
       if (i === AvoInspector.batchSize - 1) {
         events = storage.getItem(AvoBatcher.cacheKey);
@@ -182,6 +217,7 @@ describe("Batcher", () => {
 
   test("Batch is not sent if batchFlushSeconds not exceeded", () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     const now = new Date();
     const dateNowSpy = jest
@@ -192,7 +228,7 @@ describe("Batcher", () => {
         ),
       );
 
-    inspector.avoBatcher.handleTrackSchema("event name", []);
+    inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
 
     expect(checkBatchSpy).toHaveBeenCalledTimes(1);
     expect(inspectorCallSpy).not.toHaveBeenCalled();
@@ -202,6 +238,7 @@ describe("Batcher", () => {
 
   test("Batch is sent if batchFlushSeconds exceeded", async () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     const now = new Date();
     const dateNowSpy = jest
@@ -212,7 +249,7 @@ describe("Batcher", () => {
         ),
       );
 
-    await inspector.avoBatcher.handleTrackSchema("event name", []);
+    await inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
 
     const events = storage.getItem(AvoBatcher.cacheKey);
 
@@ -233,13 +270,14 @@ describe("Batcher", () => {
       events.push(
         networkHandler.bodyForEventSchemaCall(`event-name-${i}`, [
           { propertyName: `prop0`, propertyType: "string" },
-        ])
+        ], null, null)
       );
     }
 
     AvoInspector.avoStorage.setItem(AvoBatcher.cacheKey, events);
 
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
 
     setTimeout(() => {
       const setItemsSpy = jest.spyOn(

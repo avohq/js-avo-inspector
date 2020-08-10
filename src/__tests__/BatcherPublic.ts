@@ -23,10 +23,13 @@ describe("Batcher", () => {
 
   beforeAll(() => {
     inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    // @ts-ignore
+    inspector.avoDeduplicator._clearEvents();
   });
 
   test("Batcher is initialized on Inspector init", () => {
@@ -53,6 +56,8 @@ describe("Batcher", () => {
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
       eventName,
       schema,
+      null,
+      null
     );
   });
 
@@ -65,14 +70,42 @@ describe("Batcher", () => {
       prop4: 0.0,
     };
 
+
     const schema = inspector.extractSchema(properties);
 
-    inspector.trackSchemaFromEvent("event name", properties);
+    inspector.trackSchemaFromEvent(eventName, properties);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
       eventName,
       schema,
+      null,
+      null
+    );
+  });
+
+  test("handleTrackSchema is called on _avoFunctionTrackSchemaFromEvent", () => {
+    const eventName = "event name";
+    const properties = {
+      prop0: "",
+      prop2: false,
+      prop3: 0,
+      prop4: 0.0,
+    };
+    const eventId = "testId";
+    const eventHash = "testHash";
+
+    const schema = inspector.extractSchema(properties);
+
+    // @ts-ignore
+    inspector._avoFunctionTrackSchemaFromEvent(eventName, properties, eventId, eventHash);
+
+    expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
+    expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
+      eventName,
+      schema,
+      eventId,
+      eventHash
     );
   });
 
