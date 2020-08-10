@@ -3,7 +3,7 @@ import {
   EventSchemaBody,
   AvoNetworkCallsHandler,
 } from "./AvoNetworkCallsHandler";
-import { AvoInspector } from "./AvoInspector"
+import { AvoInspector } from "./AvoInspector";
 
 export interface AvoBatcherType {
   handleSessionStarted(): void;
@@ -14,7 +14,9 @@ export interface AvoBatcherType {
       propertyName: string;
       propertyType: string;
       children?: any;
-    }>
+    }>,
+    eventId: string | null,
+    eventHash: string | null
   ): void;
 }
 
@@ -52,10 +54,12 @@ export class AvoBatcher implements AvoBatcherType {
       propertyName: string;
       propertyType: string;
       children?: any;
-    }>
+    }>,
+    eventId: string | null,
+    eventHash: string | null
   ): void {
     this.events.push(
-      this.networkCallsHandler.bodyForEventSchemaCall(eventName, schema)
+      this.networkCallsHandler.bodyForEventSchemaCall(eventName, schema, eventId, eventHash)
     );
     this.saveEvents();
 
