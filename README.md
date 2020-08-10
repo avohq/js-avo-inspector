@@ -38,7 +38,6 @@ let inspector = new Inspector.AvoInspector({
 
 Logs are enabled by default in the dev mode and disabled in prod mode.
 
-Java
 ```javascript
 inspector.enableLogging(true);
 ```
@@ -53,7 +52,7 @@ Read more in the [Avo documentation](https://www.avo.app/docs/inspector/sdk/js#e
 This method gets actual tracking event parameters, extracts schema automatically and sends it to the Avo Inspector backend.
 It is the easiest way to use the library, just call this method at the same place you call your analytics tools' track methods with the same parameters.
 
-```java
+```javascript
 inspector.trackSchemaFromEvent("Event name", {
           "String Prop": "Prop Value",
           "Float Prop": 1.0,
