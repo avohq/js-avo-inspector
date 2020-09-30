@@ -49,12 +49,12 @@ export class AvoInspector {
     if (isValueEmpty(options.env)) {
       this.environment = AvoInspectorEnv.Dev;
       console.warn(
-        "[Avo Inspector] No environment provided. Defaulting to dev.",
+        "[Avo Inspector] No environment provided. Defaulting to dev."
       );
     } else if (Object.values(AvoInspectorEnv).indexOf(options.env) === -1) {
       this.environment = AvoInspectorEnv.Dev;
       console.warn(
-        "[Avo Inspector] Unsupported environment provided. Defaulting to dev. Supported environments - Dev, Staging, Prod.",
+        "[Avo Inspector] Unsupported environment provided. Defaulting to dev. Supported environments - Dev, Staging, Prod."
       );
     } else {
       this.environment = options.env;
@@ -62,7 +62,7 @@ export class AvoInspector {
 
     if (isValueEmpty(options.apiKey)) {
       throw new Error(
-        "[Avo Inspector] No API key provided. Inspector can't operate without API key.",
+        "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
       this.apiKey = options.apiKey;
@@ -70,7 +70,7 @@ export class AvoInspector {
 
     if (isValueEmpty(options.version)) {
       throw new Error(
-        "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic.",
+        "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
       );
     } else {
       this.version = options.version;
@@ -91,7 +91,7 @@ export class AvoInspector {
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion,
+      libVersion
     );
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
@@ -106,7 +106,7 @@ export class AvoInspector {
             () => {
               this.sessionTracker.startOrProlongSession(Date.now());
             },
-            false,
+            false
           );
         }
       } else {
@@ -114,15 +114,15 @@ export class AvoInspector {
       }
     } catch (e) {
       console.error(
-        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e,
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
       );
     }
   }
 
   trackSchemaFromEvent(
     eventName: string,
-    eventProperties: { [propName: string]: any },
+    eventProperties: { [propName: string]: any }
   ): Array<{
     propertyName: string;
     propertyType: string;
@@ -155,7 +155,7 @@ export class AvoInspector {
       }
     } catch (e) {
       console.error(
-        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
         e
       );
       return [];
@@ -199,8 +199,8 @@ export class AvoInspector {
       }
     } catch (e) {
       console.error(
-        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e,
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
       );
       return [];
     }
@@ -212,7 +212,7 @@ export class AvoInspector {
       propertyName: string;
       propertyType: string;
       children?: any;
-    }>,
+    }>
   ): void {
     try {
       if (
@@ -237,7 +237,7 @@ export class AvoInspector {
       }
     } catch (e) {
       console.error(
-        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
         e
       );
     }
@@ -263,8 +263,8 @@ export class AvoInspector {
       );
     } catch (e) {
       console.error(
-        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e,
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
       );
     }
   }
@@ -273,9 +273,12 @@ export class AvoInspector {
     AvoInspector._shouldLog = enable;
   }
 
-  extractSchema(eventProperties: {
-    [propName: string]: any;
-  }, shouldLogIfEnabled = true): Array<{
+  extractSchema(
+    eventProperties: {
+      [propName: string]: any;
+    },
+    shouldLogIfEnabled = true
+  ): Array<{
     propertyName: string;
     propertyType: string;
     children?: any;
@@ -303,8 +306,8 @@ export class AvoInspector {
       return AvoSchemaParser.extractSchema(eventProperties);
     } catch (e) {
       console.error(
-        "Avo Inspector: something went very wrong. Please report to support@avo.app.",
-        e,
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
       );
       return [];
     }
