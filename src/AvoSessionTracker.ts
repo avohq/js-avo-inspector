@@ -16,10 +16,13 @@ export class AvoSessionTracker {
           AvoSessionTracker.idCacheKey
         );
       } catch (e) {
-        console.error("Avo Inspector: something went wrong. Please report to support@avo.app.", e);
+        console.error(
+          "Avo Inspector: something went wrong. Please report to support@avo.app.",
+          e
+        );
       }
 
-      if ((maybeSessionId === null || maybeSessionId === undefined)) {
+      if (maybeSessionId === null || maybeSessionId === undefined) {
         AvoSessionTracker._sessionId = this.updateSessionId();
       } else {
         AvoSessionTracker._sessionId = maybeSessionId;
@@ -30,7 +33,10 @@ export class AvoSessionTracker {
 
   private _lastSessionTimestamp: number | null = null;
   get lastSessionTimestamp(): number {
-    if (this._lastSessionTimestamp === null || this._lastSessionTimestamp === 0) {
+    if (
+      this._lastSessionTimestamp === null ||
+      this._lastSessionTimestamp === 0
+    ) {
       let maybeLastSessionTimestamp = AvoInspector.avoStorage.getItem<number>(
         AvoSessionTracker.lastSessionTimestampKey
       );
@@ -86,7 +92,10 @@ export class AvoSessionTracker {
         AvoSessionTracker.sessionId
       );
     } catch (e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
     }
     return AvoSessionTracker._sessionId;
   }
