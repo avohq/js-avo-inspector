@@ -11,9 +11,9 @@ describe("Batcher", () => {
   let checkBatchSpy: jest.SpyInstance<any, unknown[]>;
   let inspectorCallSpy: jest.SpyInstance<any, unknown[]>;
 
-  const { apiKey, env, version } = defaultOptions;
+  const { apiKey, env, version, shouldLog } = defaultOptions;
 
-  const storage = new AvoStorage();
+  const storage = new AvoStorage(shouldLog);
   const networkHandler = new AvoNetworkCallsHandler(
     apiKey,
     env,

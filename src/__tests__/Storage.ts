@@ -1,7 +1,9 @@
 import { AvoStorage } from "../AvoStorage";
+import { defaultOptions } from "../__tests__/constants";
+
 
 describe("Avo Storage", () => {
-  const storage = new AvoStorage();
+  const storage = new AvoStorage(defaultOptions.shouldLog);
 
   const key = "avoKey";
   const value = "avoValue";
