@@ -6,6 +6,7 @@ export class AvoStorage {
 
   shouldLog: boolean;
   initialized = false;
+  available = true;
   onInitFuncs: Array<() => void> = [];
 
   constructor(shouldLog: boolean) {
@@ -15,7 +16,6 @@ export class AvoStorage {
       this.Platform = this.reactNative.Platform;
       this.AsyncStorage = this.reactNative.AsyncStorage;
       
-
       if (this.Platform.OS === "android") {
         this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
           this.AsyncStorage.multiGet(keys).then(
@@ -24,34 +24,73 @@ export class AvoStorage {
                 let key = keyVal[0];
                 this.data[key] = keyVal[1];
               });
-              this.initialized = true;
-              this.onInitFuncs.forEach((func) => {
-                func();
-              });
+              this.initialize();
             }
           )
         );
       } else {
-        this.initialized = true;
+        this.initialize();
       }
     } else {
-      this.initialized = true;
+      // Verify localStorage
+      const uid = new Date().toISOString();
+      try {
+        window.localStorage.setItem(uid, uid);
+        if (window.localStorage.getItem(uid) === uid) {
+          window.localStorage.removeItem(uid);
+          if (shouldLog) {
+            console.log("Avo Inspector Storage: window.localStorage ready");
+          }
+          this.initialize();
+        } else {
+          // localStorage not available
+          this.available = false;
+          this.initialized = false;
+          if (shouldLog) {
+            console.error("Avo Inspector Storage: window.localStorage not available");
+          }
+        }
+      } catch (error) {
+        // localStorage not available
+        this.available = false;
+        this.initialized = false;
+        if (shouldLog) {
+          console.error("Avo Inspector Storage: window.localStorage not available", error);
+        }
+      }
     }
   }
+
+  initialize() {
+    this.available = true;
+    this.initialized = true;
+    this.onInitFuncs.forEach((func) => {
+      func();
+    });
+  }
+  
 
   runOnInit(func: () => void) {
     if (this.initialized === true) {
       func();
-    } else {
+    } else if (this.available) {
       this.onInitFuncs.push(func);
     }
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
+    if (!this.initialized || !this.available) {
+      return Promise.resolve(null);
+    }
     let maybeItem;
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
-        maybeItem = window.localStorage.getItem(key);
+        try {
+          maybeItem = window.localStorage.getItem(key);
+        } catch (error) {
+          console.error("Avo Inspector Storage getItemAsync error:", error);
+          return Promise.resolve(null);
+        }
         if (maybeItem !== null && maybeItem !== undefined) {
           return Promise.resolve(JSON.parse(maybeItem));
         } else {
@@ -79,6 +118,9 @@ export class AvoStorage {
   }
 
   getItem<T>(key: string): T | null {
+    if (!this.initialized || !this.available) {
+      return null;
+    }
     let maybeItem;
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
@@ -106,46 +148,50 @@ export class AvoStorage {
   };
 
   setItem<T>(key: string, value: T): void {
-    if (process.env.BROWSER) {
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(key, JSON.stringify(value));
-        } catch (error) {
-          if (this.shouldLog) {
-            console.error("Avo Inspector Storage setItem error:", error);
+    this.runOnInit(() => {
+      if (process.env.BROWSER) {
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(key, JSON.stringify(value));
+          } catch (error) {
+            if (this.shouldLog) {
+              console.error("Avo Inspector Storage setItem error:", error);
+            }
           }
         }
+      } else {
+        if (this.Platform.OS === "ios") {
+          const Settings = this.reactNative.Settings;
+          Settings.set({ [key]: JSON.stringify(value) });
+        } else if (this.Platform.OS === "android") {
+          this.AsyncStorage.setItem(key, JSON.stringify(value));
+          this.data[key] = JSON.stringify(value);
+        }
       }
-    } else {
-      if (this.Platform.OS === "ios") {
-        const Settings = this.reactNative.Settings;
-        Settings.set({ [key]: JSON.stringify(value) });
-      } else if (this.Platform.OS === "android") {
-        this.AsyncStorage.setItem(key, JSON.stringify(value));
-        this.data[key] = JSON.stringify(value);
-      }
-    }
+    })
   };
 
   removeItem(key: string): void {
-    if (process.env.BROWSER) {
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.removeItem(key);
-        } catch (error) {
-          if (this.shouldLog) {
-            console.error("Avo Inspector Storage removeItem error:", error);
+    this.runOnInit(() => {
+      if (process.env.BROWSER) {
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.removeItem(key);
+          } catch (error) {
+            if (this.shouldLog) {
+              console.error("Avo Inspector Storage removeItem error:", error);
+            }
           }
         }
+      } else {
+        if (this.Platform.OS === "ios") {
+          const Settings = this.reactNative.Settings;
+          Settings.set({ [key]: null });
+        } else if (this.Platform.OS === "android") {
+          this.AsyncStorage.removeItem(key);
+          this.data[key] = null;
+        }
       }
-    } else {
-      if (this.Platform.OS === "ios") {
-        const Settings = this.reactNative.Settings;
-        Settings.set({ [key]: null });
-      } else if (this.Platform.OS === "android") {
-        this.AsyncStorage.removeItem(key);
-        this.data[key] = null;
-      }
-    }
+    })
   };
 }
