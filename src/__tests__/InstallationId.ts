@@ -5,7 +5,7 @@ import { AvoInspector } from "../AvoInspector";
 import { defaultOptions } from "../__tests__/constants";
 
 describe("InstallationId", () => {
-  const storage = new AvoStorage();
+  const storage = new AvoStorage(defaultOptions.shouldLog);
 
   beforeAll(() => {
     new AvoInspector(defaultOptions);

@@ -4,14 +4,17 @@ export class AvoStorage {
   Platform: any | null = null;
   AsyncStorage: any | null = null;
 
+  shouldLog: boolean;
   initialized = false;
   onInitFuncs: Array<() => void> = [];
 
-  constructor() {
+  constructor(shouldLog: boolean) {
+    this.shouldLog = shouldLog;
     if (!process.env.BROWSER) {
       this.reactNative = require("react-native");
       this.Platform = this.reactNative.Platform;
       this.AsyncStorage = this.reactNative.AsyncStorage;
+      
 
       if (this.Platform.OS === "android") {
         this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
@@ -79,7 +82,13 @@ export class AvoStorage {
     let maybeItem;
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
-        maybeItem = window.localStorage.getItem(key);
+        try {
+          maybeItem = window.localStorage.getItem(key);
+        } catch (error) {
+          if (this.shouldLog) {
+            console.error("Avo Inspector Storage getItem error:", error);
+          }
+        }
       }
     } else {
       if (this.Platform.OS === "ios") {
@@ -99,7 +108,13 @@ export class AvoStorage {
   setItem<T>(key: string, value: T): void {
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, JSON.stringify(value));
+        try {
+          window.localStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+          if (this.shouldLog) {
+            console.error("Avo Inspector Storage setItem error:", error);
+          }
+        }
       }
     } else {
       if (this.Platform.OS === "ios") {
@@ -115,7 +130,13 @@ export class AvoStorage {
   removeItem(key: string): void {
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem(key);
+        try {
+          window.localStorage.removeItem(key);
+        } catch (error) {
+          if (this.shouldLog) {
+            console.error("Avo Inspector Storage removeItem error:", error);
+          }
+        }
       }
     } else {
       if (this.Platform.OS === "ios") {

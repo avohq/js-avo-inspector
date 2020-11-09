@@ -11,9 +11,9 @@ jest.mock("../AvoBatcher");
 jest.mock("../AvoNetworkCallsHandler");
 
 describe("Sessions", () => {
-  const { apiKey, env, version } = defaultOptions;
+  const { apiKey, env, version, shouldLog } = defaultOptions;
 
-  const storage = new AvoStorage();
+  const storage = new AvoStorage(shouldLog);
   const networkHandler = new AvoNetworkCallsHandler(
     apiKey,
     env,

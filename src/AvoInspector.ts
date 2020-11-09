@@ -84,7 +84,7 @@ export class AvoInspector {
       AvoInspector._shouldLog = false;
     }
 
-    AvoInspector.avoStorage = new AvoStorage();
+    AvoInspector.avoStorage = new AvoStorage(AvoInspector._shouldLog);
 
     let avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
