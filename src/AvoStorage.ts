@@ -106,7 +106,6 @@ export class AvoStorage {
   };
 
   setItem<T>(key: string, value: T): void {
-    console.log("1. setting item...");
     if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
         try {
