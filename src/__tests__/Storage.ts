@@ -1,6 +1,12 @@
 import { AvoStorage } from "../AvoStorage";
 import { defaultOptions } from "../__tests__/constants";
 
+const originalWindow = { ...window };
+
+beforeEach(() => {
+  window = originalWindow;
+});
+
 describe("Avo Storage", () => {
   const storage = new AvoStorage(defaultOptions.shouldLog);
 
@@ -59,6 +65,32 @@ describe("Avo Storage", () => {
 
     storage.removeItem(key);
 
+    const item = storage.getItem(key);
+
+    expect(item).toBeNull();
+  });
+});
+
+describe("Avo Storage unavailable", () => {  
+  test("Set and get fails silently", () => {
+    Object.defineProperty(window, 'localStorage', {});
+    const storage = new AvoStorage(false);
+
+    const key = "avoKey";
+    const value = "avoValue";
+
+    storage.setItem(key, value);
+    const item = storage.getItem(key);
+    expect(item).toBeNull()
+  });
+
+  test("Remove and get fails silently", () => {
+    Object.defineProperty(window, 'localStorage', {});
+    const storage = new AvoStorage(false);
+
+    const key = "avoKey";
+
+    storage.removeItem(key);
     const item = storage.getItem(key);
 
     expect(item).toBeNull();
