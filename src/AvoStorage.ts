@@ -1,3 +1,4 @@
+
 export class AvoStorage {
   data: { [key: string]: string | null } = {};
   reactNative: any | null = null;
@@ -6,7 +7,8 @@ export class AvoStorage {
 
   shouldLog: boolean;
   initialized = false;
-  available = true;
+  useFallback = false;
+  fallbackStorage: any = {};
   onInitFuncs: Array<() => void> = [];
 
   constructor(shouldLog: boolean) {
@@ -24,12 +26,12 @@ export class AvoStorage {
                 let key = keyVal[0];
                 this.data[key] = keyVal[1];
               });
-              this.initialize();
+              this.initialize(true);
             }
           )
         );
       } else {
-        this.initialize();
+        this.initialize(true);
       }
     } else {
       // Verify localStorage
@@ -38,52 +40,46 @@ export class AvoStorage {
         window.localStorage.setItem(uid, uid);
         if (window.localStorage.getItem(uid) === uid) {
           window.localStorage.removeItem(uid);
-          if (shouldLog) {
-            console.log("Avo Inspector Storage: window.localStorage ready");
-          }
-          this.initialize();
+          this.initialize(true);
         } else {
-          // localStorage not available
-          this.available = false;
-          this.initialized = false;
-          if (shouldLog) {
-            console.error("Avo Inspector Storage: window.localStorage not available");
-          }
+          this.initialize(false);
         }
       } catch (error) {
-        // localStorage not available
-        this.available = false;
-        this.initialized = false;
-        if (shouldLog) {
-          console.error("Avo Inspector Storage: window.localStorage not available", error);
-        }
+        this.initialize(false);
       }
     }
   }
 
-  initialize() {
-    this.available = true;
+  initialize(localStorageAvailable: boolean) {
     this.initialized = true;
+    if (localStorageAvailable === false) {
+      this.useFallback = true;
+    };
     this.onInitFuncs.forEach((func) => {
       func();
     });
   }
   
-
   runOnInit(func: () => void) {
     if (this.initialized === true) {
       func();
-    } else if (this.available) {
+    } else {
       this.onInitFuncs.push(func);
     }
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
-    if (!this.initialized || !this.available) {
-      return Promise.resolve(null);
-    }
     let maybeItem;
-    if (process.env.BROWSER) {
+    if (this.initialized === false) {
+      return Promise.resolve(null);
+    } else if (this.useFallback === true) {
+      maybeItem = this.fallbackStorage[key];
+      if (maybeItem !== null && maybeItem !== undefined) {
+        return Promise.resolve(JSON.parse(maybeItem));
+      } else {
+        return Promise.resolve(null);
+      }
+    } else if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
         try {
           maybeItem = window.localStorage.getItem(key);
@@ -91,6 +87,7 @@ export class AvoStorage {
           console.error("Avo Inspector Storage getItemAsync error:", error);
           return Promise.resolve(null);
         }
+
         if (maybeItem !== null && maybeItem !== undefined) {
           return Promise.resolve(JSON.parse(maybeItem));
         } else {
@@ -118,11 +115,12 @@ export class AvoStorage {
   }
 
   getItem<T>(key: string): T | null {
-    if (!this.initialized || !this.available) {
-      return null;
-    }
     let maybeItem;
-    if (process.env.BROWSER) {
+    if (this.initialized === false) {
+      maybeItem = null;
+    } else if (this.useFallback === true) {
+      maybeItem = this.fallbackStorage[key];
+    } else if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
         try {
           maybeItem = window.localStorage.getItem(key);
@@ -140,6 +138,7 @@ export class AvoStorage {
         maybeItem = this.data[key];
       }
     }
+
     if (maybeItem !== null && maybeItem !== undefined) {
       return JSON.parse(maybeItem);
     } else {
@@ -149,7 +148,9 @@ export class AvoStorage {
 
   setItem<T>(key: string, value: T): void {
     this.runOnInit(() => {
-      if (process.env.BROWSER) {
+      if (this.useFallback === true) {
+        this.fallbackStorage[key] = JSON.stringify(value);
+      } else if (process.env.BROWSER) {
         if (typeof window !== "undefined") {
           try {
             window.localStorage.setItem(key, JSON.stringify(value));
@@ -159,21 +160,21 @@ export class AvoStorage {
             }
           }
         }
-      } else {
-        if (this.Platform.OS === "ios") {
-          const Settings = this.reactNative.Settings;
-          Settings.set({ [key]: JSON.stringify(value) });
-        } else if (this.Platform.OS === "android") {
-          this.AsyncStorage.setItem(key, JSON.stringify(value));
-          this.data[key] = JSON.stringify(value);
-        }
+      } else if (this.Platform.OS === "ios") {
+        const Settings = this.reactNative.Settings;
+        Settings.set({ [key]: JSON.stringify(value) });
+      } else if (this.Platform.OS === "android") {
+        this.AsyncStorage.setItem(key, JSON.stringify(value));
+        this.data[key] = JSON.stringify(value);
       }
     })
   };
 
   removeItem(key: string): void {
     this.runOnInit(() => {
-      if (process.env.BROWSER) {
+      if (this.useFallback === true) {
+        this.fallbackStorage[key] = undefined;
+      } else if (process.env.BROWSER) {
         if (typeof window !== "undefined") {
           try {
             window.localStorage.removeItem(key);
@@ -183,14 +184,12 @@ export class AvoStorage {
             }
           }
         }
-      } else {
-        if (this.Platform.OS === "ios") {
-          const Settings = this.reactNative.Settings;
-          Settings.set({ [key]: null });
-        } else if (this.Platform.OS === "android") {
-          this.AsyncStorage.removeItem(key);
-          this.data[key] = null;
-        }
+      } else if (this.Platform.OS === "ios") {
+        const Settings = this.reactNative.Settings;
+        Settings.set({ [key]: null });
+      } else if (this.Platform.OS === "android") {
+        this.AsyncStorage.removeItem(key);
+        this.data[key] = null;
       }
     })
   };

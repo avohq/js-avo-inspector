@@ -72,25 +72,75 @@ describe("Avo Storage", () => {
 });
 
 describe("Avo Storage unavailable", () => {  
-  test("Set and get fails silently", () => {
+  const key = "avoKey";
+  const value = "avoValue";
+
+  beforeEach(() => {
     Object.defineProperty(window, 'localStorage', {});
-    const storage = new AvoStorage(false);
-
-    const key = "avoKey";
-    const value = "avoValue";
-
-    storage.setItem(key, value);
-    const item = storage.getItem(key);
-    expect(item).toBeNull()
   });
 
-  test("Remove and get fails silently", () => {
-    Object.defineProperty(window, 'localStorage', {});
+  test("Fallback mode enabled", () => {
+    const storage = new AvoStorage(false);
+    expect(storage.useFallback).toBe(true);
+    expect(storage.initialized).toBe(true)
+  });
+
+  test("Sets and gets item with shouldLog on", () => {
+    const storage = new AvoStorage(true);
+
+    storage.setItem(key, value);
+
+    const item = storage.getItem(key);
+
+    expect(item).toBe(value);
+  });
+
+  test("Sets and gets item with shouldLog off", () => {
     const storage = new AvoStorage(false);
 
-    const key = "avoKey";
+    storage.setItem(key, value);
+
+    const item = storage.getItem(key);
+
+    expect(item).toBe(value);
+  });
+
+  test("Gets item asynchronously", async () => {
+    const storage = new AvoStorage(false);
+    
+    storage.removeItem(key);
+    storage.setItem(key, value);
+
+    const item = await storage.getItemAsync(key);
+
+    expect(item).toBe(value);
+  });
+
+  test("Returns null if key does not exist", () => {
+    const storage = new AvoStorage(false);
+    
+    storage.removeItem(key);
+
+    const item = storage.getItem(key);
+
+    expect(item).toBeNull();
+  });
+
+  test("Deletes item with shouldLog on", () => {
+    const storage = new AvoStorage(true);
 
     storage.removeItem(key);
+
+    const item = storage.getItem(key);
+
+    expect(item).toBeNull();
+  });
+
+  test("Deletes item with shouldLog off", () => {
+    const storage = new AvoStorage(false);
+
+    storage.removeItem(key);
+
     const item = storage.getItem(key);
 
     expect(item).toBeNull();
