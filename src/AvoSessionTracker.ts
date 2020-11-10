@@ -6,7 +6,7 @@ export class AvoSessionTracker {
   private static _sessionId: null | string = null;
   static get sessionId(): string {
     if (AvoSessionTracker._sessionId === null) {
-      if (!AvoInspector.avoStorage.initialized) {
+      if (!AvoInspector.avoStorage.storageInitialized) {
         return "unknown";
       }
 

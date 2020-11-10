@@ -69,20 +69,68 @@ describe("Avo Storage", () => {
 
     expect(item).toBeNull();
   });
+
+  test("storage writes are delayed until the storage is initialized on web", () => {
+    storage.storageInitialized = false;
+
+    storage.setItem(key, "OnStorageInitFuncs on web");
+
+    const itemBeforeInit = storage.getItem(key);
+
+    expect(itemBeforeInit).toBeNull();
+
+    storage.initializeAndItemsLoadedWeb(true);
+
+    const itemAfterInit = storage.getItem(key);
+
+    expect(itemAfterInit).toEqual("OnStorageInitFuncs on web");
+  });
+
+  test("storage writes are delayed until the storage is initialized on android", () => {
+    storage.storageInitialized = false;
+
+    storage.setItem(key, "OnStorageInitFuncs on android");
+
+    const itemBeforeInit = storage.getItem(key);
+
+    expect(itemBeforeInit).toBeNull();
+
+    storage.initializeAndItemsLoadedIos();
+
+    const itemAfterInit = storage.getItem(key);
+
+    expect(itemAfterInit).toEqual("OnStorageInitFuncs on android");
+  });
+
+  test("storage writes are delayed until the storage is initialized on ios", () => {
+    storage.storageInitialized = false;
+
+    storage.setItem(key, "OnStorageInitFuncs on ios");
+
+    const itemBeforeInit = storage.getItem(key);
+
+    expect(itemBeforeInit).toBeNull();
+
+    storage.initializeAndItemsLoadedWeb(true);
+
+    const itemAfterInit = storage.getItem(key);
+
+    expect(itemAfterInit).toEqual("OnStorageInitFuncs on ios");
+  });
 });
 
-describe("Avo Storage unavailable", () => {  
+describe("Avo Storage unavailable", () => {
   const key = "avoKey";
   const value = "avoValue";
 
   beforeEach(() => {
-    Object.defineProperty(window, 'localStorage', {});
+    Object.defineProperty(window, "localStorage", {});
   });
 
   test("Fallback mode enabled", () => {
     const storage = new AvoStorage(false);
     expect(storage.useFallback).toBe(true);
-    expect(storage.initialized).toBe(true)
+    expect(storage.storageInitialized).toBe(true);
   });
 
   test("Sets and gets item with shouldLog on", () => {
@@ -107,7 +155,7 @@ describe("Avo Storage unavailable", () => {
 
   test("Gets item asynchronously", async () => {
     const storage = new AvoStorage(false);
-    
+
     storage.removeItem(key);
     storage.setItem(key, value);
 
@@ -118,7 +166,7 @@ describe("Avo Storage unavailable", () => {
 
   test("Returns null if key does not exist", () => {
     const storage = new AvoStorage(false);
-    
+
     storage.removeItem(key);
 
     const item = storage.getItem(key);

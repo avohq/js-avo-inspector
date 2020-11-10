@@ -5,11 +5,11 @@ export class AvoStorage {
   AsyncStorage: any | null = null;
 
   shouldLog: boolean;
-  initialized = false;
+  storageInitialized = false;
   itemsFromLastSessionLoaded = false;
   useFallback = false;
   fallbackStorage: any = {};
-  onInitFuncs: Array<() => void> = [];
+  onStorageInitFuncs: Array<() => void> = [];
   onItemsFromLastSessionLoadedFuncs: Array<() => void> = [];
 
   constructor(shouldLog: boolean) {
@@ -54,8 +54,8 @@ export class AvoStorage {
   }
 
   initializeAndroid() {
-    this.initialized = true;
-    this.onInitFuncs.forEach((func) => {
+    this.storageInitialized = true;
+    this.onStorageInitFuncs.forEach((func) => {
       func();
     });
   }
@@ -68,9 +68,9 @@ export class AvoStorage {
   }
 
   initializeAndItemsLoadedIos() {
-    this.initialized = true;
+    this.storageInitialized = true;
     this.itemsFromLastSessionLoaded = true;
-    this.onInitFuncs.forEach((func) => {
+    this.onStorageInitFuncs.forEach((func) => {
       func();
     });
     this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
@@ -79,12 +79,14 @@ export class AvoStorage {
   }
 
   initializeAndItemsLoadedWeb(localStorageAvailable: boolean) {
-    this.initialized = true;
+    console.log("initialization started");
+    this.storageInitialized = true;
     this.itemsFromLastSessionLoaded = true;
     if (localStorageAvailable === false) {
       this.useFallback = true;
     }
-    this.onInitFuncs.forEach((func) => {
+    this.onStorageInitFuncs.forEach((func) => {
+      console.log("running oninit function");
       func();
     });
     this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
@@ -92,11 +94,13 @@ export class AvoStorage {
     });
   }
 
-  runOnInit(func: () => void) {
-    if (this.initialized === true) {
+  runOnStorageInit(func: () => void) {
+    if (this.storageInitialized === true) {
+      console.log("running oninit function");
       func();
     } else {
-      this.onInitFuncs.push(func);
+      console.log("storing oninit function");
+      this.onStorageInitFuncs.push(func);
     }
   }
 
@@ -110,7 +114,7 @@ export class AvoStorage {
 
   getItemAsync<T>(key: string): Promise<T | null> {
     let maybeItem;
-    if (this.initialized === false) {
+    if (this.storageInitialized === false) {
       return Promise.resolve(null);
     } else if (this.useFallback === true) {
       maybeItem = this.fallbackStorage[key];
@@ -158,7 +162,7 @@ export class AvoStorage {
 
   getItem<T>(key: string): T | null {
     let maybeItem;
-    if (this.initialized === false) {
+    if (this.storageInitialized === false) {
       maybeItem = null;
     } else if (this.useFallback === true) {
       maybeItem = this.fallbackStorage[key];
@@ -189,7 +193,7 @@ export class AvoStorage {
   }
 
   setItem<T>(key: string, value: T): void {
-    this.runOnInit(() => {
+    this.runOnStorageInit(() => {
       if (this.useFallback === true) {
         this.fallbackStorage[key] = JSON.stringify(value);
       } else if (process.env.BROWSER) {
@@ -213,7 +217,7 @@ export class AvoStorage {
   }
 
   removeItem(key: string): void {
-    this.runOnInit(() => {
+    this.runOnStorageInit(() => {
       if (this.useFallback === true) {
         this.fallbackStorage[key] = undefined;
       } else if (process.env.BROWSER) {
