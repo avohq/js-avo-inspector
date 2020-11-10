@@ -89,48 +89,58 @@ export class AvoStorage {
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
-    let maybeItem;
-    if (this.useFallback === true) {
-      maybeItem = this.fallbackStorage[key];
-      if (maybeItem !== null && maybeItem !== undefined) {
-        return Promise.resolve(JSON.parse(maybeItem));
-      } else {
-        return Promise.resolve(null);
-      }
-    } else if (process.env.BROWSER) {
-      if (typeof window !== "undefined") {
-        try {
-          maybeItem = window.localStorage.getItem(key);
-        } catch (error) {
-          console.error("Avo Inspector Storage getItemAsync error:", error);
-          return Promise.resolve(null);
-        }
-
-        if (maybeItem !== null && maybeItem !== undefined) {
-          return Promise.resolve(JSON.parse(maybeItem));
-        } else {
-          return Promise.resolve(null);
-        }
-      } else {
-        return Promise.resolve(null);
-      }
+    if (!process.env.BROWSER && this.Platform.OS === "android") {
+      let maybeItem = this.AsyncStorage.getItem(key);
+      return maybeItem.then((storedItem: string | null) => {
+        storedItem != null ? JSON.parse(storedItem) : null;
+      });
     } else {
-      if (this.Platform.OS === "ios") {
-        const Settings = this.reactNative.Settings;
-        maybeItem = Settings.get(key);
-        if (maybeItem !== null && maybeItem !== undefined) {
-          return Promise.resolve(JSON.parse(maybeItem));
-        } else {
-          return Promise.resolve(null);
-        }
-      } else if (this.Platform.OS === "android") {
-        maybeItem = this.AsyncStorage.getItem(key);
-        return maybeItem.then((storedItem: string | null) => {
-          storedItem != null ? JSON.parse(storedItem) : null;
+      const that = this;
+      return new Promise(function (resolve, _reject) {
+        that.runOnStorageInit(() => {
+          if (that.useFallback === true) {
+            let maybeItem = that.fallbackStorage[key];
+            if (maybeItem !== null && maybeItem !== undefined) {
+              resolve(JSON.parse(maybeItem));
+            } else {
+              resolve(null);
+            }
+          } else if (process.env.BROWSER) {
+            if (typeof window !== "undefined") {
+              let maybeItem;
+              try {
+                maybeItem = window.localStorage.getItem(key);
+              } catch (error) {
+                console.error(
+                  "Avo Inspector Storage getItemAsync error:",
+                  error
+                );
+                Promise.resolve(null);
+              }
+
+              if (maybeItem !== null && maybeItem !== undefined) {
+                resolve(JSON.parse(maybeItem));
+              } else {
+                resolve(null);
+              }
+            } else {
+              resolve(null);
+            }
+          } else {
+            if (that.Platform.OS === "ios") {
+              const Settings = that.reactNative.Settings;
+              let maybeItem = Settings.get(key);
+              if (maybeItem !== null && maybeItem !== undefined) {
+                resolve(JSON.parse(maybeItem));
+              } else {
+                resolve(null);
+              }
+            } else {
+              resolve(null);
+            }
+          }
         });
-      } else {
-        return Promise.resolve(null);
-      }
+      });
     }
   }
 
