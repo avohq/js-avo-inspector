@@ -9,7 +9,6 @@ export class AvoStorage {
   useFallback = false;
   fallbackStorage: { [key: string]: string | null } = {};
   onStorageInitFuncs: Array<() => void> = [];
-  // onItemsFromLastSessionLoadedFuncs: Array<() => void> = [];
 
   constructor(shouldLog: boolean) {
     this.shouldLog = shouldLog;
