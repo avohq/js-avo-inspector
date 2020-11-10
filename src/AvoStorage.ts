@@ -79,14 +79,12 @@ export class AvoStorage {
   }
 
   initializeAndItemsLoadedWeb(localStorageAvailable: boolean) {
-    console.log("initialization started");
     this.storageInitialized = true;
     this.itemsFromLastSessionLoaded = true;
     if (localStorageAvailable === false) {
       this.useFallback = true;
     }
     this.onStorageInitFuncs.forEach((func) => {
-      console.log("running oninit function");
       func();
     });
     this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
@@ -96,10 +94,8 @@ export class AvoStorage {
 
   runOnStorageInit(func: () => void) {
     if (this.storageInitialized === true) {
-      console.log("running oninit function");
       func();
     } else {
-      console.log("storing oninit function");
       this.onStorageInitFuncs.push(func);
     }
   }
