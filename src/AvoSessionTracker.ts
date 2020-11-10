@@ -68,7 +68,7 @@ export class AvoSessionTracker {
   }
 
   startOrProlongSession(atTime: number): void {
-    AvoInspector.avoStorage.runOnInit(() => {
+    AvoInspector.avoStorage.runOnItemsFromPreviousSessionLoaded(() => {
       const timeSinceLastSession = atTime - this.lastSessionTimestamp;
 
       if (timeSinceLastSession > this._sessionLengthMillis) {

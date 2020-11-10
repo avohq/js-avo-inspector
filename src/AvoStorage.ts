@@ -1,4 +1,3 @@
-
 export class AvoStorage {
   data: { [key: string]: string | null } = {};
   reactNative: any | null = null;
@@ -7,9 +6,11 @@ export class AvoStorage {
 
   shouldLog: boolean;
   initialized = false;
+  itemsFromLastSessionLoaded = false;
   useFallback = false;
   fallbackStorage: any = {};
   onInitFuncs: Array<() => void> = [];
+  onItemsFromLastSessionLoadedFuncs: Array<() => void> = [];
 
   constructor(shouldLog: boolean) {
     this.shouldLog = shouldLog;
@@ -17,8 +18,10 @@ export class AvoStorage {
       this.reactNative = require("react-native");
       this.Platform = this.reactNative.Platform;
       this.AsyncStorage = this.reactNative.AsyncStorage;
-      
+
       if (this.Platform.OS === "android") {
+        // Android is the only platform that requires async loading of items from the prev session
+        this.initializeAndroid();
         this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
           this.AsyncStorage.multiGet(keys).then(
             (keyVals: Array<Array<string>>) => {
@@ -26,12 +29,12 @@ export class AvoStorage {
                 let key = keyVal[0];
                 this.data[key] = keyVal[1];
               });
-              this.initialize(true);
+              this.itemsLoadedAndroid();
             }
           )
         );
       } else {
-        this.initialize(true);
+        this.initializeAndItemsLoadedIos();
       }
     } else {
       // Verify localStorage
@@ -40,31 +43,68 @@ export class AvoStorage {
         window.localStorage.setItem(uid, uid);
         if (window.localStorage.getItem(uid) === uid) {
           window.localStorage.removeItem(uid);
-          this.initialize(true);
+          this.initializeAndItemsLoadedWeb(true);
         } else {
-          this.initialize(false);
+          this.initializeAndItemsLoadedWeb(false);
         }
       } catch (error) {
-        this.initialize(false);
+        this.initializeAndItemsLoadedWeb(false);
       }
     }
   }
 
-  initialize(localStorageAvailable: boolean) {
+  initializeAndroid() {
     this.initialized = true;
-    if (localStorageAvailable === false) {
-      this.useFallback = true;
-    };
     this.onInitFuncs.forEach((func) => {
       func();
     });
   }
-  
+
+  itemsLoadedAndroid() {
+    this.itemsFromLastSessionLoaded = true;
+    this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
+      func();
+    });
+  }
+
+  initializeAndItemsLoadedIos() {
+    this.initialized = true;
+    this.itemsFromLastSessionLoaded = true;
+    this.onInitFuncs.forEach((func) => {
+      func();
+    });
+    this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
+      func();
+    });
+  }
+
+  initializeAndItemsLoadedWeb(localStorageAvailable: boolean) {
+    this.initialized = true;
+    this.itemsFromLastSessionLoaded = true;
+    if (localStorageAvailable === false) {
+      this.useFallback = true;
+    }
+    this.onInitFuncs.forEach((func) => {
+      func();
+    });
+    this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
+      func();
+    });
+  }
+
   runOnInit(func: () => void) {
     if (this.initialized === true) {
       func();
     } else {
       this.onInitFuncs.push(func);
+    }
+  }
+
+  runOnItemsFromPreviousSessionLoaded(func: () => void) {
+    if (this.itemsFromLastSessionLoaded === true) {
+      func();
+    } else {
+      this.onItemsFromLastSessionLoadedFuncs.push(func);
     }
   }
 
@@ -107,7 +147,9 @@ export class AvoStorage {
         }
       } else if (this.Platform.OS === "android") {
         maybeItem = this.AsyncStorage.getItem(key);
-        return maybeItem.then((storedItem: string | null) => { storedItem != null ? JSON.parse(storedItem) : null });
+        return maybeItem.then((storedItem: string | null) => {
+          storedItem != null ? JSON.parse(storedItem) : null;
+        });
       } else {
         return Promise.resolve(null);
       }
@@ -144,7 +186,7 @@ export class AvoStorage {
     } else {
       return null;
     }
-  };
+  }
 
   setItem<T>(key: string, value: T): void {
     this.runOnInit(() => {
@@ -167,8 +209,8 @@ export class AvoStorage {
         this.AsyncStorage.setItem(key, JSON.stringify(value));
         this.data[key] = JSON.stringify(value);
       }
-    })
-  };
+    });
+  }
 
   removeItem(key: string): void {
     this.runOnInit(() => {
@@ -191,6 +233,6 @@ export class AvoStorage {
         this.AsyncStorage.removeItem(key);
         this.data[key] = null;
       }
-    })
-  };
+    });
+  }
 }
