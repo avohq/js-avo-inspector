@@ -6,11 +6,10 @@ export class AvoStorage {
 
   shouldLog: boolean;
   storageInitialized = false;
-  itemsFromLastSessionLoaded = false;
   useFallback = false;
   fallbackStorage: { [key: string]: string | null } = {};
   onStorageInitFuncs: Array<() => void> = [];
-  onItemsFromLastSessionLoadedFuncs: Array<() => void> = [];
+  // onItemsFromLastSessionLoadedFuncs: Array<() => void> = [];
 
   constructor(shouldLog: boolean) {
     this.shouldLog = shouldLog;
@@ -20,15 +19,14 @@ export class AvoStorage {
       this.AsyncStorage = this.reactNative.AsyncStorage;
 
       if (this.Platform.OS === "android") {
-        this.initializeStorageAndroid();
         this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
-          this.itemsLoadedAndroid();
+          this.initializeStorageAndroid();
         });
       } else {
-        this.initializeStorageAndItemsLoadedIos();
+        this.initializeStorageIos();
       }
     } else {
-      this.initializeStorageAndItemsLoadedWeb(this.isLocalStorageAvailable());
+      this.initializeStorageWeb(this.isLocalStorageAvailable());
     }
   }
 
@@ -66,34 +64,19 @@ export class AvoStorage {
     });
   }
 
-  itemsLoadedAndroid() {
-    this.itemsFromLastSessionLoaded = true;
-    this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
-      func();
-    });
-  }
-
-  initializeStorageAndItemsLoadedIos() {
+  initializeStorageIos() {
     this.storageInitialized = true;
-    this.itemsFromLastSessionLoaded = true;
     this.onStorageInitFuncs.forEach((func) => {
       func();
     });
-    this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
-      func();
-    });
   }
 
-  initializeStorageAndItemsLoadedWeb(isLocalStorageAvailable: boolean) {
+  initializeStorageWeb(isLocalStorageAvailable: boolean) {
     this.storageInitialized = true;
-    this.itemsFromLastSessionLoaded = true;
     if (isLocalStorageAvailable === false) {
       this.useFallback = true;
     }
     this.onStorageInitFuncs.forEach((func) => {
-      func();
-    });
-    this.onItemsFromLastSessionLoadedFuncs.forEach((func) => {
       func();
     });
   }
@@ -106,19 +89,9 @@ export class AvoStorage {
     }
   }
 
-  runOnItemsFromPreviousSessionLoaded(func: () => void) {
-    if (this.itemsFromLastSessionLoaded === true) {
-      func();
-    } else {
-      this.onItemsFromLastSessionLoadedFuncs.push(func);
-    }
-  }
-
   getItemAsync<T>(key: string): Promise<T | null> {
     let maybeItem;
-    if (this.storageInitialized === false) {
-      return Promise.resolve(null);
-    } else if (this.useFallback === true) {
+    if (this.useFallback === true) {
       maybeItem = this.fallbackStorage[key];
       if (maybeItem !== null && maybeItem !== undefined) {
         return Promise.resolve(JSON.parse(maybeItem));

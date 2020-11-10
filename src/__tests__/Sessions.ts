@@ -238,7 +238,7 @@ describe("Sessions", () => {
 
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    AvoInspector.avoStorage.itemsFromLastSessionLoaded = false;
+    AvoInspector.avoStorage.storageInitialized = false;
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -253,7 +253,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
 
     // When
-    AvoInspector.avoStorage.itemsLoadedAndroid();
+    AvoInspector.avoStorage.initializeStorageAndroid();
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
@@ -265,7 +265,7 @@ describe("Sessions", () => {
 
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    AvoInspector.avoStorage.itemsFromLastSessionLoaded = false;
+    AvoInspector.avoStorage.storageInitialized = false;
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -280,7 +280,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
 
     // When
-    AvoInspector.avoStorage.initializeStorageAndItemsLoadedIos();
+    AvoInspector.avoStorage.initializeStorageIos();
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
@@ -292,7 +292,7 @@ describe("Sessions", () => {
 
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    AvoInspector.avoStorage.itemsFromLastSessionLoaded = false;
+    AvoInspector.avoStorage.storageInitialized = false;
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -307,7 +307,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
 
     // When
-    AvoInspector.avoStorage.initializeStorageAndItemsLoadedWeb(true);
+    AvoInspector.avoStorage.initializeStorageWeb(true);
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);

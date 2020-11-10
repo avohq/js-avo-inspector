@@ -79,7 +79,7 @@ describe("Avo Storage", () => {
 
     expect(itemBeforeInit).toBeNull();
 
-    storage.initializeStorageAndItemsLoadedWeb(true);
+    storage.initializeStorageWeb(true);
 
     const itemAfterInit = storage.getItem(key);
 
@@ -95,7 +95,7 @@ describe("Avo Storage", () => {
 
     expect(itemBeforeInit).toBeNull();
 
-    storage.initializeStorageAndItemsLoadedIos();
+    storage.initializeStorageIos();
 
     const itemAfterInit = storage.getItem(key);
 
@@ -111,7 +111,7 @@ describe("Avo Storage", () => {
 
     expect(itemBeforeInit).toBeNull();
 
-    storage.initializeStorageAndItemsLoadedWeb(true);
+    storage.initializeStorageWeb(true);
 
     const itemAfterInit = storage.getItem(key);
 
