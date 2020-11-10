@@ -71,7 +71,9 @@ describe("Avo Storage", () => {
   });
 
   test("storage writes are delayed until the storage is initialized on web", () => {
-    storage.storageInitialized = false;
+    const storageWebImpl: any = storage.storageImpl;
+
+    storageWebImpl.storageInitialized = false;
 
     storage.setItem(key, "OnStorageInitFuncs on web");
 
@@ -79,43 +81,11 @@ describe("Avo Storage", () => {
 
     expect(itemBeforeInit).toBeNull();
 
-    storage.initializeStorageWeb(true);
+    storageWebImpl.init(true);
 
     const itemAfterInit = storage.getItem(key);
 
     expect(itemAfterInit).toEqual("OnStorageInitFuncs on web");
-  });
-
-  test("storage writes are delayed until the storage is initialized on android", () => {
-    storage.storageInitialized = false;
-
-    storage.setItem(key, "OnStorageInitFuncs on android");
-
-    const itemBeforeInit = storage.getItem(key);
-
-    expect(itemBeforeInit).toBeNull();
-
-    storage.initializeStorageIos();
-
-    const itemAfterInit = storage.getItem(key);
-
-    expect(itemAfterInit).toEqual("OnStorageInitFuncs on android");
-  });
-
-  test("storage writes are delayed until the storage is initialized on ios", () => {
-    storage.storageInitialized = false;
-
-    storage.setItem(key, "OnStorageInitFuncs on ios");
-
-    const itemBeforeInit = storage.getItem(key);
-
-    expect(itemBeforeInit).toBeNull();
-
-    storage.initializeStorageWeb(true);
-
-    const itemAfterInit = storage.getItem(key);
-
-    expect(itemAfterInit).toEqual("OnStorageInitFuncs on ios");
   });
 });
 
@@ -129,8 +99,9 @@ describe("Avo Storage unavailable", () => {
 
   test("Fallback mode enabled", () => {
     const storage = new AvoStorage(false);
-    expect(storage.useFallback).toBe(true);
-    expect(storage.storageInitialized).toBe(true);
+    const storageImpl: any = storage.storageImpl;
+    expect(storageImpl.useFallbackStorage).toBe(true);
+    expect(storageImpl.storageInitialized).toBe(true);
   });
 
   test("Sets and gets item with shouldLog on", () => {

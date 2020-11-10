@@ -9,7 +9,7 @@ export class AvoInstallationId {
       return AvoInstallationId.installationId;
     }
 
-    if (!AvoInspector.avoStorage.storageInitialized) {
+    if (!AvoInspector.avoStorage.isInitialized()) {
       return "unknown";
     }
 

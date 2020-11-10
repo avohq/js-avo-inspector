@@ -232,7 +232,7 @@ describe("Sessions", () => {
     expect(sessionTracker.sessionLengthMillis).toBe(sessionTimeMs);
   });
 
-  test("Delays session init if items from last sessions are not loaded on android", () => {
+  /*   test("Delays session init if items from last sessions are not loaded on android", () => {
     // Given
     const callMoment = Date.now();
 
@@ -257,7 +257,7 @@ describe("Sessions", () => {
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
-  });
+  }); */
 
   test("Delays session init if items from last sessions are not loaded on ios", () => {
     // Given
@@ -265,7 +265,7 @@ describe("Sessions", () => {
 
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    AvoInspector.avoStorage.storageInitialized = false;
+    (AvoInspector.avoStorage.storageImpl as any).storageInitialized = false;
 
     // When
     let sessionTracker = new AvoSessionTracker(mockBatcher);
@@ -280,34 +280,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
 
     // When
-    AvoInspector.avoStorage.initializeStorageIos();
-
-    // Then
-    expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
-  });
-
-  test("Delays session init if items from last sessions are not loaded on web", () => {
-    // Given
-    const callMoment = Date.now();
-
-    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
-
-    AvoInspector.avoStorage.storageInitialized = false;
-
-    // When
-    let sessionTracker = new AvoSessionTracker(mockBatcher);
-
-    // Then
-    expect(sessionTracker.lastSessionTimestamp).toBe(0);
-
-    // When
-    sessionTracker.startOrProlongSession(callMoment);
-
-    // Then
-    expect(sessionTracker.lastSessionTimestamp).toBe(0);
-
-    // When
-    AvoInspector.avoStorage.initializeStorageWeb(true);
+    AvoInspector.avoStorage.storageImpl.init(true);
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);

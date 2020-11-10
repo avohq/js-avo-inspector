@@ -6,7 +6,7 @@ export class AvoSessionTracker {
   private static _sessionId: null | string = null;
   static get sessionId(): string {
     if (AvoSessionTracker._sessionId === null) {
-      if (!AvoInspector.avoStorage.storageInitialized) {
+      if (!AvoInspector.avoStorage.isInitialized()) {
         return "unknown";
       }
 
@@ -68,7 +68,7 @@ export class AvoSessionTracker {
   }
 
   startOrProlongSession(atTime: number): void {
-    AvoInspector.avoStorage.runOnStorageInit(() => {
+    AvoInspector.avoStorage.runAfterInit(() => {
       const timeSinceLastSession = atTime - this.lastSessionTimestamp;
 
       if (timeSinceLastSession > this._sessionLengthMillis) {
