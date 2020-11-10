@@ -1,5 +1,5 @@
 export class AvoStorage {
-  data: { [key: string]: string | null } = {};
+  androidMemoryDataToAvoidAsyncQueries: { [key: string]: string | null } = {};
   reactNative: any | null = null;
   Platform: any | null = null;
   AsyncStorage: any | null = null;
@@ -8,7 +8,7 @@ export class AvoStorage {
   storageInitialized = false;
   itemsFromLastSessionLoaded = false;
   useFallback = false;
-  fallbackStorage: any = {};
+  fallbackStorage: { [key: string]: string | null } = {};
   onStorageInitFuncs: Array<() => void> = [];
   onItemsFromLastSessionLoadedFuncs: Array<() => void> = [];
 
@@ -20,40 +20,46 @@ export class AvoStorage {
       this.AsyncStorage = this.reactNative.AsyncStorage;
 
       if (this.Platform.OS === "android") {
-        // Android is the only platform that requires async loading of items from the prev session
-        this.initializeAndroid();
-        this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
-          this.AsyncStorage.multiGet(keys).then(
-            (keyVals: Array<Array<string>>) => {
-              keyVals.forEach((keyVal) => {
-                let key = keyVal[0];
-                this.data[key] = keyVal[1];
-              });
-              this.itemsLoadedAndroid();
-            }
-          )
-        );
+        this.initializeStorageAndroid();
+        this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
+          this.itemsLoadedAndroid();
+        });
       } else {
-        this.initializeAndItemsLoadedIos();
+        this.initializeStorageAndItemsLoadedIos();
       }
     } else {
-      // Verify localStorage
-      const uid = new Date().toISOString();
-      try {
-        window.localStorage.setItem(uid, uid);
-        if (window.localStorage.getItem(uid) === uid) {
-          window.localStorage.removeItem(uid);
-          this.initializeAndItemsLoadedWeb(true);
-        } else {
-          this.initializeAndItemsLoadedWeb(false);
-        }
-      } catch (error) {
-        this.initializeAndItemsLoadedWeb(false);
-      }
+      this.initializeStorageAndItemsLoadedWeb(this.isLocalStorageAvailable());
     }
   }
 
-  initializeAndroid() {
+  loadAndroidDataToMemoryToAvoidAsyncQueries(onLoaded: () => void) {
+    this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
+      this.AsyncStorage.multiGet(keys).then((keyVals: Array<Array<string>>) => {
+        keyVals.forEach((keyVal) => {
+          let key = keyVal[0];
+          this.androidMemoryDataToAvoidAsyncQueries[key] = keyVal[1];
+        });
+        onLoaded();
+      })
+    );
+  }
+
+  isLocalStorageAvailable(): boolean {
+    const uid = new Date().toISOString();
+    try {
+      window.localStorage.setItem(uid, uid);
+      if (window.localStorage.getItem(uid) === uid) {
+        window.localStorage.removeItem(uid);
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      return false;
+    }
+  }
+
+  initializeStorageAndroid() {
     this.storageInitialized = true;
     this.onStorageInitFuncs.forEach((func) => {
       func();
@@ -67,7 +73,7 @@ export class AvoStorage {
     });
   }
 
-  initializeAndItemsLoadedIos() {
+  initializeStorageAndItemsLoadedIos() {
     this.storageInitialized = true;
     this.itemsFromLastSessionLoaded = true;
     this.onStorageInitFuncs.forEach((func) => {
@@ -78,10 +84,10 @@ export class AvoStorage {
     });
   }
 
-  initializeAndItemsLoadedWeb(localStorageAvailable: boolean) {
+  initializeStorageAndItemsLoadedWeb(isLocalStorageAvailable: boolean) {
     this.storageInitialized = true;
     this.itemsFromLastSessionLoaded = true;
-    if (localStorageAvailable === false) {
+    if (isLocalStorageAvailable === false) {
       this.useFallback = true;
     }
     this.onStorageInitFuncs.forEach((func) => {
@@ -177,7 +183,7 @@ export class AvoStorage {
         const Settings = this.reactNative.Settings;
         maybeItem = Settings.get(key);
       } else if (this.Platform.OS === "android") {
-        maybeItem = this.data[key];
+        maybeItem = this.androidMemoryDataToAvoidAsyncQueries[key];
       }
     }
 
@@ -207,7 +213,7 @@ export class AvoStorage {
         Settings.set({ [key]: JSON.stringify(value) });
       } else if (this.Platform.OS === "android") {
         this.AsyncStorage.setItem(key, JSON.stringify(value));
-        this.data[key] = JSON.stringify(value);
+        this.androidMemoryDataToAvoidAsyncQueries[key] = JSON.stringify(value);
       }
     });
   }
@@ -215,7 +221,7 @@ export class AvoStorage {
   removeItem(key: string): void {
     this.runOnStorageInit(() => {
       if (this.useFallback === true) {
-        this.fallbackStorage[key] = undefined;
+        this.fallbackStorage[key] = null;
       } else if (process.env.BROWSER) {
         if (typeof window !== "undefined") {
           try {
@@ -231,7 +237,7 @@ export class AvoStorage {
         Settings.set({ [key]: null });
       } else if (this.Platform.OS === "android") {
         this.AsyncStorage.removeItem(key);
-        this.data[key] = null;
+        this.androidMemoryDataToAvoidAsyncQueries[key] = null;
       }
     });
   }

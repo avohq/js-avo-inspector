@@ -280,7 +280,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
 
     // When
-    AvoInspector.avoStorage.initializeAndItemsLoadedIos();
+    AvoInspector.avoStorage.initializeStorageAndItemsLoadedIos();
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
@@ -307,7 +307,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
 
     // When
-    AvoInspector.avoStorage.initializeAndItemsLoadedWeb(true);
+    AvoInspector.avoStorage.initializeStorageAndItemsLoadedWeb(true);
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
