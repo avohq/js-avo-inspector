@@ -9,6 +9,8 @@ For more information about the Inspector project please read [Avo documentation]
 
 # Installation
 
+> If you are looking for React Native library please switch to [this branch](https://github.com/avohq/js-avo-inspector/tree/react-native-node-package) and use `react-native-avo-inspector` npm package.
+
 The library is distributed with npm
 
 ```

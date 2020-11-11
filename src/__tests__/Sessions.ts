@@ -11,15 +11,15 @@ jest.mock("../AvoBatcher");
 jest.mock("../AvoNetworkCallsHandler");
 
 describe("Sessions", () => {
-  const { apiKey, env, version } = defaultOptions;
+  const { apiKey, env, version, shouldLog } = defaultOptions;
 
-  const storage = new AvoStorage();
+  const storage = new AvoStorage(shouldLog);
   const networkHandler = new AvoNetworkCallsHandler(
     apiKey,
     env,
     "",
     version,
-    inspectorVersion,
+    inspectorVersion
   );
   const mockBatcher = new AvoBatcher(networkHandler);
 
@@ -136,7 +136,7 @@ describe("Sessions", () => {
 
     storage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      callMoment - sessionTimeMs - 1,
+      callMoment - sessionTimeMs - 1
     );
 
     // When
@@ -158,7 +158,7 @@ describe("Sessions", () => {
 
     storage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      callMoment - sessionTimeMs + 1,
+      callMoment - sessionTimeMs + 1
     );
 
     // When
@@ -179,7 +179,7 @@ describe("Sessions", () => {
 
     storage.setItem(
       AvoSessionTracker.lastSessionTimestampKey,
-      callMoment - sessionTimeMs + 1,
+      callMoment - sessionTimeMs + 1
     );
 
     // When
@@ -191,7 +191,7 @@ describe("Sessions", () => {
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(
-      callMoment + sessionTimeMs,
+      callMoment + sessionTimeMs
     );
     expect(AvoSessionTracker.sessionId).toBe(prevSessionId);
     expect(mockBatcher.handleSessionStarted).toHaveBeenCalledTimes(0);
@@ -230,5 +230,32 @@ describe("Sessions", () => {
 
     // Then
     expect(sessionTracker.sessionLengthMillis).toBe(sessionTimeMs);
+  });
+
+  test("Delays session init if items from last sessions are not loaded", () => {
+    // Given
+    const callMoment = Date.now();
+
+    storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
+
+    (AvoInspector.avoStorage.storageImpl as any).storageInitialized = false;
+
+    // When
+    let sessionTracker = new AvoSessionTracker(mockBatcher);
+
+    // Then
+    expect(sessionTracker.lastSessionTimestamp).toBe(0);
+
+    // When
+    sessionTracker.startOrProlongSession(callMoment);
+
+    // Then
+    expect(sessionTracker.lastSessionTimestamp).toBe(0);
+
+    // When
+    AvoInspector.avoStorage.storageImpl.init(true);
+
+    // Then
+    expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
   });
 });

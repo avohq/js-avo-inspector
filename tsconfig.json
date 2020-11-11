@@ -4,6 +4,7 @@
     "target": "ES6",
     "declaration": true,
     "strict": true,
+    "noImplicitAny": true,
     "baseUrl": "./src",
     "outDir": "./dist"
   },
