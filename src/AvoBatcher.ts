@@ -33,12 +33,17 @@ export class AvoBatcher implements AvoBatcherType {
     this.batchFlushAttemptTimestamp = Date.now();
 
     AvoInspector.avoStorage
-      .getItemAsync<Array<SessionStartedBody | EventSchemaBody> | null>(
+      .getItemAsync<Array<SessionStartedBody | EventSchemaBody | null> | null>(
         AvoBatcher.cacheKey
       )
       .then((savedEvents) => {
         if (savedEvents !== null) {
-          this.events = this.events.concat(savedEvents);
+          let nonNullSavedEvents = savedEvents.filter(
+            (event) => event !== null
+          );
+          this.events = this.events.concat(
+            nonNullSavedEvents as Array<SessionStartedBody | EventSchemaBody>
+          );
           this.checkIfBatchNeedsToBeSent();
         }
       });

@@ -16,31 +16,40 @@ abstract class PlatformAvoStorage {
   }
 }
 
-export class AndroidAvoStorage extends PlatformAvoStorage {
+class AndroidAvoStorage extends PlatformAvoStorage {
   androidMemoryDataToAvoidAsyncQueries: { [key: string]: string | null } = {};
   AsyncStorage: any | null = null;
   memoryStorageInitialized = false;
   onStorageInitFuncs: Array<() => void> = [];
   reactNative: any | null = null;
+  shouldLog: boolean = false;
 
-  init(_shouldLog: boolean) {
+  init(shouldLog: boolean) {
     if (!process.env.BROWSER) {
       this.reactNative = require("react-native");
+
+      this.shouldLog = shouldLog;
+
+      this.AsyncStorage = this.reactNative.AsyncStorage;
+
+      this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
+        this.initializeStorageAndroid();
+      });
     }
-
-    this.AsyncStorage = this.reactNative.AsyncStorage;
-
-    this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
-      this.initializeStorageAndroid();
-    });
   }
 
   private loadAndroidDataToMemoryToAvoidAsyncQueries(onLoaded: () => void) {
     this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
       this.AsyncStorage.multiGet(keys).then((keyVals: Array<Array<string>>) => {
+        if (this.shouldLog) {
+          console.log("Avo Inspector: android loaded data from memory");
+        }
         keyVals.forEach((keyVal) => {
           let key = keyVal[0];
           this.androidMemoryDataToAvoidAsyncQueries[key] = keyVal[1];
+          if (this.shouldLog) {
+            console.log(key, keyVal[1]);
+          }
         });
         onLoaded();
       })
@@ -55,13 +64,13 @@ export class AndroidAvoStorage extends PlatformAvoStorage {
   }
 
   isInitialized() {
-    return this.memoryStorageInitialized;
+    return this.reactNative && this.memoryStorageInitialized;
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
     let maybeItem = this.AsyncStorage.getItem(key);
-    return maybeItem.then((storedItem: string | null) => {
-      storedItem != null ? JSON.parse(storedItem) : null;
+    return maybeItem.then((storedItem: string | null): T | null => {
+      return storedItem != null ? JSON.parse(storedItem) : null;
     });
   }
 
@@ -89,7 +98,7 @@ export class AndroidAvoStorage extends PlatformAvoStorage {
   }
 }
 
-export class IosAvoStorage extends PlatformAvoStorage {
+class IosAvoStorage extends PlatformAvoStorage {
   reactNative: any | null = null;
 
   init(_shouldLog: boolean) {
@@ -129,7 +138,7 @@ export class IosAvoStorage extends PlatformAvoStorage {
   }
 }
 
-export class BrowserAvoStorage extends PlatformAvoStorage {
+class BrowserAvoStorage extends PlatformAvoStorage {
   useFallbackStorage = false;
   fallbackStorage: { [key: string]: string | null } = {};
   storageInitialized = false;
@@ -183,7 +192,12 @@ export class BrowserAvoStorage extends PlatformAvoStorage {
             try {
               maybeItem = window.localStorage.getItem(key);
             } catch (error) {
-              console.error("Avo Inspector Storage getItemAsync error:", error);
+              if (thisStorage.shouldLog) {
+                console.error(
+                  "Avo Inspector Storage getItemAsync error:",
+                  error
+                );
+              }
               resolve(null);
             }
 
