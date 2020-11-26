@@ -5,7 +5,7 @@
 # Avo documentation
 
 This is a quick start guide.
-For more information about the Inspector project please read [Avo documentation](https://www.avo.app/docs/inspector/sdk/js).
+For more information about the Inspector project please read [Avo documentation](https://www.avo.app/docs/implementation/inspector/sdk/web).
 
 # Installation
 
@@ -16,7 +16,9 @@ The library is distributed with npm
 ```
     npm i avo-inspector
 ```
+
 or
+
 ```
     yarn add avo-inspector
 ```
@@ -29,11 +31,11 @@ Obtain the API key at [Avo.app](https://www.avo.app/welcome)
 import * as Inspector from "avo-inspector";
 
 let inspector = new Inspector.AvoInspector({
-    apiKey: "your api key",
-    env: Inspector.AvoInspectorEnv.Dev,
-    version: "1.0.0",
-    appName: "My app"
-  });
+  apiKey: "your api key",
+  env: Inspector.AvoInspectorEnv.Dev,
+  version: "1.0.0",
+  appName: "My app",
+});
 ```
 
 # Enabling logs
@@ -56,10 +58,10 @@ It is the easiest way to use the library, just call this method at the same plac
 
 ```javascript
 inspector.trackSchemaFromEvent("Event name", {
-          "String Prop": "Prop Value",
-          "Float Prop": 1.0,
-          "Boolean Prop": true
-        }); 
+  "String Prop": "Prop Value",
+  "Float Prop": 1.0,
+  "Boolean Prop": true,
+});
 ```
 
 ### 2.
@@ -68,21 +70,22 @@ If you prefer to extract data schema manually you would use this method.
 
 ```javascript
 inspector.trackSchema("Event name", [
-    { propertyName: "String prop", propertyType: "string" },
-    { propertyName: "Float prop", propertyType: "float" },
-    { propertyName: "Boolean prop", propertyType: "boolean" },
-  ]);
+  { propertyName: "String prop", propertyType: "string" },
+  { propertyName: "Float prop", propertyType: "float" },
+  { propertyName: "Boolean prop", propertyType: "boolean" },
+]);
 ```
 
 # Extracting event schema manually
 
 ```javascript
 let schema = inspector.extractSchema({
-          "String Prop": "Prop Value",
-          "Float Prop": 1.0,
-          "Boolean Prop": true
-        });
+  "String Prop": "Prop Value",
+  "Float Prop": 1.0,
+  "Boolean Prop": true,
+});
 ```
+
 You can experiment with this method to see how more complex schemas look, for example with nested lists and objects.
 
 # Batching control
