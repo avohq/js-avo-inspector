@@ -2,7 +2,7 @@ import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 const defaultOptions = {
   apiKey: "api-key-xxx",
-  env: AvoInspectorEnv.Dev,
+  env: AvoInspectorEnv.Prod,
   version: "1",
   shouldLog: true
 };
