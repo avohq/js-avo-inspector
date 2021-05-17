@@ -24,6 +24,13 @@ export class AvoInspector {
   static get batchSize() {
     return this._batchSize;
   }
+  static set batchSize(newSize: number) {
+    if (newSize < 1) {
+      this._batchSize = 1;
+    } else {
+      this._batchSize = newSize;
+    }
+  }
 
   private static _batchFlushSeconds = 30;
   static get batchFlushSeconds() {
@@ -77,9 +84,10 @@ export class AvoInspector {
     }
 
     if (this.environment === AvoInspectorEnv.Dev) {
-      AvoInspector._batchFlushSeconds = 1;
+      AvoInspector._batchSize = 1;
       AvoInspector._shouldLog = true;
     } else {
+      AvoInspector._batchSize = 30;
       AvoInspector._batchFlushSeconds = 30;
       AvoInspector._shouldLog = false;
     }
