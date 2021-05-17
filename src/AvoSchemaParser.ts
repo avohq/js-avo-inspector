@@ -3,7 +3,7 @@ let isArray = (obj: any): boolean => {
 };
 
 export class AvoSchemaParser {
-  extractSchema(eventProperties: {
+  static extractSchema(eventProperties: {
     [propName: string]: any;
   }): Array<{
     propertyName: string;
@@ -54,7 +54,7 @@ export class AvoSchemaParser {
     return mappedEventProps;
   }
 
-  private removeDuplicates(array: Array<any>): Array<any> {
+  private static removeDuplicates(array: Array<any>): Array<any> {
     // XXX TODO fix any types
     var primitives: any = { boolean: {}, number: {}, string: {} };
     var objects: Array<any> = [];
@@ -71,7 +71,7 @@ export class AvoSchemaParser {
     });
   }
 
-  private getPropValueType(propValue: any): string {
+  private static getPropValueType(propValue: any): string {
     let propType = typeof propValue;
     if (propValue == null) {
       return "null";

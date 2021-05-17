@@ -1,4 +1,4 @@
-
+.DS_Store
 /node_modules
 /.pnp
 .pnp.js
@@ -6,6 +6,7 @@
 /coverage
 
 /dist
+/dist-native
 /build
 /.cache
 

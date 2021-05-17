@@ -4,12 +4,16 @@ import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoBatcher } from "./AvoBatcher";
 import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
+import { AvoDeduplicator } from "./AvoDeduplicator";
 
-let libVersion = require("../package.json").version;
+import { isValueEmpty } from "./utils";
+
+const libVersion = require("../package.json").version;
 
 export class AvoInspector {
   environment: AvoInspectorEnvValueType;
   avoBatcher: AvoBatcher;
+  avoDeduplicator: AvoDeduplicator;
   sessionTracker: AvoSessionTracker;
   apiKey: string;
   version: string;
@@ -37,6 +41,9 @@ export class AvoInspector {
   static get shouldLog() {
     return this._shouldLog;
   }
+  static set shouldLog(enable) {
+    this._shouldLog = enable;
+  }
 
   // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
   constructor(options: {
@@ -46,20 +53,21 @@ export class AvoInspector {
     appName?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
-    if (options.env === null || options.env === undefined) {
+    if (isValueEmpty(options.env)) {
       this.environment = AvoInspectorEnv.Dev;
       console.warn(
         "[Avo Inspector] No environment provided. Defaulting to dev."
+      );
+    } else if (Object.values(AvoInspectorEnv).indexOf(options.env) === -1) {
+      this.environment = AvoInspectorEnv.Dev;
+      console.warn(
+        "[Avo Inspector] Unsupported environment provided. Defaulting to dev. Supported environments - Dev, Staging, Prod."
       );
     } else {
       this.environment = options.env;
     }
 
-    if (
-      options.apiKey === null ||
-      options.apiKey === undefined ||
-      options.apiKey.trim().length == 0
-    ) {
+    if (isValueEmpty(options.apiKey)) {
       throw new Error(
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
@@ -67,11 +75,7 @@ export class AvoInspector {
       this.apiKey = options.apiKey;
     }
 
-    if (
-      options.version === null ||
-      options.version === undefined ||
-      options.version.trim().length == 0
-    ) {
+    if (isValueEmpty(options.version)) {
       throw new Error(
         "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
       );
@@ -88,7 +92,7 @@ export class AvoInspector {
       AvoInspector._shouldLog = false;
     }
 
-    AvoInspector.avoStorage = new AvoStorage();
+    AvoInspector.avoStorage = new AvoStorage(AvoInspector._shouldLog);
 
     let avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
@@ -99,38 +103,114 @@ export class AvoInspector {
     );
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
-    
+    this.avoDeduplicator = new AvoDeduplicator();
+
     try {
       if (process.env.BROWSER) {
-        window.addEventListener(
-          "load",
-          () => {
-            this.sessionTracker.startOrProlongSession(Date.now());
-          },
-          false
-        );
+        // XXX make node/browser split clearer
+        if (typeof window !== "undefined") {
+          window.addEventListener(
+            "load",
+            () => {
+              this.sessionTracker.startOrProlongSession(Date.now());
+            },
+            false
+          );
+        }
       } else {
         this.sessionTracker.startOrProlongSession(Date.now());
       }
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
     }
   }
 
   trackSchemaFromEvent(
     eventName: string,
     eventProperties: { [propName: string]: any }
-  ): void {
+  ): Array<{
+    propertyName: string;
+    propertyType: string;
+    children?: any;
+  }> {
     try {
-      if (AvoInspector.shouldLog) {
-        console.log(
-          "Avo Inspector: supplied event " + eventName + " with params " + JSON.stringify(eventProperties)
-        );
+      if (
+        this.avoDeduplicator.shouldRegisterEvent(
+          eventName,
+          eventProperties,
+          false
+        )
+      ) {
+        if (AvoInspector.shouldLog) {
+          console.log(
+            "Avo Inspector: supplied event " +
+              eventName +
+              " with params " +
+              JSON.stringify(eventProperties)
+          );
+        }
+        let eventSchema = this.extractSchema(eventProperties, false);
+        this.trackSchemaInternal(eventName, eventSchema, null, null);
+        return eventSchema;
+      } else {
+        if (AvoInspector.shouldLog) {
+          console.log("Avo Inspector: Deduplicated event: " + eventName);
+        }
+        return [];
       }
-      let eventSchema = this.extractSchema(eventProperties);
-      this.trackSchema(eventName, eventSchema);
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
+      return [];
+    }
+  }
+
+  private _avoFunctionTrackSchemaFromEvent(
+    eventName: string,
+    eventProperties: { [propName: string]: any },
+    eventId: string,
+    eventHash: string
+  ): Array<{
+    propertyName: string;
+    propertyType: string;
+    children?: any;
+  }> {
+    try {
+      if (
+        this.avoDeduplicator.shouldRegisterEvent(
+          eventName,
+          eventProperties,
+          true
+        )
+      ) {
+        if (AvoInspector.shouldLog) {
+          console.log(
+            "Avo Inspector: supplied event " +
+              eventName +
+              " with params " +
+              JSON.stringify(eventProperties)
+          );
+        }
+        let eventSchema = this.extractSchema(eventProperties, false);
+        this.trackSchemaInternal(eventName, eventSchema, eventId, eventHash);
+        return eventSchema;
+      } else {
+        if (AvoInspector.shouldLog) {
+          console.log("Avo Inspector: Deduplicated event: " + eventName);
+        }
+        return [];
+      }
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
+      return [];
     }
   }
 
@@ -143,10 +223,57 @@ export class AvoInspector {
     }>
   ): void {
     try {
+      if (
+        this.avoDeduplicator.shouldRegisterSchemaFromManually(
+          eventName,
+          eventSchema
+        )
+      ) {
+        if (AvoInspector.shouldLog) {
+          console.log(
+            "Avo Inspector: supplied event " +
+              eventName +
+              " with schema " +
+              JSON.stringify(eventSchema)
+          );
+        }
+        this.trackSchemaInternal(eventName, eventSchema, null, null);
+      } else {
+        if (AvoInspector.shouldLog) {
+          console.log("Avo Inspector: Deduplicated event: " + eventName);
+        }
+      }
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
+    }
+  }
+
+  private trackSchemaInternal(
+    eventName: string,
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+    }>,
+    eventId: string | null,
+    eventHash: string | null
+  ): void {
+    try {
       this.sessionTracker.startOrProlongSession(Date.now());
-      this.avoBatcher.handleTrackSchema(eventName, eventSchema);
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+      this.avoBatcher.handleTrackSchema(
+        eventName,
+        eventSchema,
+        eventId,
+        eventHash
+      );
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
     }
   }
 
@@ -154,18 +281,42 @@ export class AvoInspector {
     AvoInspector._shouldLog = enable;
   }
 
-  extractSchema(eventProperties: {
-    [propName: string]: any;
-  }): Array<{
+  extractSchema(
+    eventProperties: {
+      [propName: string]: any;
+    },
+    shouldLogIfEnabled = true
+  ): Array<{
     propertyName: string;
     propertyType: string;
     children?: any;
   }> {
     try {
       this.sessionTracker.startOrProlongSession(Date.now());
-      return new AvoSchemaParser().extractSchema(eventProperties);
-    } catch(e) {
-      console.error("Avo Inspector: something went very wrong. Please report to support@avo.app.", e);
+
+      if (this.avoDeduplicator.hasSeenEventParams(eventProperties, true)) {
+        if (shouldLogIfEnabled && AvoInspector.shouldLog) {
+          console.warn(
+            "Avo Inspector: WARNING! You are trying to extract schema shape that was just reported by your Avo functions. " +
+              "This is an indicator of duplicate inspector reporting. " +
+              "Please reach out to support@avo.app for advice if you are not sure how to handle this."
+          );
+        }
+      }
+
+      if (AvoInspector.shouldLog) {
+        console.log(
+          "Avo Inspector: extracting schema from " +
+            JSON.stringify(eventProperties)
+        );
+      }
+
+      return AvoSchemaParser.extractSchema(eventProperties);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
       return [];
     }
   }

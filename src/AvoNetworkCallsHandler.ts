@@ -29,6 +29,9 @@ export interface EventSchemaBody extends BaseBody {
     propertyType: string;
     children?: any;
   }>;
+  avoFunction: boolean;
+  eventId: string | null;
+  eventHash: string | null;
 }
 
 export class AvoNetworkCallsHandler {
@@ -56,11 +59,16 @@ export class AvoNetworkCallsHandler {
     this.libVersion = libVersion;
   }
 
-  callInspectorWithBatchBody(events: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
+  callInspectorWithBatchBody(inEvents: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
     if (this.sending) {
       onCompleted("Batch sending cancelled because another batch sending is in progress. Your events will be sent with next batch.");
       return;
     }
+
+    const events = inEvents.filter(x => x != null);
+
+    this.fixSessionAndTrackingIds(events);
+
     if (events.length === 0) {
       return;
     }
@@ -73,6 +81,8 @@ export class AvoNetworkCallsHandler {
     }
 
     if (AvoInspector.shouldLog) {
+      console.log("Avo Inspector: events", events);
+
       events.forEach(
         function (event) {
           if (event.type === "sessionStarted") {
@@ -111,6 +121,40 @@ export class AvoNetworkCallsHandler {
     this.sending = false;
   }
 
+  private fixSessionAndTrackingIds(events: (SessionStartedBody | EventSchemaBody)[]) {
+    let knownSessionId: string | null = null;
+    let knownTrackingId: string | null = null;
+    events.forEach(
+      function (event) {
+        if (event.sessionId !== null && event.sessionId !== undefined && event.sessionId !== "unknown") {
+          knownSessionId = event.sessionId;
+        }
+
+        if (event.trackingId !== null && event.trackingId !== undefined && event.trackingId !== "unknown") {
+          knownTrackingId = event.trackingId;
+        }
+      }
+    );
+    events.forEach(
+      function (event) {
+        if (event.sessionId === "unknown") {
+          if (knownSessionId != null) {
+            event.sessionId = knownSessionId;
+          } else {
+            event.sessionId = AvoSessionTracker.sessionId
+          }
+        }
+        if (event.trackingId === "unknown") {
+          if (knownTrackingId != null) {
+            event.trackingId = knownTrackingId;
+          } else {
+            event.trackingId = AvoInstallationId.getInstallationId();
+          }
+        }
+      }
+    );
+  }
+
   bodyForSessionStartedCall(): SessionStartedBody {
     let sessionBody = this.createBaseCallBody() as SessionStartedBody;
     sessionBody.type = "sessionStarted";
@@ -123,12 +167,25 @@ export class AvoNetworkCallsHandler {
       propertyName: string;
       propertyType: string;
       children?: any;
-    }>
+    }>,
+    eventId: string | null,
+    eventHash: string | null
   ): EventSchemaBody {
     let eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
     eventSchemaBody.eventName = eventName;
     eventSchemaBody.eventProperties = eventProperties;
+
+    if (eventId != null) {
+      eventSchemaBody.avoFunction = true;
+      eventSchemaBody.eventId = eventId;
+      eventSchemaBody.eventHash = eventHash;
+    } else {
+      eventSchemaBody.avoFunction = false;
+      eventSchemaBody.eventId = null;
+      eventSchemaBody.eventHash = null;
+    }
+
     return eventSchemaBody;
   }
 

@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "es2015",
+    "module": "CommonJS",
+    "target": "ES5",
     "declaration": true,
-    "outDir": "./dist",
+    "strict": true,
+    "noImplicitAny": true,
     "baseUrl": "./src",
-    "strict": true
+    "outDir": "./dist"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["src/tests"]
 }

@@ -2,3 +2,7 @@ tsconfig.json
 src
 examples
 *.bs.js
+dist/__tests__
+dist/__mocks__
+dist-native/__tests__
+dist-native/__mocks__

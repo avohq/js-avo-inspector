@@ -1,2 +1,2 @@
-export {AvoInspector} from './AvoInspector';
-export {AvoInspectorEnv} from './AvoInspectorEnv';
+export { AvoInspector } from "./AvoInspector";
+export { AvoInspectorEnv } from "./AvoInspectorEnv";
