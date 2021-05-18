@@ -100,7 +100,7 @@ You can experiment with this method to see how more complex schemas look, for ex
 In order to ensure our SDK doesn't have a large impact on performance or battery life it supports event schemas batching.
 
 Default batch size is 30 and default batch flush timeout is 30 seconds.
-In development mode default batch flush timeout is 1 second, i.e. the SDK batches schemas of events sent withing one second.
+In development mode batching is disabled by default.
 
 ```javascript
 inspector.setBatchSize(15);
