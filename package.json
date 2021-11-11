@@ -8,6 +8,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --emitDeclarationOnly && webpack src/index.ts --mode production --resolve-extensions .ts --module-bind ts=ts-loader --define process.env.BROWSER=1 --output-filename index.js --output-library-target umd",
+    "build-for-script-tag": "tsc --emitDeclarationOnly && webpack src/browser.js --mode production --resolve-extensions .ts --module-bind ts=ts-loader --define process.env.BROWSER=1 --woutput-filename browser.js --output-library-target umd",
     "build-native": "tsc --outDir dist-native",
     "test": "jest",
     "test:browser": "BROWSER=1 jest",

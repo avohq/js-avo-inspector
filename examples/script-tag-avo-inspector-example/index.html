@@ -1,0 +1,27 @@
+<html>
+    <head>
+        <title>Script Tag Inspector Example</title>
+
+        <!-- START OF INSPECTOR TAG -->
+        <script >
+            !function(){var t=window.inspector=window.inspector||[];t.methods=["trackSchemaFromEvent","trackSchema","setBatchSize","setBatchFlushSeconds"],t.factory=function(e){return function(){var r=Array.prototype.slice.call(arguments);return r.unshift(e),t.push(r),t}};for(var e=0;e<t.methods.length;e++){var r=t.methods[e];t[r]=t.factory(r)}t.load=function(){var t=document.createElement("script");t.type="text/javascript",t.async=!0,t.src="https://cdn.avo.app/inspector/inspector-v1.min.js";var e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(t,e)},t._scriptVersion=1}();
+            
+            // Update the following variables to match your project.
+            inspector.__API_KEY__ = "YOUR-API-KEY";
+            inspector.__ENV__ = "dev"; // or "prod"
+            inspector.__VERSION__ = "YOUR-APP-VERSION";
+            inspector.__APP_NAME__ = "YOUR-APP-NAME";
+            
+            inspector.load();
+        </script>
+        <!-- END OF INSPECTOR TAG --> 
+
+    </head>
+    <body>
+        <h1>Script Tag Inspector Example</h1>
+        <p>
+            This example shows how to install the Avo Inspector via <code>script</code> tag.
+        </p>
+        <button onclick="window.inspector.trackSchemaFromEvent('My Event Name', {'My Property Name': 'string'})">Track Event Schema</button>
+    </body>
+</html>
