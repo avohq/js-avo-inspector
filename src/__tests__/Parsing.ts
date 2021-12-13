@@ -15,6 +15,71 @@ describe("Schema Parsing", () => {
     expect(schema).toEqual([]);
   });
 
+  test("Record is parsed correctly", () => {
+    // Given
+    const eventProperrtiesaRecord: Record<string, unknown> = {
+      prop0: true,
+      prop1: 1,
+      prop2: "str",
+      prop3: 0.5,
+      prop4: undefined,
+      prop5: null,
+      prop6: { an: "object" },
+      prop7: [
+        "a",
+        "list",
+        {
+          "obj in list": true,
+          "int field": 1,
+        },
+        ["another", "list"],
+        [1, 2],
+      ],
+    };
+
+    // When
+    const res = inspector.extractSchema(eventProperrtiesaRecord);
+
+    // Then
+    res.forEach(({ propertyName }, index) => {
+      expect(propertyName).toBe(`prop${index}`);
+    });
+
+    expect(res.length).toBe(8);
+
+    expect(res[0].propertyType).toBe(type.BOOL);
+    expect(res[1].propertyType).toBe(type.INT);
+    expect(res[2].propertyType).toBe(type.STRING);
+    expect(res[3].propertyType).toBe(type.FLOAT);
+    expect(res[4].propertyType).toBe(type.NULL);
+    expect(res[5].propertyType).toBe(type.NULL);
+
+    expect(res[6].propertyType).toBe(type.OBJECT);
+    expect(res[6].children).toMatchObject([
+      {
+        propertyName: "an",
+        propertyType: type.STRING,
+      },
+    ]);
+
+    expect(res[7].propertyType).toBe(type.LIST);
+    expect(res[7].children).toMatchObject([
+      type.STRING,
+      [
+        {
+          propertyName: "obj in list",
+          propertyType: type.BOOL,
+        },
+        {
+          propertyName: "int field",
+          propertyType: type.INT,
+        },
+      ],
+      [type.STRING],
+      [type.INT],
+    ]);
+  });
+
   test("Property types and names are set", () => {
     // Given
     const eventProperties = {
