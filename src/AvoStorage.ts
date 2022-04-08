@@ -1,5 +1,5 @@
 abstract class PlatformAvoStorage {
-  abstract init(shouldLog: boolean): void;
+  abstract init(shouldLog: boolean, suffix: string): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
   abstract getItem<T>(key: string): T | null;
   abstract setItem<T>(key: string, value: T): void;
@@ -23,9 +23,12 @@ class AndroidAvoStorage extends PlatformAvoStorage {
   onStorageInitFuncs: Array<() => void> = [];
   reactNative: any | null = null;
   shouldLog: boolean = false;
+  suffix: string = "";
 
-  init(shouldLog: boolean) {
+  init(shouldLog: boolean, suffix: string) {
     if (!process.env.BROWSER) {
+      this.suffix = suffix;
+
       this.reactNative = require("react-native");
 
       this.shouldLog = shouldLog;
@@ -45,10 +48,12 @@ class AndroidAvoStorage extends PlatformAvoStorage {
           console.log("Avo Inspector: android loaded data from memory");
         }
         keyVals.forEach((keyVal) => {
-          let key = keyVal[0];
-          this.androidMemoryDataToAvoidAsyncQueries[key] = keyVal[1];
-          if (this.shouldLog) {
-            console.log(key, keyVal[1]);
+          let keyInStorage = keyVal[0];
+          if (keyInStorage.endsWith(this.suffix)) {
+            this.androidMemoryDataToAvoidAsyncQueries[keyInStorage] = keyVal[1];
+            if (this.shouldLog) {
+              console.log(keyInStorage, keyVal[1]);
+            }
           }
         });
         onLoaded();
@@ -68,25 +73,25 @@ class AndroidAvoStorage extends PlatformAvoStorage {
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
-    let maybeItem = this.AsyncStorage.getItem(key);
+    let maybeItem = this.AsyncStorage.getItem(key + this.suffix);
     return maybeItem.then((storedItem: string | null): T | null => {
       return storedItem != null ? JSON.parse(storedItem) : null;
     });
   }
 
   getItem<T>(key: string): T | null {
-    let maybeItem = this.androidMemoryDataToAvoidAsyncQueries[key];
+    let maybeItem = this.androidMemoryDataToAvoidAsyncQueries[key + this.suffix];
     return this.parseJson(maybeItem);
   }
 
   setItem<T>(key: string, value: T): void {
-    this.AsyncStorage.setItem(key, JSON.stringify(value));
-    this.androidMemoryDataToAvoidAsyncQueries[key] = JSON.stringify(value);
+    this.AsyncStorage.setItem(key + this.suffix, JSON.stringify(value));
+    this.androidMemoryDataToAvoidAsyncQueries[key + this.suffix] = JSON.stringify(value);
   }
 
   removeItem(key: string): void {
-    this.AsyncStorage.removeItem(key);
-    this.androidMemoryDataToAvoidAsyncQueries[key] = null;
+    this.AsyncStorage.removeItem(key + this.suffix);
+    this.androidMemoryDataToAvoidAsyncQueries[key + this.suffix] = null;
   }
 
   runAfterInit(func: () => void) {
@@ -100,9 +105,11 @@ class AndroidAvoStorage extends PlatformAvoStorage {
 
 class IosAvoStorage extends PlatformAvoStorage {
   reactNative: any | null = null;
+  suffix: string = "";
 
-  init(_shouldLog: boolean) {
+  init(_shouldLog: boolean, suffix: string) {
     if (!process.env.BROWSER) {
+      this.suffix = suffix;
       this.reactNative = require("react-native");
     }
   }
@@ -113,24 +120,24 @@ class IosAvoStorage extends PlatformAvoStorage {
 
   getItemAsync<T>(key: string): Promise<T | null> {
     const Settings = this.reactNative.Settings;
-    let maybeItem = Settings.get(key);
+    let maybeItem = Settings.get(key + this.suffix);
     return Promise.resolve(this.parseJson(maybeItem));
   }
 
   getItem<T>(key: string): T | null {
     const Settings = this.reactNative.Settings;
-    let maybeItem = Settings.get(key);
+    let maybeItem = Settings.get(key + this.suffix);
     return this.parseJson(maybeItem);
   }
 
   setItem<T>(key: string, value: T): void {
     const Settings = this.reactNative.Settings;
-    Settings.set({ [key]: JSON.stringify(value) });
+    Settings.set({ [key + this.suffix]: JSON.stringify(value) });
   }
 
   removeItem(key: string): void {
     const Settings = this.reactNative.Settings;
-    Settings.set({ [key]: null });
+    Settings.set({ [key + this.suffix]: null });
   }
 
   runAfterInit(func: () => void): void {
@@ -144,9 +151,11 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   storageInitialized = false;
   onStorageInitFuncs: Array<() => void> = [];
   shouldLog: boolean = false;
+  suffix: string = "";
 
-  init(shouldLog: boolean) {
+  init(shouldLog: boolean, suffix: string) {
     this.shouldLog = shouldLog;
+    this.suffix = suffix;
     this.initializeStorageWeb(this.isLocalStorageAvailable());
   }
 
@@ -184,13 +193,13 @@ class BrowserAvoStorage extends PlatformAvoStorage {
     return new Promise(function (resolve, _reject) {
       thisStorage.runAfterInit(() => {
         if (thisStorage.useFallbackStorage === true) {
-          let maybeItem = thisStorage.fallbackStorage[key];
+          let maybeItem = thisStorage.fallbackStorage[key + thisStorage.suffix];
           resolve(thisStorage.parseJson(maybeItem));
         } else {
           if (typeof window !== "undefined") {
             let maybeItem;
             try {
-              maybeItem = window.localStorage.getItem(key);
+              maybeItem = window.localStorage.getItem(key + thisStorage.suffix);
             } catch (error) {
               if (thisStorage.shouldLog) {
                 console.error(
@@ -215,11 +224,11 @@ class BrowserAvoStorage extends PlatformAvoStorage {
     if (this.storageInitialized === false) {
       maybeItem = null;
     } else if (this.useFallbackStorage === true) {
-      maybeItem = this.fallbackStorage[key];
+      maybeItem = this.fallbackStorage[key + this.suffix];
     } else if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
         try {
-          maybeItem = window.localStorage.getItem(key);
+          maybeItem = window.localStorage.getItem(key + this.suffix);
         } catch (error) {
           if (this.shouldLog) {
             console.error("Avo Inspector Storage getItem error:", error);
@@ -234,11 +243,11 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   setItem<T>(key: string, value: T): void {
     this.runAfterInit(() => {
       if (this.useFallbackStorage === true) {
-        this.fallbackStorage[key] = JSON.stringify(value);
+        this.fallbackStorage[key + this.suffix] = JSON.stringify(value);
       } else {
         if (typeof window !== "undefined") {
           try {
-            window.localStorage.setItem(key, JSON.stringify(value));
+            window.localStorage.setItem(key + this.suffix, JSON.stringify(value));
           } catch (error) {
             if (this.shouldLog) {
               console.error("Avo Inspector Storage setItem error:", error);
@@ -252,11 +261,11 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   removeItem(key: string): void {
     this.runAfterInit(() => {
       if (this.useFallbackStorage === true) {
-        this.fallbackStorage[key] = null;
+        this.fallbackStorage[key + this.suffix] = null;
       } else {
         if (typeof window !== "undefined") {
           try {
-            window.localStorage.removeItem(key);
+            window.localStorage.removeItem(key + this.suffix);
           } catch (error) {
             if (this.shouldLog) {
               console.error("Avo Inspector Storage removeItem error:", error);
@@ -281,7 +290,7 @@ export class AvoStorage {
 
   storageImpl: PlatformAvoStorage;
 
-  constructor(shouldLog: boolean) {
+  constructor(shouldLog: boolean, suffix: string = "") {
     if (!process.env.BROWSER) {
       let reactNative = require("react-native");
       this.Platform = reactNative.Platform.OS;
@@ -296,7 +305,7 @@ export class AvoStorage {
       this.Platform = "browser";
       this.storageImpl = new BrowserAvoStorage();
     }
-    this.storageImpl.init(shouldLog);
+    this.storageImpl.init(shouldLog, suffix);
   }
 
   isInitialized() {

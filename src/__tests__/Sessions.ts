@@ -253,7 +253,7 @@ describe("Sessions", () => {
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
 
     // When
-    AvoInspector.avoStorage.storageImpl.init(true);
+    AvoInspector.avoStorage.storageImpl.init(true, "");
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(callMoment);
