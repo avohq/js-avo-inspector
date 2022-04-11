@@ -8,7 +8,7 @@ const inspector = new Inspector.AvoInspector({
   env: Inspector.AvoInspectorEnv.Dev,
   version: "1.0.0",
   appName: "Demo App",
-  suffix: "1"
+  suffix: "1" // This parameter is optional
 });
 
 const App = () => {
