@@ -35,6 +35,7 @@ let inspector = new Inspector.AvoInspector({
   env: Inspector.AvoInspectorEnv.Dev,
   version: "1.0.0",
   appName: "My app",
+  suffix: "unique-string" // optional, if you have more than 1 instance of the Avo Inspector in same project
 });
 ```
 
