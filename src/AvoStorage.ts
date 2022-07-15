@@ -21,16 +21,16 @@ class AndroidAvoStorage extends PlatformAvoStorage {
   AsyncStorage: any | null = null;
   memoryStorageInitialized = false;
   onStorageInitFuncs: Array<() => void> = [];
-  reactNative: any | null = null;
+  reactNativeAsyncStorage: any | null = null;
   shouldLog: boolean = false;
 
   init(shouldLog: boolean) {
     if (!process.env.BROWSER) {
-      this.reactNative = require("react-native");
+      this.reactNativeAsyncStorage = require("@react-native-async-storage/async-storage");
 
       this.shouldLog = shouldLog;
 
-      this.AsyncStorage = this.reactNative.AsyncStorage;
+      this.AsyncStorage = this.reactNativeAsyncStorage.AsyncStorage;
 
       this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
         this.initializeStorageAndroid();
@@ -64,7 +64,7 @@ class AndroidAvoStorage extends PlatformAvoStorage {
   }
 
   isInitialized() {
-    return this.reactNative && this.memoryStorageInitialized;
+    return this.reactNativeAsyncStorage && this.memoryStorageInitialized;
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
@@ -99,37 +99,37 @@ class AndroidAvoStorage extends PlatformAvoStorage {
 }
 
 class IosAvoStorage extends PlatformAvoStorage {
-  reactNative: any | null = null;
+  reactNativeAsyncStorage: any | null = null;
 
   init(_shouldLog: boolean) {
     if (!process.env.BROWSER) {
-      this.reactNative = require("react-native");
+      this.reactNativeAsyncStorage = require("@react-native-async-storage/async-storage");
     }
   }
 
   isInitialized() {
-    return this.reactNative != null;
+    return this.reactNativeAsyncStorage != null;
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
-    const Settings = this.reactNative.Settings;
+    const Settings = this.reactNativeAsyncStorage.Settings;
     let maybeItem = Settings.get(key);
     return Promise.resolve(this.parseJson(maybeItem));
   }
 
   getItem<T>(key: string): T | null {
-    const Settings = this.reactNative.Settings;
+    const Settings = this.reactNativeAsyncStorage.Settings;
     let maybeItem = Settings.get(key);
     return this.parseJson(maybeItem);
   }
 
   setItem<T>(key: string, value: T): void {
-    const Settings = this.reactNative.Settings;
+    const Settings = this.reactNativeAsyncStorage.Settings;
     Settings.set({ [key]: JSON.stringify(value) });
   }
 
   removeItem(key: string): void {
-    const Settings = this.reactNative.Settings;
+    const Settings = this.reactNativeAsyncStorage.Settings;
     Settings.set({ [key]: null });
   }
 
