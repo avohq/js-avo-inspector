@@ -18,19 +18,19 @@ abstract class PlatformAvoStorage {
 
 class AndroidAvoStorage extends PlatformAvoStorage {
   androidMemoryDataToAvoidAsyncQueries: { [key: string]: string | null } = {};
+  storageLib: any | null = null;
   AsyncStorage: any | null = null;
   memoryStorageInitialized = false;
   onStorageInitFuncs: Array<() => void> = [];
-  reactNative: any | null = null;
   shouldLog: boolean = false;
 
   init(shouldLog: boolean) {
     if (!process.env.BROWSER) {
-      this.reactNative = require("react-native");
+      this.storageLib = require("@react-native-async-storage/async-storage");
 
       this.shouldLog = shouldLog;
 
-      this.AsyncStorage = this.reactNative.AsyncStorage;
+      this.AsyncStorage = this.storageLib.default;
 
       this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
         this.initializeStorageAndroid();
@@ -64,7 +64,7 @@ class AndroidAvoStorage extends PlatformAvoStorage {
   }
 
   isInitialized() {
-    return this.reactNative && this.memoryStorageInitialized;
+    return this.storageLib && this.memoryStorageInitialized;
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
