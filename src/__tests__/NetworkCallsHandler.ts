@@ -76,7 +76,7 @@ describe("NetworkCallsHandler", () => {
     });
   });
 
-  test("bodyForEventSchemaCall returns base body + event schema used for event sending from non avo functions", () => {
+  test("bodyForEventSchemaCall returns base body + event schema used for event sending from non Avo Codegen", () => {
     const eventName = "event name";
     const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
 
@@ -97,7 +97,7 @@ describe("NetworkCallsHandler", () => {
     });
   });
 
-  test("bodyForEventSchemaCall returns base body + event schema used for event sending from avo functions", () => {
+  test("bodyForEventSchemaCall returns base body + event schema used for event sending from Avo Codegen", () => {
     const eventName = "event name";
     const eventId = "event id";
     const eventHash = "event hash";

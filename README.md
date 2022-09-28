@@ -5,7 +5,7 @@
 # Avo documentation
 
 This is a quick start guide.
-For more information about the Inspector project please read [Avo documentation](https://www.avo.app/docs/implementation/inspector/sdk/web).
+For more information about Inspector project please read [Avo documentation](https://www.avo.app/docs/implementation/inspector/sdk/web).
 
 # Installation
 
@@ -35,7 +35,7 @@ let inspector = new Inspector.AvoInspector({
   env: Inspector.AvoInspectorEnv.Dev,
   version: "1.0.0",
   appName: "My app",
-  suffix: "unique-string" // optional, if you have more than 1 instance of the Avo Inspector in same project
+  suffix: "unique-string" // optional, if you have more than 1 instance of Avo Inspector in same project
 });
 ```
 
@@ -47,13 +47,13 @@ Logs are enabled by default in the dev mode and disabled in prod mode.
 inspector.enableLogging(true);
 ```
 
-# Integrating with Avo Functions (Avo generated code)
+# Integrating with Avo Codegen
 
 The setup is lightweight and is covered [in this guide](https://www.avo.app/docs/implementation/start-using-inspector-with-avo-functions).
 
-Every event sent with Avo Function after this integration will automatically be sent to the Avo Inspector.
+Every event sent with Avo Function after this integration will automatically be sent to Inspector.
 
-# Sending event schemas for events reported outside of Avo Functions
+# Sending event schemas for events reported outside of Codegen
 
 Whenever you send tracking event call one of the following methods:
 
@@ -61,7 +61,7 @@ Read more in the [Avo documentation](https://www.avo.app/docs/implementation/dev
 
 ### 1.
 
-This method gets actual tracking event parameters, extracts schema automatically and sends it to the Avo Inspector backend.
+This method gets actual tracking event parameters, extracts schema automatically and sends it to the Inspector backend.
 It is the easiest way to use the library, just call this method at the same place you call your analytics tools' track methods with the same parameters.
 
 ```javascript

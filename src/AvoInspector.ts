@@ -298,7 +298,7 @@ export class AvoInspector {
       if (this.avoDeduplicator.hasSeenEventParams(eventProperties, true)) {
         if (shouldLogIfEnabled && AvoInspector.shouldLog) {
           console.warn(
-            "Avo Inspector: WARNING! You are trying to extract schema shape that was just reported by your Avo functions. " +
+            "Avo Inspector: WARNING! You are trying to extract schema shape that was just reported by your Avo Codegen. " +
             "This is an indicator of duplicate inspector reporting. " +
             "Please reach out to support@avo.app for advice if you are not sure how to handle this."
           );
