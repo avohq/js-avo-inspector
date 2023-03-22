@@ -1,2 +1,2 @@
 export { AvoInspector } from "./AvoInspector";
-export { AvoInspectorEnv } from "./AvoInspectorEnv";
+export { AvoInspectorEnv, AvoInspectorEnvType, AvoInspectorEnvValueType } from "./AvoInspectorEnv";
