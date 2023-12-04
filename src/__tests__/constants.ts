@@ -11,23 +11,23 @@ const error = {
   API_KEY:
     "[Avo Inspector] No API key provided. Inspector can't operate without API key.",
   VERSION:
-    "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic.",
+    "[Avo Inspector] No version provided. Many features of Inspector rely on versioning. Please provide comparable string version, i.e. integer or semantic."
 };
 
 const mockedReturns = {
   INSTALLATION_ID: "avo-instalation-id",
   GUID: "generated-guid",
-  SESSION_ID: "session-id",
+  SESSION_ID: "session-id"
 };
 
 const networkCallType = {
   EVENT: "event",
-  SESSION_STARTED: "sessionStarted",
+  SESSION_STARTED: "sessionStarted"
 };
 
 const requestMsg = {
   ERROR: "Request failed",
-  TIMEOUT: "Request timed out",
+  TIMEOUT: "Request timed out"
 };
 
 const trackingEndpoint = "https://api.avo.app/inspector/v1/track";
@@ -42,7 +42,7 @@ const type = {
   LIST: "list",
   BOOL: "boolean",
   NULL: "null",
-  UNKNOWN: "unknown",
+  UNKNOWN: "unknown"
 };
 
 export {
@@ -53,5 +53,5 @@ export {
   requestMsg,
   sessionTimeMs,
   type,
-  trackingEndpoint,
+  trackingEndpoint
 };

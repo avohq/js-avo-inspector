@@ -1,6 +1,6 @@
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
-import { AvoNetworkCallsHandler, EventSchemaBody, SessionStartedBody } from "../AvoNetworkCallsHandler";
+import { AvoNetworkCallsHandler, type EventSchemaBody, type SessionStartedBody } from "../AvoNetworkCallsHandler";
 import { AvoStorage } from "../AvoStorage";
 
 import { defaultOptions, networkCallType } from "./constants";
@@ -19,18 +19,18 @@ describe("Batcher", () => {
     env,
     "",
     version,
-    inspectorVersion,
+    inspectorVersion
   );
 
   beforeAll(() => {
     checkBatchSpy = jest.spyOn(
       AvoBatcher.prototype as any,
-      "checkIfBatchNeedsToBeSent",
+      "checkIfBatchNeedsToBeSent"
     );
 
     inspectorCallSpy = jest.spyOn(
       AvoNetworkCallsHandler.prototype as any,
-      "callInspectorWithBatchBody",
+      "callInspectorWithBatchBody"
     );
   });
 
@@ -45,7 +45,7 @@ describe("Batcher", () => {
 
     inspector.avoBatcher.handleSessionStarted();
 
-    const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
     expect(events).not.toBeNull();
 
@@ -64,7 +64,7 @@ describe("Batcher", () => {
     inspector.avoBatcher.handleSessionStarted();
     inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
 
-    const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
     expect(events).not.toBeNull();
 
@@ -82,7 +82,7 @@ describe("Batcher", () => {
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
     inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
-    const events:(SessionStartedBody | EventSchemaBody)[] | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
 
     expect(events).not.toBeNull();
 
@@ -94,7 +94,7 @@ describe("Batcher", () => {
 
   test("checkIfBatchNeedsToBeSent is called on Batcher initialization", async () => {
     const event = networkHandler.bodyForEventSchemaCall("name", [
-      { propertyName: "prop0", propertyType: "string" },
+      { propertyName: "prop0", propertyType: "string" }
     ], "testEventId", "testEventHash");
 
     storage.setItem(AvoBatcher.cacheKey, [event]);
@@ -125,7 +125,7 @@ describe("Batcher", () => {
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
     const schemaEvent = networkHandler.bodyForEventSchemaCall("name", [
-      { propertyName: "prop0", propertyType: "string" },
+      { propertyName: "prop0", propertyType: "string" }
     ], "testEventId", "testEventHash");
     const sessionEvent = networkHandler.bodyForSessionStartedCall();
 
@@ -133,25 +133,25 @@ describe("Batcher", () => {
     inspector.enableLogging(false);
 
     inspector.avoBatcher.handleTrackSchema("name", [
-      { propertyName: "prop0", propertyType: "string" },
+      { propertyName: "prop0", propertyType: "string" }
     ], "testEventId", "testEventHash");
     inspector.avoBatcher.handleSessionStarted();
 
-    const events:(SessionStartedBody | EventSchemaBody)[] | null = storage.getItem(AvoBatcher.cacheKey);
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = storage.getItem(AvoBatcher.cacheKey);
 
     expect(events).not.toBeNull();
     if (events != null) {
       expect(events[0]).not.toBe(schemaEvent);
-      expect({...events[0], messageId: undefined, createdAt:undefined}).toStrictEqual({...schemaEvent, messageId: undefined, createdAt:undefined});
+      expect({ ...events[0], messageId: undefined, createdAt: undefined }).toStrictEqual({ ...schemaEvent, messageId: undefined, createdAt: undefined });
       expect(events[1]).not.toBe(sessionEvent);
-      expect({...events[1], messageId: undefined, createdAt:undefined}).toStrictEqual({...sessionEvent, messageId: undefined, createdAt:undefined});
+      expect({ ...events[1], messageId: undefined, createdAt: undefined }).toStrictEqual({ ...sessionEvent, messageId: undefined, createdAt: undefined });
     }
   });
 
   test("Events are retrieved from Storage on init", () => {
     const getItemAsyncSpy = jest.spyOn(
       AvoStorage.prototype as any,
-      "getItemAsync",
+      "getItemAsync"
     );
 
     new AvoInspector(defaultOptions);
@@ -224,8 +224,8 @@ describe("Batcher", () => {
       .spyOn(Date, "now")
       .mockImplementation(() =>
         now.setMilliseconds(
-          now.getMilliseconds() + (AvoInspector.batchFlushSeconds - 1) * 1000,
-        ),
+          now.getMilliseconds() + (AvoInspector.batchFlushSeconds - 1) * 1000
+        )
       );
 
     inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
@@ -245,8 +245,8 @@ describe("Batcher", () => {
       .spyOn(Date, "now")
       .mockImplementation(() =>
         now.setMilliseconds(
-          now.getMilliseconds() + AvoInspector.batchFlushSeconds * 1000,
-        ),
+          now.getMilliseconds() + AvoInspector.batchFlushSeconds * 1000
+        )
       );
 
     await inspector.avoBatcher.handleTrackSchema("event name", [], null, null);
@@ -264,12 +264,12 @@ describe("Batcher", () => {
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
     const eventLimit = 1000;
-    let events:(SessionStartedBody | EventSchemaBody)[] = [];
+    const events: Array<SessionStartedBody | EventSchemaBody> = [];
 
     for (let i = 0; i < eventLimit + 1; i++) {
       events.push(
         networkHandler.bodyForEventSchemaCall(`event-name-${i}`, [
-          { propertyName: `prop0`, propertyType: "string" },
+          { propertyName: "prop0", propertyType: "string" }
         ], null, null)
       );
     }
@@ -282,12 +282,12 @@ describe("Batcher", () => {
     setTimeout(() => {
       const setItemsSpy = jest.spyOn(
         AvoStorage.prototype as any,
-        "setItem",
+        "setItem"
       );
 
       inspector.avoBatcher.handleSessionStarted();
 
-      const savedEvents = AvoInspector.avoStorage.getItem<(EventSchemaBody | SessionStartedBody)[]>(AvoBatcher.cacheKey);
+      const savedEvents = AvoInspector.avoStorage.getItem<Array<EventSchemaBody | SessionStartedBody>>(AvoBatcher.cacheKey);
 
       expect(savedEvents).not.toBeNull();
 
@@ -295,7 +295,7 @@ describe("Batcher", () => {
         events.push(savedEvents[savedEvents.length - 1]);
       }
       events.splice(0, 2);
-      
+
       expect(setItemsSpy).toHaveBeenCalledTimes(1);
       expect(setItemsSpy).toHaveBeenCalledWith(AvoBatcher.cacheKey, events);
 

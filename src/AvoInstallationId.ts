@@ -4,7 +4,7 @@ import { AvoInspector } from "./AvoInspector";
 export class AvoInstallationId {
   static installationId: null | string = null;
 
-  static getInstallationId(): string {
+  static getInstallationId (): string {
     if (AvoInstallationId.installationId !== null) {
       return AvoInstallationId.installationId;
     }
@@ -13,7 +13,7 @@ export class AvoInstallationId {
       return "unknown";
     }
 
-    let maybeInstallationId = AvoInspector.avoStorage.getItem<string>(
+    const maybeInstallationId = AvoInspector.avoStorage.getItem<string>(
       AvoInstallationId.cacheKey
     );
     if (maybeInstallationId === null || maybeInstallationId === undefined) {
@@ -28,7 +28,7 @@ export class AvoInstallationId {
     return AvoInstallationId.installationId;
   }
 
-  static get cacheKey(): string {
+  static get cacheKey (): string {
     return "AvoInstallationId";
   }
 }

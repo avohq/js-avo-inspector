@@ -4,53 +4,53 @@ import { AvoInspector } from "./AvoInspector";
 import { AvoInstallationId } from "./AvoInstallationId";
 
 export interface BaseBody {
-  apiKey: string;
-  appName: string;
-  appVersion: string;
-  libVersion: string;
-  env: string;
-  libPlatform: "web";
-  messageId: string;
-  trackingId: string;
-  createdAt: string;
-  sessionId: string;
-  samplingRate: number;
+  apiKey: string
+  appName: string
+  appVersion: string
+  libVersion: string
+  env: string
+  libPlatform: "web"
+  messageId: string
+  trackingId: string
+  createdAt: string
+  sessionId: string
+  samplingRate: number
 }
 
 export interface SessionStartedBody extends BaseBody {
-  type: "sessionStarted";
+  type: "sessionStarted"
 }
 
 export interface EventSchemaBody extends BaseBody {
-  type: "event";
-  eventName: string;
+  type: "event"
+  eventName: string
   eventProperties: Array<{
-    propertyName: string;
-    propertyType: string;
-    children?: any;
-  }>;
-  avoFunction: boolean;
-  eventId: string | null;
-  eventHash: string | null;
+    propertyName: string
+    propertyType: string
+    children?: any
+  }>
+  avoFunction: boolean
+  eventId: string | null
+  eventHash: string | null
 }
 
 export class AvoNetworkCallsHandler {
-  private apiKey: string;
-  private envName: string;
-  private appName: string;
-  private appVersion: string;
-  private libVersion: string;
+  private readonly apiKey: string;
+  private readonly envName: string;
+  private readonly appName: string;
+  private readonly appVersion: string;
+  private readonly libVersion: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
 
-  private static trackingEndpoint = "https://api.avo.app/inspector/v1/track";
+  private static readonly trackingEndpoint = "https://api.avo.app/inspector/v1/track";
 
-  constructor(
+  constructor (
     apiKey: string,
     envName: string,
     appName: string,
     appVersion: string,
-    libVersion: string,
+    libVersion: string
   ) {
     this.apiKey = apiKey;
     this.envName = envName;
@@ -59,7 +59,7 @@ export class AvoNetworkCallsHandler {
     this.libVersion = libVersion;
   }
 
-  callInspectorWithBatchBody(inEvents: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
+  callInspectorWithBatchBody (inEvents: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
     if (this.sending) {
       onCompleted("Batch sending cancelled because another batch sending is in progress. Your events will be sent with next batch.");
       return;
@@ -88,20 +88,20 @@ export class AvoNetworkCallsHandler {
           if (event.type === "sessionStarted") {
             console.log("Avo Inspector: sending session started event.");
           } else if (event.type === "event") {
-            let schemaEvent: EventSchemaBody = event;
+            const schemaEvent: EventSchemaBody = event;
             console.log("Avo Inspector: sending event " + schemaEvent.eventName + " with schema " + JSON.stringify(schemaEvent.eventProperties));
           }
         }
-      )
+      );
     }
 
     this.sending = true;
-    let xmlhttp = new XMLHttpRequest();
+    const xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
     xmlhttp.setRequestHeader("Content-Type", "text/plain");
     xmlhttp.send(JSON.stringify(events));
     xmlhttp.onload = () => {
-      if (xmlhttp.status != 200) {
+      if (xmlhttp.status !== 200) {
         onCompleted(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`);
       } else {
         const samplingRate = JSON.parse(xmlhttp.response).samplingRate;
@@ -117,11 +117,11 @@ export class AvoNetworkCallsHandler {
     };
     xmlhttp.ontimeout = () => {
       onCompleted("Request timed out");
-    }
+    };
     this.sending = false;
   }
 
-  private fixSessionAndTrackingIds(events: (SessionStartedBody | EventSchemaBody)[]) {
+  private fixSessionAndTrackingIds (events: Array<SessionStartedBody | EventSchemaBody>): void {
     let knownSessionId: string | null = null;
     let knownTrackingId: string | null = null;
     events.forEach(
@@ -141,7 +141,7 @@ export class AvoNetworkCallsHandler {
           if (knownSessionId != null) {
             event.sessionId = knownSessionId;
           } else {
-            event.sessionId = AvoSessionTracker.sessionId
+            event.sessionId = AvoSessionTracker.sessionId;
           }
         }
         if (event.trackingId === "unknown") {
@@ -155,23 +155,23 @@ export class AvoNetworkCallsHandler {
     );
   }
 
-  bodyForSessionStartedCall(): SessionStartedBody {
-    let sessionBody = this.createBaseCallBody() as SessionStartedBody;
+  bodyForSessionStartedCall (): SessionStartedBody {
+    const sessionBody = this.createBaseCallBody() as SessionStartedBody;
     sessionBody.type = "sessionStarted";
     return sessionBody;
   }
 
-  bodyForEventSchemaCall(
+  bodyForEventSchemaCall (
     eventName: string,
     eventProperties: Array<{
-      propertyName: string;
-      propertyType: string;
-      children?: any;
+      propertyName: string
+      propertyType: string
+      children?: any
     }>,
     eventId: string | null,
     eventHash: string | null
   ): EventSchemaBody {
-    let eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
+    const eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
     eventSchemaBody.eventName = eventName;
     eventSchemaBody.eventProperties = eventProperties;
@@ -189,7 +189,7 @@ export class AvoNetworkCallsHandler {
     return eventSchemaBody;
   }
 
-  private createBaseCallBody(): BaseBody {
+  private createBaseCallBody (): BaseBody {
     return {
       apiKey: this.apiKey,
       appName: this.appName,
@@ -201,7 +201,7 @@ export class AvoNetworkCallsHandler {
       trackingId: AvoInstallationId.getInstallationId(),
       createdAt: new Date().toISOString(),
       sessionId: AvoSessionTracker.sessionId,
-      samplingRate: this.samplingRate,
+      samplingRate: this.samplingRate
     };
   }
 }

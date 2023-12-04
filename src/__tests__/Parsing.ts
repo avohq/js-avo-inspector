@@ -9,7 +9,7 @@ describe("Schema Parsing", () => {
   });
 
   test("Empty array returned if eventProperties are not set", () => {
-    // @ts-ignore
+    // @ts-expect-error
     const schema = inspector.extractSchema();
 
     expect(schema).toEqual([]);
@@ -30,11 +30,11 @@ describe("Schema Parsing", () => {
         "list",
         {
           "obj in list": true,
-          "int field": 1,
+          "int field": 1
         },
         ["another", "list"],
-        [1, 2],
-      ],
+        [1, 2]
+      ]
     };
 
     // When
@@ -58,8 +58,8 @@ describe("Schema Parsing", () => {
     expect(res[6].children).toMatchObject([
       {
         propertyName: "an",
-        propertyType: type.STRING,
-      },
+        propertyType: type.STRING
+      }
     ]);
 
     expect(res[7].propertyType).toBe(type.LIST);
@@ -68,15 +68,15 @@ describe("Schema Parsing", () => {
       [
         {
           propertyName: "obj in list",
-          propertyType: type.BOOL,
+          propertyType: type.BOOL
         },
         {
           propertyName: "int field",
-          propertyType: type.INT,
-        },
+          propertyType: type.INT
+        }
       ],
       [type.STRING],
-      [type.INT],
+      [type.INT]
     ]);
   });
 
@@ -95,11 +95,11 @@ describe("Schema Parsing", () => {
         "list",
         {
           "obj in list": true,
-          "int field": 1,
+          "int field": 1
         },
         ["another", "list"],
-        [1, 2],
-      ],
+        [1, 2]
+      ]
     };
 
     // When
@@ -121,8 +121,8 @@ describe("Schema Parsing", () => {
     expect(res[6].children).toMatchObject([
       {
         propertyName: "an",
-        propertyType: type.STRING,
-      },
+        propertyType: type.STRING
+      }
     ]);
 
     expect(res[7].propertyType).toBe(type.LIST);
@@ -131,22 +131,22 @@ describe("Schema Parsing", () => {
       [
         {
           propertyName: "obj in list",
-          propertyType: type.BOOL,
+          propertyType: type.BOOL
         },
         {
           propertyName: "int field",
-          propertyType: type.INT,
-        },
+          propertyType: type.INT
+        }
       ],
       [type.STRING],
-      [type.INT],
+      [type.INT]
     ]);
   });
 
   test("Duplicated values are removed", () => {
     // Given
     const eventProperties = {
-      prop0: ["true", "false", true, 10, "true", true, 11, 10, 0.1, 0.1],
+      prop0: ["true", "false", true, 10, "true", true, 11, 10, 0.1, 0.1]
     };
 
     // When
@@ -158,7 +158,7 @@ describe("Schema Parsing", () => {
       type.STRING,
       type.BOOL,
       type.INT,
-      type.FLOAT,
+      type.FLOAT
     ]);
   });
 
@@ -172,7 +172,7 @@ describe("Schema Parsing", () => {
       prop4: undefined,
       prop5: null,
       prop6: {},
-      prop7: [],
+      prop7: []
     };
 
     // When

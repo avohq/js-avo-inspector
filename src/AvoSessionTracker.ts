@@ -1,10 +1,10 @@
 import AvoGuid from "./AvoGuid";
-import { AvoBatcherType } from "./AvoBatcher";
+import { type AvoBatcherType } from "./AvoBatcher";
 import { AvoInspector } from "./AvoInspector";
 
 export class AvoSessionTracker {
   private static _sessionId: null | string = null;
-  static get sessionId(): string {
+  static get sessionId (): string {
     if (AvoSessionTracker._sessionId === null) {
       if (!AvoInspector.avoStorage.isInitialized()) {
         return "unknown";
@@ -32,12 +32,12 @@ export class AvoSessionTracker {
   }
 
   private _lastSessionTimestamp: number | null = null;
-  get lastSessionTimestamp(): number {
+  get lastSessionTimestamp (): number {
     if (
       this._lastSessionTimestamp === null ||
       this._lastSessionTimestamp === 0
     ) {
-      let maybeLastSessionTimestamp = AvoInspector.avoStorage.getItem<number>(
+      const maybeLastSessionTimestamp = AvoInspector.avoStorage.getItem<number>(
         AvoSessionTracker.lastSessionTimestampKey
       );
       if (
@@ -56,18 +56,18 @@ export class AvoSessionTracker {
     return this._lastSessionTimestamp;
   }
 
-  private _sessionLengthMillis: number = 5 * 60 * 1000;
-  get sessionLengthMillis(): number {
+  private readonly _sessionLengthMillis: number = 5 * 60 * 1000;
+  get sessionLengthMillis (): number {
     return this._sessionLengthMillis;
   }
 
-  private avoBatcher: AvoBatcherType;
+  private readonly avoBatcher: AvoBatcherType;
 
-  constructor(avoBatcher: AvoBatcherType) {
+  constructor (avoBatcher: AvoBatcherType) {
     this.avoBatcher = avoBatcher;
   }
 
-  startOrProlongSession(atTime: number): void {
+  startOrProlongSession (atTime: number): void {
     AvoInspector.avoStorage.runAfterInit(() => {
       const timeSinceLastSession = atTime - this.lastSessionTimestamp;
 
@@ -84,7 +84,7 @@ export class AvoSessionTracker {
     });
   }
 
-  private static updateSessionId(): string {
+  private static updateSessionId (): string {
     AvoSessionTracker._sessionId = AvoGuid.newGuid();
     try {
       AvoInspector.avoStorage.setItem(
@@ -100,11 +100,11 @@ export class AvoSessionTracker {
     return AvoSessionTracker._sessionId;
   }
 
-  static get lastSessionTimestampKey(): string {
+  static get lastSessionTimestampKey (): string {
     return "AvoInspectorSessionTimestamp";
   }
 
-  static get idCacheKey(): string {
+  static get idCacheKey (): string {
     return "AvoInspectorSessionId";
   }
 }

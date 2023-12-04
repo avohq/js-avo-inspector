@@ -1,4 +1,4 @@
-let xhrMock = {
+const xhrMock = {
   open: jest.fn(),
   send: jest.fn(),
   setRequestHeader: jest.fn(),
@@ -6,7 +6,7 @@ let xhrMock = {
   onerror: jest.fn(),
   ontimeout: jest.fn(),
   status: 200,
-  response: "{}",
+  response: "{}"
 };
 
 (window as any).XMLHttpRequest = jest.fn(() => xhrMock);

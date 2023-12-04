@@ -1,4 +1,4 @@
-import { AvoInspectorEnv, AvoInspectorEnvValueType } from "./AvoInspectorEnv";
+import { AvoInspectorEnv, type AvoInspectorEnvValueType } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
 import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoBatcher } from "./AvoBatcher";
@@ -21,10 +21,11 @@ export class AvoInspector {
   static avoStorage: AvoStorage;
 
   private static _batchSize = 30;
-  static get batchSize() {
+  static get batchSize () {
     return this._batchSize;
   }
-  static set batchSize(newSize: number) {
+
+  static set batchSize (newSize: number) {
     if (newSize < 1) {
       this._batchSize = 1;
     } else {
@@ -33,25 +34,26 @@ export class AvoInspector {
   }
 
   private static _batchFlushSeconds = 30;
-  static get batchFlushSeconds() {
+  static get batchFlushSeconds () {
     return this._batchFlushSeconds;
   }
 
   private static _shouldLog = false;
-  static get shouldLog() {
+  static get shouldLog () {
     return this._shouldLog;
   }
-  static set shouldLog(enable) {
+
+  static set shouldLog (enable) {
     this._shouldLog = enable;
   }
 
   // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
-  constructor(options: {
-    apiKey: string;
-    env: AvoInspectorEnvValueType;
-    version: string;
-    appName?: string;
-    suffix?: string;
+  constructor (options: {
+    apiKey: string
+    env: AvoInspectorEnvValueType
+    version: string
+    appName?: string
+    suffix?: string
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -59,7 +61,7 @@ export class AvoInspector {
       console.warn(
         "[Avo Inspector] No environment provided. Defaulting to dev."
       );
-    } else if (Object.values(AvoInspectorEnv).indexOf(options.env) === -1) {
+    } else if (!Object.values(AvoInspectorEnv).includes(options.env)) {
       this.environment = AvoInspectorEnv.Dev;
       console.warn(
         "[Avo Inspector] Unsupported environment provided. Defaulting to dev. Supported environments - Dev, Staging, Prod."
@@ -95,7 +97,7 @@ export class AvoInspector {
 
     AvoInspector.avoStorage = new AvoStorage(AvoInspector._shouldLog, options.suffix != null ? options.suffix : "");
 
-    let avoNetworkCallsHandler = new AvoNetworkCallsHandler(
+    const avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
       this.environment.toString(),
       options.appName || "",
@@ -129,14 +131,14 @@ export class AvoInspector {
     }
   }
 
-  trackSchemaFromEvent(
+  trackSchemaFromEvent (
     eventName: string,
-    eventProperties: { [propName: string]: any }
+    eventProperties: Record<string, any>
   ): Array<{
-    propertyName: string;
-    propertyType: string;
-    children?: any;
-  }> {
+      propertyName: string
+      propertyType: string
+      children?: any
+    }> {
     try {
       if (
         this.avoDeduplicator.shouldRegisterEvent(
@@ -153,7 +155,7 @@ export class AvoInspector {
             JSON.stringify(eventProperties)
           );
         }
-        let eventSchema = this.extractSchema(eventProperties, false);
+        const eventSchema = this.extractSchema(eventProperties, false);
         this.trackSchemaInternal(eventName, eventSchema, null, null);
         return eventSchema;
       } else {
@@ -171,16 +173,16 @@ export class AvoInspector {
     }
   }
 
-  private _avoFunctionTrackSchemaFromEvent(
+  private _avoFunctionTrackSchemaFromEvent (
     eventName: string,
-    eventProperties: { [propName: string]: any },
+    eventProperties: Record<string, any>,
     eventId: string,
     eventHash: string
   ): Array<{
-    propertyName: string;
-    propertyType: string;
-    children?: any;
-  }> {
+      propertyName: string
+      propertyType: string
+      children?: any
+    }> {
     try {
       if (
         this.avoDeduplicator.shouldRegisterEvent(
@@ -197,7 +199,7 @@ export class AvoInspector {
             JSON.stringify(eventProperties)
           );
         }
-        let eventSchema = this.extractSchema(eventProperties, false);
+        const eventSchema = this.extractSchema(eventProperties, false);
         this.trackSchemaInternal(eventName, eventSchema, eventId, eventHash);
         return eventSchema;
       } else {
@@ -215,12 +217,12 @@ export class AvoInspector {
     }
   }
 
-  trackSchema(
+  trackSchema (
     eventName: string,
     eventSchema: Array<{
-      propertyName: string;
-      propertyType: string;
-      children?: any;
+      propertyName: string
+      propertyType: string
+      children?: any
     }>
   ): void {
     try {
@@ -252,12 +254,12 @@ export class AvoInspector {
     }
   }
 
-  private trackSchemaInternal(
+  private trackSchemaInternal (
     eventName: string,
     eventSchema: Array<{
-      propertyName: string;
-      propertyType: string;
-      children?: any;
+      propertyName: string
+      propertyType: string
+      children?: any
     }>,
     eventId: string | null,
     eventHash: string | null
@@ -278,20 +280,18 @@ export class AvoInspector {
     }
   }
 
-  enableLogging(enable: boolean) {
+  enableLogging (enable: boolean) {
     AvoInspector._shouldLog = enable;
   }
 
-  extractSchema(
-    eventProperties: {
-      [propName: string]: any;
-    },
+  extractSchema (
+    eventProperties: Record<string, any>,
     shouldLogIfEnabled = true
   ): Array<{
-    propertyName: string;
-    propertyType: string;
-    children?: any;
-  }> {
+      propertyName: string
+      propertyType: string
+      children?: any
+    }> {
     try {
       this.sessionTracker.startOrProlongSession(Date.now());
 
@@ -322,11 +322,11 @@ export class AvoInspector {
     }
   }
 
-  setBatchSize(newBatchSize: number): void {
+  setBatchSize (newBatchSize: number): void {
     AvoInspector._batchSize = newBatchSize;
   }
 
-  setBatchFlushSeconds(newBatchFlushSeconds: number): void {
+  setBatchFlushSeconds (newBatchFlushSeconds: number): void {
     AvoInspector._batchFlushSeconds = newBatchFlushSeconds;
   }
 }

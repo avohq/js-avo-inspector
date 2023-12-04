@@ -2,8 +2,7 @@ const isValueEmpty = (value: string | null | undefined): boolean => {
   return value === null || value === undefined || value.trim().length == 0;
 };
 
-function deepEquals(x: any, y: any) {
-
+function deepEquals (x: any, y: any) {
   if (x === y) {
     return true;
   }

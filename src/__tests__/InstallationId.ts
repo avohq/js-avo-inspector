@@ -11,7 +11,7 @@ describe("InstallationId", () => {
     new AvoInspector(defaultOptions);
   });
 
-  test(`cacheKey equal to "AvoInstallationId"`, () => {
+  test("cacheKey equal to \"AvoInstallationId\"", () => {
     expect(AvoInstallationId.cacheKey).toEqual("AvoInstallationId");
   });
 
@@ -19,7 +19,7 @@ describe("InstallationId", () => {
     // Given
 
     // When
-    let installationId = AvoInstallationId.getInstallationId();
+    const installationId = AvoInstallationId.getInstallationId();
 
     // Then
     expect(installationId).not.toBeNull();
@@ -30,7 +30,7 @@ describe("InstallationId", () => {
     storage.removeItem(AvoInstallationId.cacheKey);
 
     // When
-    let installationId = AvoInstallationId.getInstallationId();
+    const installationId = AvoInstallationId.getInstallationId();
 
     // Then
     expect(installationId).not.toBeNull();
@@ -44,7 +44,7 @@ describe("InstallationId", () => {
     AvoInstallationId.installationId = null;
 
     // When
-    let installationId = AvoInstallationId.getInstallationId();
+    const installationId = AvoInstallationId.getInstallationId();
 
     // Then
     expect(installationId).toBe(newId);
