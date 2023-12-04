@@ -7,8 +7,8 @@
   "react-native": "dist-native/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc --emitDeclarationOnly && webpack --config webpack.browserConfig.js",
-    "build-for-script-tag": "tsc --emitDeclarationOnly && webpack --config webpack.scriptConfig.js",
+    "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js",
+    "build-for-script-tag": "tsc --outDir dist-browser --emitDeclarationOnly && webpack --config webpack.browserConfig.js",
     "build-native": "tsc --outDir dist-native",
     "test": "jest",
     "test:browser": "BROWSER=1 jest",

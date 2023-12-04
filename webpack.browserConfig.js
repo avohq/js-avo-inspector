@@ -2,7 +2,7 @@ const webpack = require('webpack');
 
 module.exports = {
   mode: 'production',
-  entry: './src/index.ts',
+  entry: './src/browser.js',
   resolve: {
     extensions: [".ts"],
   },
