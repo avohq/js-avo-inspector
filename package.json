@@ -3,13 +3,11 @@
   "version": "1.3.0",
   "description": "",
   "main": "dist/index.js",
-  "browser": "dist/index.js",
-  "react-native": "dist-native/index.js",
+  "browser": "dist/browser.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --emitDeclarationOnly && webpack src/index.ts --mode production --resolve-extensions .ts --module-bind ts=ts-loader --define process.env.BROWSER=1 --output-filename index.js --output-library-target umd",
     "build-for-script-tag": "tsc --emitDeclarationOnly && webpack src/browser.js --mode production --resolve-extensions .ts --module-bind ts=ts-loader --define process.env.BROWSER=1 --woutput-filename browser.js --output-library-target umd",
-    "build-native": "tsc --outDir dist-native",
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
     "typecheck": "tsc --noEmit"
@@ -42,7 +40,6 @@
     "analytics",
     "avo",
     "react",
-    "react-native",
     "node",
     "javascript"
   ],
@@ -69,8 +66,5 @@
     "typescript": "^4.1.3",
     "webpack": "^4.44.2",
     "webpack-cli": "^3.3.12"
-  },
-  "externals": [
-    "react-native"
-  ]
+  }
 }
