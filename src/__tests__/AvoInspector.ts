@@ -66,7 +66,6 @@ describe("Initialization", () => {
 
   test("Dev environment is used when env is not provided", () => {
     // Given
-    // @ts-expect-error
     let env;
 
     // When
