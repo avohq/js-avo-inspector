@@ -16,135 +16,6 @@ abstract class PlatformAvoStorage {
   }
 }
 
-class AndroidAvoStorage extends PlatformAvoStorage {
-  androidMemoryDataToAvoidAsyncQueries: { [key: string]: string | null } = {};
-  AsyncStorage: any | null = null;
-  memoryStorageInitialized = false;
-  onStorageInitFuncs: Array<() => void> = [];
-  reactNative: any | null = null;
-  shouldLog: boolean = false;
-  suffix: string = "";
-
-  init(shouldLog: boolean, suffix: string) {
-    if (!process.env.BROWSER) {
-      this.suffix = suffix;
-
-      this.reactNative = require("react-native");
-
-      this.shouldLog = shouldLog;
-
-      this.AsyncStorage = this.reactNative.AsyncStorage;
-
-      this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
-        this.initializeStorageAndroid();
-      });
-    }
-  }
-
-  private loadAndroidDataToMemoryToAvoidAsyncQueries(onLoaded: () => void) {
-    this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
-      this.AsyncStorage.multiGet(keys).then((keyVals: Array<Array<string>>) => {
-        if (this.shouldLog) {
-          console.log("Avo Inspector: android loaded data from memory");
-        }
-        keyVals.forEach((keyVal) => {
-          let keyInStorage = keyVal[0];
-          if (keyInStorage.endsWith(this.suffix)) {
-            this.androidMemoryDataToAvoidAsyncQueries[keyInStorage] = keyVal[1];
-            if (this.shouldLog) {
-              console.log(keyInStorage, keyVal[1]);
-            }
-          }
-        });
-        onLoaded();
-      })
-    );
-  }
-
-  private initializeStorageAndroid() {
-    this.memoryStorageInitialized = true;
-    this.onStorageInitFuncs.forEach((func) => {
-      func();
-    });
-  }
-
-  isInitialized() {
-    return this.reactNative && this.memoryStorageInitialized;
-  }
-
-  getItemAsync<T>(key: string): Promise<T | null> {
-    let maybeItem = this.AsyncStorage.getItem(key + this.suffix);
-    return maybeItem.then((storedItem: string | null): T | null => {
-      return storedItem != null ? JSON.parse(storedItem) : null;
-    });
-  }
-
-  getItem<T>(key: string): T | null {
-    let maybeItem = this.androidMemoryDataToAvoidAsyncQueries[key + this.suffix];
-    return this.parseJson(maybeItem);
-  }
-
-  setItem<T>(key: string, value: T): void {
-    this.AsyncStorage.setItem(key + this.suffix, JSON.stringify(value));
-    this.androidMemoryDataToAvoidAsyncQueries[key + this.suffix] = JSON.stringify(value);
-  }
-
-  removeItem(key: string): void {
-    this.AsyncStorage.removeItem(key + this.suffix);
-    this.androidMemoryDataToAvoidAsyncQueries[key + this.suffix] = null;
-  }
-
-  runAfterInit(func: () => void) {
-    if (this.memoryStorageInitialized === true) {
-      func();
-    } else {
-      this.onStorageInitFuncs.push(func);
-    }
-  }
-}
-
-class IosAvoStorage extends PlatformAvoStorage {
-  reactNative: any | null = null;
-  suffix: string = "";
-
-  init(_shouldLog: boolean, suffix: string) {
-    if (!process.env.BROWSER) {
-      this.suffix = suffix;
-      this.reactNative = require("react-native");
-    }
-  }
-
-  isInitialized() {
-    return this.reactNative != null;
-  }
-
-  getItemAsync<T>(key: string): Promise<T | null> {
-    const Settings = this.reactNative.Settings;
-    let maybeItem = Settings.get(key + this.suffix);
-    return Promise.resolve(this.parseJson(maybeItem));
-  }
-
-  getItem<T>(key: string): T | null {
-    const Settings = this.reactNative.Settings;
-    let maybeItem = Settings.get(key + this.suffix);
-    return this.parseJson(maybeItem);
-  }
-
-  setItem<T>(key: string, value: T): void {
-    const Settings = this.reactNative.Settings;
-    Settings.set({ [key + this.suffix]: JSON.stringify(value) });
-  }
-
-  removeItem(key: string): void {
-    const Settings = this.reactNative.Settings;
-    Settings.set({ [key + this.suffix]: null });
-  }
-
-  runAfterInit(func: () => void): void {
-    func();
-  }
-}
-
 class BrowserAvoStorage extends PlatformAvoStorage {
   useFallbackStorage = false;
   fallbackStorage: { [key: string]: string | null } = {};
@@ -291,20 +162,8 @@ export class AvoStorage {
   storageImpl: PlatformAvoStorage;
 
   constructor(shouldLog: boolean, suffix: string = "") {
-    if (!process.env.BROWSER) {
-      let reactNative = require("react-native");
-      this.Platform = reactNative.Platform.OS;
-      if (this.Platform === "android") {
-        this.storageImpl = new AndroidAvoStorage();
-      } else if (this.Platform === "ios") {
-        this.storageImpl = new IosAvoStorage();
-      } else {
-        throw new Error("Avo Inpector is not supported on " + this.Platform);
-      }
-    } else {
-      this.Platform = "browser";
-      this.storageImpl = new BrowserAvoStorage();
-    }
+    this.Platform = "browser";
+    this.storageImpl = new BrowserAvoStorage();
     this.storageImpl.init(shouldLog, suffix);
   }
 
