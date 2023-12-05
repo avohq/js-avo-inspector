@@ -13,12 +13,12 @@ describe("Batcher", () => {
   let inspector: AvoInspector;
 
   const { apiKey, env, version } = defaultOptions;
-  let networkHandler = new AvoNetworkCallsHandler(
+  const networkHandler = new AvoNetworkCallsHandler(
     apiKey,
     env,
     "",
     version,
-    inspectorVersion,
+    inspectorVersion
   );
 
   beforeAll(() => {
@@ -28,7 +28,7 @@ describe("Batcher", () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-    // @ts-ignore
+    // @ts-expect-error
     inspector.avoDeduplicator._clearEvents();
   });
 
@@ -42,12 +42,12 @@ describe("Batcher", () => {
     const schema = [
       {
         propertyName: "prop0",
-        propertyType: "string",
+        propertyType: "string"
       },
       {
         propertyName: "prop1",
-        propertyType: "string",
-      },
+        propertyType: "string"
+      }
     ];
 
     inspector.trackSchema(eventName, schema);
@@ -67,9 +67,8 @@ describe("Batcher", () => {
       prop0: "",
       prop2: false,
       prop3: 0,
-      prop4: 0.0,
+      prop4: 0.0
     };
-
 
     const schema = inspector.extractSchema(properties);
 
@@ -90,14 +89,14 @@ describe("Batcher", () => {
       prop0: "",
       prop2: false,
       prop3: 0,
-      prop4: 0.0,
+      prop4: 0.0
     };
     const eventId = "testId";
     const eventHash = "testHash";
 
     const schema = inspector.extractSchema(properties);
 
-    // @ts-ignore
+    // @ts-expect-error
     inspector._avoFunctionTrackSchemaFromEvent(eventName, properties, eventId, eventHash);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);

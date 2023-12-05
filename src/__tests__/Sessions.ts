@@ -33,12 +33,12 @@ describe("Sessions", () => {
     // Given
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    let inspector = new AvoInspector(defaultOptions);
+    const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // When
-    let loadEvent = document.createEvent("Event");
+    const loadEvent = document.createEvent("Event");
     loadEvent.initEvent("load", false, false);
     window.dispatchEvent(loadEvent);
 
@@ -50,7 +50,7 @@ describe("Sessions", () => {
     // Given
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    let inspector = new AvoInspector(defaultOptions);
+    const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
@@ -65,7 +65,7 @@ describe("Sessions", () => {
     // Given
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    let inspector = new AvoInspector(defaultOptions);
+    const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
@@ -80,7 +80,7 @@ describe("Sessions", () => {
     // Given
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
-    let inspector = new AvoInspector(defaultOptions);
+    const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
     inspector.sessionTracker = new AvoSessionTracker(mockBatcher);
 
@@ -104,7 +104,7 @@ describe("Sessions", () => {
     storage.removeItem(AvoSessionTracker.lastSessionTimestampKey);
 
     // When
-    let sessionTracker = new AvoSessionTracker(new AvoBatcher(networkHandler));
+    const sessionTracker = new AvoSessionTracker(new AvoBatcher(networkHandler));
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(0);
@@ -241,7 +241,7 @@ describe("Sessions", () => {
     (AvoInspector.avoStorage.storageImpl as any).storageInitialized = false;
 
     // When
-    let sessionTracker = new AvoSessionTracker(mockBatcher);
+    const sessionTracker = new AvoSessionTracker(mockBatcher);
 
     // Then
     expect(sessionTracker.lastSessionTimestamp).toBe(0);

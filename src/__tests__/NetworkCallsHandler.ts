@@ -1,6 +1,6 @@
 import AvoGuid from "../AvoGuid";
 import { AvoInstallationId } from "../AvoInstallationId";
-import { AvoNetworkCallsHandler, BaseBody } from "../AvoNetworkCallsHandler";
+import { AvoNetworkCallsHandler, type BaseBody } from "../AvoNetworkCallsHandler";
 import { AvoSessionTracker } from "../AvoSessionTracker";
 
 import xhrMock from "../__mocks__/xhr";
@@ -9,7 +9,7 @@ import {
   defaultOptions,
   mockedReturns,
   requestMsg,
-  trackingEndpoint,
+  trackingEndpoint
 } from "./constants";
 
 const inspectorVersion = process.env.npm_package_version || "";
@@ -25,7 +25,7 @@ describe("NetworkCallsHandler", () => {
   const now = new Date();
 
   beforeAll(() => {
-    // @ts-ignore
+    // @ts-expect-error
     jest.spyOn(global, "Date").mockImplementation(() => now);
 
     jest
@@ -45,7 +45,7 @@ describe("NetworkCallsHandler", () => {
       env,
       "",
       version,
-      inspectorVersion,
+      inspectorVersion
     );
 
     baseBody = {
@@ -59,7 +59,7 @@ describe("NetworkCallsHandler", () => {
       trackingId: mockedReturns.INSTALLATION_ID,
       createdAt: new Date().toISOString(),
       sessionId: mockedReturns.SESSION_ID,
-      samplingRate: 1.0,
+      samplingRate: 1.0
     };
   });
 
@@ -72,7 +72,7 @@ describe("NetworkCallsHandler", () => {
 
     expect(body).toEqual({
       ...baseBody,
-      type: "sessionStarted",
+      type: "sessionStarted"
     });
   });
 
@@ -106,7 +106,7 @@ describe("NetworkCallsHandler", () => {
     const body = networkHandler.bodyForEventSchemaCall(
       eventName,
       eventProperties,
-      eventId, 
+      eventId,
       eventHash
     );
 
@@ -149,7 +149,7 @@ describe("NetworkCallsHandler", () => {
 
     expect(xhrMock.setRequestHeader).toBeCalledWith(
       "Content-Type",
-      "text/plain",
+      "text/plain"
     );
 
     expect(xhrMock.send).toBeCalledTimes(1);

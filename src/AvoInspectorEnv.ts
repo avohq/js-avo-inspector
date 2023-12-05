@@ -1,7 +1,7 @@
 export const AvoInspectorEnv = {
   Prod: "prod",
   Dev: "dev",
-  Staging: "staging",
+  Staging: "staging"
 } as const;
 
 export type AvoInspectorEnvType = typeof AvoInspectorEnv;

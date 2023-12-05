@@ -9,10 +9,10 @@ describe("Initialization", () => {
     const apiKey = "api-key-xxx";
 
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       env: AvoInspectorEnv.Prod,
       version: "0",
-      apiKey,
+      apiKey
     });
 
     // Then
@@ -21,7 +21,7 @@ describe("Initialization", () => {
 
   test("Error is thrown when Api Key is not set", () => {
     // Given
-    // @ts-ignore
+    // @ts-expect-error
     let apiKey;
 
     // Then
@@ -29,8 +29,8 @@ describe("Initialization", () => {
       new AvoInspector({
         env: AvoInspectorEnv.Prod,
         version: "0",
-        // @ts-ignore
-        apiKey,
+        // @ts-expect-error
+        apiKey
       });
     }).toThrow(error.API_KEY);
   });
@@ -44,7 +44,7 @@ describe("Initialization", () => {
       new AvoInspector({
         env: AvoInspectorEnv.Prod,
         version: "0",
-        apiKey,
+        apiKey
       });
     }).toThrow(error.API_KEY);
   });
@@ -58,23 +58,22 @@ describe("Initialization", () => {
       new AvoInspector({
         env: AvoInspectorEnv.Prod,
         version: "0",
-        // @ts-ignore
-        apiKey,
+        // @ts-expect-error
+        apiKey
       });
     }).toThrow(error.API_KEY);
   });
 
   test("Dev environment is used when env is not provided", () => {
     // Given
-    // @ts-ignore
     let env;
 
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       version: "0",
-      // @ts-ignore
-      env,
+      // @ts-expect-error
+      env
     });
 
     // Then
@@ -86,11 +85,11 @@ describe("Initialization", () => {
     const env = "";
 
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       version: "0",
-      // @ts-ignore
-      env,
+      // @ts-expect-error
+      env
     });
 
     // Then
@@ -99,10 +98,10 @@ describe("Initialization", () => {
 
   test("Dev env is set using AvoInspectorEnv", () => {
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Dev,
-      version: "0",
+      version: "0"
     });
 
     // Then
@@ -111,10 +110,10 @@ describe("Initialization", () => {
 
   test("Dev environment is set using string", () => {
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       env: "dev",
-      version: "0",
+      version: "0"
     });
 
     // Then
@@ -123,10 +122,10 @@ describe("Initialization", () => {
 
   test("Staging env is set using AvoInspectorEnv", () => {
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Staging,
-      version: "0",
+      version: "0"
     });
 
     // Then
@@ -135,10 +134,10 @@ describe("Initialization", () => {
 
   test("Staging environment is set using string", () => {
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       env: "staging",
-      version: "0",
+      version: "0"
     });
 
     // Then
@@ -147,10 +146,10 @@ describe("Initialization", () => {
 
   test("Prod env is set using AvoInspectorEnv", () => {
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Prod,
-      version: "0",
+      version: "0"
     });
 
     // Then
@@ -159,10 +158,10 @@ describe("Initialization", () => {
 
   test("Prod environment is set using string", () => {
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       env: "prod",
-      version: "0",
+      version: "0"
     });
 
     // Then
@@ -173,11 +172,11 @@ describe("Initialization", () => {
     // When
     const env = "test";
 
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       version: "0",
-      // @ts-ignore
-      env,
+      // @ts-expect-error
+      env
     });
 
     // Then
@@ -188,10 +187,10 @@ describe("Initialization", () => {
     const version = "1";
 
     // When
-    let inspector = new AvoInspector({
+    const inspector = new AvoInspector({
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Prod,
-      version,
+      version
     });
 
     // Then
@@ -200,7 +199,7 @@ describe("Initialization", () => {
 
   test("Error is thrown when version is not set", () => {
     // Given
-    // @ts-ignore
+    // @ts-expect-error
     let version;
 
     // Then
@@ -208,8 +207,8 @@ describe("Initialization", () => {
       new AvoInspector({
         apiKey: "api-key-xxx",
         env: AvoInspectorEnv.Prod,
-        // @ts-ignore
-        version,
+        // @ts-expect-error
+        version
       });
     }).toThrow(error.VERSION);
   });
@@ -223,7 +222,7 @@ describe("Initialization", () => {
       new AvoInspector({
         apiKey: "api-key-xxx",
         env: AvoInspectorEnv.Prod,
-        version,
+        version
       });
     }).toThrow(error.VERSION);
   });
@@ -237,8 +236,8 @@ describe("Initialization", () => {
       new AvoInspector({
         apiKey: "api-key-xxx",
         env: AvoInspectorEnv.Prod,
-        // @ts-ignore
-        version,
+        // @ts-expect-error
+        version
       });
     }).toThrow(error.VERSION);
   });

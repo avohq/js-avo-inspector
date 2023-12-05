@@ -1,11 +1,11 @@
 abstract class PlatformAvoStorage {
-  abstract init(shouldLog: boolean, suffix: string): void;
+  abstract init (shouldLog: boolean, suffix: string): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
   abstract getItem<T>(key: string): T | null;
   abstract setItem<T>(key: string, value: T): void;
-  abstract removeItem(key: string): void;
-  abstract runAfterInit(func: () => void): void;
-  abstract isInitialized(): boolean;
+  abstract removeItem (key: string): void;
+  abstract runAfterInit (func: () => void): void;
+  abstract isInitialized (): boolean;
 
   parseJson<T>(maybeItem: string | null | undefined): T | null {
     if (maybeItem !== null && maybeItem !== undefined) {
@@ -18,21 +18,21 @@ abstract class PlatformAvoStorage {
 
 class BrowserAvoStorage extends PlatformAvoStorage {
   useFallbackStorage = false;
-  fallbackStorage: { [key: string]: string | null } = {};
+  fallbackStorage: Record<string, string | null> = {};
   storageInitialized = false;
   onStorageInitFuncs: Array<() => void> = [];
   shouldLog: boolean = false;
   suffix: string = "";
 
-  init(shouldLog: boolean, suffix: string) {
+  init (shouldLog: boolean, suffix: string): void {
     this.shouldLog = shouldLog;
     this.suffix = suffix;
     this.initializeStorageWeb(this.isLocalStorageAvailable());
   }
 
-  private initializeStorageWeb(isLocalStorageAvailable: boolean) {
+  private initializeStorageWeb (isLocalStorageAvailable: boolean): void {
     this.storageInitialized = true;
-    if (isLocalStorageAvailable === false) {
+    if (!isLocalStorageAvailable) {
       this.useFallbackStorage = true;
     }
     this.onStorageInitFuncs.forEach((func) => {
@@ -40,7 +40,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
     });
   }
 
-  private isLocalStorageAvailable(): boolean {
+  private isLocalStorageAvailable (): boolean {
     const uid = new Date().toISOString();
     try {
       window.localStorage.setItem(uid, uid);
@@ -55,24 +55,23 @@ class BrowserAvoStorage extends PlatformAvoStorage {
     }
   }
 
-  isInitialized() {
+  isInitialized (): boolean {
     return this.storageInitialized;
   }
 
-  getItemAsync<T>(key: string): Promise<T | null> {
-    let thisStorage = this;
-    return new Promise(function (resolve, _reject) {
-      thisStorage.runAfterInit(() => {
-        if (thisStorage.useFallbackStorage === true) {
-          let maybeItem = thisStorage.fallbackStorage[key + thisStorage.suffix];
-          resolve(thisStorage.parseJson(maybeItem));
+  async getItemAsync<T>(key: string): Promise<T | null> {
+    return await new Promise((resolve, _reject) => {
+      this.runAfterInit(() => {
+        if (this.useFallbackStorage) {
+          const maybeItem = this.fallbackStorage[key + this.suffix];
+          resolve(this.parseJson(maybeItem));
         } else {
           if (typeof window !== "undefined") {
             let maybeItem;
             try {
-              maybeItem = window.localStorage.getItem(key + thisStorage.suffix);
+              maybeItem = window.localStorage.getItem(key + this.suffix);
             } catch (error) {
-              if (thisStorage.shouldLog) {
+              if (this.shouldLog) {
                 console.error(
                   "Avo Inspector Storage getItemAsync error:",
                   error
@@ -81,7 +80,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
               resolve(null);
             }
 
-            resolve(thisStorage.parseJson(maybeItem));
+            resolve(this.parseJson(maybeItem));
           } else {
             resolve(null);
           }
@@ -92,9 +91,9 @@ class BrowserAvoStorage extends PlatformAvoStorage {
 
   getItem<T>(key: string): T | null {
     let maybeItem;
-    if (this.storageInitialized === false) {
+    if (!this.storageInitialized) {
       maybeItem = null;
-    } else if (this.useFallbackStorage === true) {
+    } else if (this.useFallbackStorage) {
       maybeItem = this.fallbackStorage[key + this.suffix];
     } else if (process.env.BROWSER) {
       if (typeof window !== "undefined") {
@@ -113,7 +112,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
 
   setItem<T>(key: string, value: T): void {
     this.runAfterInit(() => {
-      if (this.useFallbackStorage === true) {
+      if (this.useFallbackStorage) {
         this.fallbackStorage[key + this.suffix] = JSON.stringify(value);
       } else {
         if (typeof window !== "undefined") {
@@ -129,9 +128,9 @@ class BrowserAvoStorage extends PlatformAvoStorage {
     });
   }
 
-  removeItem(key: string): void {
+  removeItem (key: string): void {
     this.runAfterInit(() => {
-      if (this.useFallbackStorage === true) {
+      if (this.useFallbackStorage) {
         this.fallbackStorage[key + this.suffix] = null;
       } else {
         if (typeof window !== "undefined") {
@@ -147,8 +146,8 @@ class BrowserAvoStorage extends PlatformAvoStorage {
     });
   }
 
-  runAfterInit(func: () => void): void {
-    if (this.storageInitialized === true) {
+  runAfterInit (func: () => void): void {
+    if (this.storageInitialized) {
       func();
     } else {
       this.onStorageInitFuncs.push(func);
@@ -161,18 +160,18 @@ export class AvoStorage {
 
   storageImpl: PlatformAvoStorage;
 
-  constructor(shouldLog: boolean, suffix: string = "") {
+  constructor (shouldLog: boolean, suffix: string = "") {
     this.Platform = "browser";
     this.storageImpl = new BrowserAvoStorage();
     this.storageImpl.init(shouldLog, suffix);
   }
 
-  isInitialized() {
+  isInitialized (): boolean {
     return this.storageImpl.isInitialized();
   }
 
-  getItemAsync<T>(key: string): Promise<T | null> {
-    return this.storageImpl.getItemAsync(key);
+  async getItemAsync<T>(key: string): Promise<T | null> {
+    return await this.storageImpl.getItemAsync(key);
   }
 
   getItem<T>(key: string): T | null {
@@ -183,11 +182,11 @@ export class AvoStorage {
     this.storageImpl.setItem(key, value);
   }
 
-  removeItem(key: string): void {
+  removeItem (key: string): void {
     this.storageImpl.removeItem(key);
   }
 
-  runAfterInit(func: () => void): void {
+  runAfterInit (func: () => void): void {
     this.storageImpl.runAfterInit(func);
   }
 }
