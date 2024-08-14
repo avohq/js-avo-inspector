@@ -25,7 +25,6 @@ describe("NetworkCallsHandler", () => {
   const now = new Date();
 
   beforeAll(() => {
-    // @ts-expect-error
     jest.spyOn(global, "Date").mockImplementation(() => now);
 
     jest
