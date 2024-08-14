@@ -18,6 +18,7 @@
     "url": "git+https://github.com/avohq/web-avo-inspector.git"
   },
   "jest": {
+    "testEnvironment": "jsdom",
     "transform": {
       "^.+\\.[j]sx?$": "babel-jest",
       "^.+\\.[t]sx?$": "ts-jest"
@@ -62,6 +63,7 @@
     "eslint-plugin-n": "^17.10.2",
     "eslint-plugin-promise": "^7.1.0",
     "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "ts-jest": "^29.2.4",
     "ts-loader": "^9.5.1",
     "typescript": "*",

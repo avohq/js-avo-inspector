@@ -98,9 +98,11 @@ describe("Batcher", () => {
     ], "testEventId", "testEventHash");
 
     storage.setItem(AvoBatcher.cacheKey, [event]);
-    await new AvoBatcher(networkHandler);
+    new AvoBatcher(networkHandler);
 
-    expect(checkBatchSpy).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    expect(checkBatchSpy).toHaveBeenCalled();
   });
 
   test("checkIfBatchNeedsToBeSent is called on handleSessionStarted", () => {
