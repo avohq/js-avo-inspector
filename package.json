@@ -1,9 +1,9 @@
 {
   "name": "avo-inspector",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "",
   "main": "dist/index.js",
-  "browser": "dist/browser.js",
+  "browser": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js",
