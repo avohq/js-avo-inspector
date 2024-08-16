@@ -4,3 +4,7 @@ examples
 *.bs.js
 dist/__tests__
 dist/__mocks__
+dist/browser.js
+.github/
+.vscode/
+.merlin
