@@ -20,7 +20,7 @@ jest.mock('avo-inspector', () => {
 
     const browserModule = jest.requireActual(browserPath);
 
-    return browserModule; // require("avo-inspector/dist/index.js");
+    return browserModule;
   }
 
   throw new Error('Browser field not found in package.json');
