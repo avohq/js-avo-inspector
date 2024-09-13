@@ -11,7 +11,8 @@
     "lint": "eslint ./src --ext .js,.ts",
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "yarn build && yarn test:browser && rm -rf examples/ts-avo-inspector-example/node_modules/ && cd examples/ts-avo-inspector-example/ && yarn && yarn test --watchAll=false"
   },
   "repository": {
     "type": "git",
