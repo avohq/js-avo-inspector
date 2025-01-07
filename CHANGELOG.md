@@ -1,3 +1,7 @@
+## 1.4.2
+
+Security update
+
 ## 1.4.1
 
 Security update
