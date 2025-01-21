@@ -2,7 +2,7 @@
   "name": "avo-inspector",
   "sources": [
     {
-      "dir": "reason",
+      "dir": "rescript",
       "subdirs": true
     }
   ],
