@@ -6,7 +6,6 @@ type env = [
   | @as("prod") #Prod
 ]
 
-@deriving(abstract)
 type options = {
   apiKey: string,
   env: env,
@@ -16,8 +15,9 @@ type options = {
 @new @module("avo-inspector")
 external make: options => t = "AvoInspector"
 
+// The unit is redundant, but is kept for backwards compatibility
 let make = (~apiKey, ~env, ~version, ()) => {
-  make(options(~apiKey, ~env, ~version))
+  make({apiKey: apiKey, env: env, version: version})
 }
 
 @send
