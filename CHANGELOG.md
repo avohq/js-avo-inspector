@@ -1,3 +1,9 @@
+## 2.0.0
+
+- Contains no changes for most users
+- Add Rescript support
+- [Breaking] Remove Reason support
+
 ## 1.4.2
 
 Security update
