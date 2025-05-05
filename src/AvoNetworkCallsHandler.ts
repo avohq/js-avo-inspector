@@ -99,7 +99,7 @@ export class AvoNetworkCallsHandler {
     const xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
     xmlhttp.setRequestHeader("Content-Type", "text/plain");
-    xmlhttp.timeout = 2000;
+    xmlhttp.timeout = AvoInspector.networkTimeout;
     xmlhttp.send(JSON.stringify(events));
     xmlhttp.onload = () => {
       if (xmlhttp.status !== 200) {
