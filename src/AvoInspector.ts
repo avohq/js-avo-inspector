@@ -47,6 +47,15 @@ export class AvoInspector {
     this._shouldLog = enable;
   }
 
+  private static _networkTimeout = 2000;
+  static get networkTimeout () {
+    return this._networkTimeout;
+  }
+
+  static set networkTimeout (timeout) {
+    this._networkTimeout = timeout;
+  }
+
   // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
   constructor (options: {
     apiKey: string

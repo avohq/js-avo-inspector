@@ -182,8 +182,8 @@ describe("NetworkCallsHandler", () => {
 
     xhrErrorMock.onload();
 
-    expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith("Error 400: Bad Request");
+    expect(customCallback).toHaveBeenCalledTimes(1);
+    expect(customCallback).toHaveBeenCalledWith(new Error("Error 400: Bad Request"));
   });
 
   test("Custom callback is called onerror", () => {
@@ -196,8 +196,8 @@ describe("NetworkCallsHandler", () => {
 
     xhrErrorMock.onerror();
 
-    expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith(requestMsg.ERROR);
+    expect(customCallback).toHaveBeenCalledTimes(1);
+    expect(customCallback).toHaveBeenCalledWith(new Error(requestMsg.ERROR));
   });
 
   test("Custom callback is called ontimeout", () => {
@@ -210,7 +210,7 @@ describe("NetworkCallsHandler", () => {
 
     xhrErrorMock.ontimeout();
 
-    expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith(requestMsg.TIMEOUT);
+    expect(customCallback).toHaveBeenCalledTimes(1);
+    expect(customCallback).toHaveBeenCalledWith(new Error(requestMsg.TIMEOUT));
   });
 });

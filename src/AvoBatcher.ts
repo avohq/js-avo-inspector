@@ -46,6 +46,8 @@ export class AvoBatcher implements AvoBatcherType {
           );
           this.checkIfBatchNeedsToBeSent();
         }
+      }).catch((error) => {
+        console.error("Avo Inspector: error getting events from cache", error);
       });
   }
 
@@ -105,14 +107,14 @@ export class AvoBatcher implements AvoBatcherType {
       avoBatcher.events = [];
       this.networkCallsHandler.callInspectorWithBatchBody(
         sendingEvents,
-        function (error: string | null): any {
+        function (error: Error | null): any {
           if (error != null) {
             avoBatcher.events = avoBatcher.events.concat(sendingEvents);
 
             if (AvoInspector.shouldLog) {
               console.log(
                 "Avo Inspector: batch sending failed: " +
-                  error +
+                  error.message +
                   ". We will attempt to send your schemas with next batch"
               );
             }

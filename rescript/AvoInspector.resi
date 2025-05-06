@@ -5,3 +5,5 @@ type options = {apiKey: string, env: env, version: string}
 external make: options => t = "AvoInspector"
 @send
 external trackSchemaFromEvent: (t, string, Js.Json.t) => unit = "trackSchemaFromEvent"
+
+let setNetworkTimeout: int => unit
