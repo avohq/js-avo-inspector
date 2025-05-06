@@ -17,3 +17,8 @@ external make: options => t = "AvoInspector"
 
 @send
 external trackSchemaFromEvent: (t, string, Js.Json.t) => unit = "trackSchemaFromEvent"
+
+let setNetworkTimeout = (timeout) => {
+  %raw(`require("avo-inspector").AvoInspector.networkTimeout = timeout`)
+  ()
+}

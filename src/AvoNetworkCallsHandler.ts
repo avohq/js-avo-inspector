@@ -59,9 +59,9 @@ export class AvoNetworkCallsHandler {
     this.libVersion = libVersion;
   }
 
-  callInspectorWithBatchBody (inEvents: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
+  callInspectorWithBatchBody (inEvents: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: Error | null) => any): void {
     if (this.sending) {
-      onCompleted("Batch sending cancelled because another batch sending is in progress. Your events will be sent with next batch.");
+      onCompleted(new Error("Batch sending cancelled because another batch sending is in progress. Your events will be sent with next batch."));
       return;
     }
 
@@ -103,7 +103,7 @@ export class AvoNetworkCallsHandler {
     xmlhttp.send(JSON.stringify(events));
     xmlhttp.onload = () => {
       if (xmlhttp.status !== 200) {
-        onCompleted(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`);
+        onCompleted(new Error(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`));
       } else {
         const samplingRate = JSON.parse(xmlhttp.response).samplingRate;
         if (samplingRate !== undefined) {
@@ -112,14 +112,16 @@ export class AvoNetworkCallsHandler {
 
         onCompleted(null);
       }
+      this.sending = false;
     };
     xmlhttp.onerror = () => {
-      onCompleted("Request failed");
+      onCompleted(new Error("Request failed"));
+      this.sending = false;
     };
     xmlhttp.ontimeout = () => {
-      onCompleted("Request timed out");
+      onCompleted(new Error("Request timed out"));
+      this.sending = false;
     };
-    this.sending = false;
   }
 
   private fixSessionAndTrackingIds (events: Array<SessionStartedBody | EventSchemaBody>): void {
