@@ -1,3 +1,8 @@
+## 2.1.0
+
+- Add `set networkTimeout` setter, in ms
+- Improve timeout errors handling
+
 ## 2.0.0
 
 - Contains no changes for most users
