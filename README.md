@@ -110,6 +110,14 @@ inspector.setBatchSize(15);
 inspector.setBatchFlushSeconds(10);
 ```
 
+# Network timeout
+
+You can control the network timeout for the SDK. Default is 2 seconds.
+
+```javascript
+Inspector.AvoInspector.networkTimeout = 5000;
+```
+
 ## Author
 
 Avo (https://www.avo.app), friends@avo.app
