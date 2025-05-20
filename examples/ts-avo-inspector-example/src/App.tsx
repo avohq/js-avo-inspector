@@ -37,6 +37,7 @@ const App = () => {
     if (eventName === "" || propName === "" || propValue === "") return;
 
     inspector.trackSchemaFromEvent(eventName, { [propName]: propValue });
+    Inspector.AvoInspector.networkTimeout = 1000;
     setSchema({
       eventName: "",
       propName: "",
