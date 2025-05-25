@@ -85,7 +85,25 @@ export class AvoSchemaParser {
       return "boolean";
     } else if (propType === "object") {
       if (isArray(propValue)) {
-        return "list";
+        // Get types of all non-empty elements
+        const elementTypes = propValue
+          .filter((item: any) => item != null && (!isArray(item) || item.length > 0))
+          .map((item: any) => this.getPropValueType(item));
+
+        if (elementTypes.length === 0) {
+          return "list(unknown)";
+        }
+
+        // Check if all elements have the same type
+        const firstType = elementTypes[0];
+        const allSameType = elementTypes.every((type: string) => type === firstType);
+
+        if (allSameType) {
+          return `list(${firstType})`;
+        }
+
+        // If types are inconsistent, return the type of the first non-empty element
+        return `list(${firstType})`;
       } else {
         return "object";
       }
