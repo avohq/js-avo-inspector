@@ -62,7 +62,7 @@ describe("Schema Parsing", () => {
       }
     ]);
 
-    expect(res[7].propertyType).toBe(type.LIST);
+    expect(res[7].propertyType).toBe("list(string)");
     expect(res[7].children).toMatchObject([
       type.STRING,
       [
@@ -125,7 +125,7 @@ describe("Schema Parsing", () => {
       }
     ]);
 
-    expect(res[7].propertyType).toBe(type.LIST);
+    expect(res[7].propertyType).toBe("list(string)");
     expect(res[7].children).toMatchObject([
       type.STRING,
       [
@@ -153,7 +153,7 @@ describe("Schema Parsing", () => {
     const res = inspector.extractSchema(eventProperties);
 
     // Then
-    expect(res[0].propertyType).toBe(type.LIST);
+    expect(res[0].propertyType).toBe("list(string)");
     expect(res[0].children).toMatchObject([
       type.STRING,
       type.BOOL,
@@ -189,7 +189,144 @@ describe("Schema Parsing", () => {
     expect(res[6].propertyType).toBe(type.OBJECT);
     expect(res[6].children).toMatchObject([]);
 
-    expect(res[7].propertyType).toBe(type.LIST);
+    expect(res[7].propertyType).toBe("list(unknown)");
     expect(res[7].children).toMatchObject([]);
+  });
+
+  describe("List Type Detection", () => {
+    test("Empty array returns list(unknown)", () => {
+      const eventProperties = {
+        emptyList: []
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(unknown)");
+    });
+
+    test("List of primitive types", () => {
+      const eventProperties = {
+        stringList: ["a", "b", "c"],
+        numberList: [1, 2, 3],
+        floatList: [1.1, 2.2, 3.3],
+        booleanList: [true, false, true],
+        mixedPrimitiveList: [1, "string", true, 2.5]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(string)");
+      expect(res[1].propertyType).toBe("list(int)");
+      expect(res[2].propertyType).toBe("list(float)");
+      expect(res[3].propertyType).toBe("list(boolean)");
+      expect(res[4].propertyType).toBe("list(int)"); // First element type
+    });
+
+    test("List of objects", () => {
+      const eventProperties = {
+        simpleObjectList: [{ name: "John" }, { name: "Jane" }],
+        nestedObjectList: [{ user: { name: "John" } }, { user: { name: "Jane" } }],
+        mixedObjectList: [{ name: "John" }, { age: 30 }]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(object)");
+      expect(res[1].propertyType).toBe("list(object)");
+      expect(res[2].propertyType).toBe("list(object)");
+    });
+
+    test("List of lists", () => {
+      const eventProperties = {
+        stringListList: [["a", "b"], ["c", "d"]],
+        numberListList: [[1, 2], [3, 4]],
+        mixedListList: [["a", 1], [true, 2.5]]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(list(string))");
+      expect(res[1].propertyType).toBe("list(list(int))");
+      expect(res[2].propertyType).toBe("list(list(string))");
+    });
+
+    test("List with null/undefined values", () => {
+      const eventProperties = {
+        nullFirst: [null, "string", 1],
+        undefinedFirst: [undefined, "string", 1],
+        mixedNulls: ["string", null, undefined, 1]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(string)");
+      expect(res[1].propertyType).toBe("list(string)");
+      expect(res[2].propertyType).toBe("list(string)");
+    });
+
+    test("List with empty objects", () => {
+      const eventProperties = {
+        emptyObjectFirst: [{}, { name: "John" }],
+        mixedEmptyObjects: [{ name: "John" }, {}, { age: 30 }]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(object)");
+      expect(res[1].propertyType).toBe("list(object)");
+    });
+
+    test("List with empty arrays", () => {
+      const eventProperties = {
+        emptyArrayFirst: [[], [1, 2, 3]],
+        mixedEmptyArrays: [[1, 2], [], [3, 4]],
+        consistentNestedLists: [[1, 2], [3, 4], [5, 6]],
+        mixedNestedLists: [[1, 2], ["a", "b"], [true, false]]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(list(int))");
+      expect(res[1].propertyType).toBe("list(list(int))");
+      expect(res[2].propertyType).toBe("list(list(int))");
+      expect(res[3].propertyType).toBe("list(list(int))"); // First element type
+    });
+
+    test("List with complex nested structures", () => {
+      const eventProperties = {
+        complexList: [
+          {
+            user: {
+              name: "John",
+              addresses: [
+                { city: "New York", zip: 10001 },
+                { city: "Boston", zip: 2108 }
+              ]
+            }
+          },
+          {
+            user: {
+              name: "Jane",
+              addresses: [
+                { city: "Chicago", zip: 60601 }
+              ]
+            }
+          }
+        ]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(object)");
+    });
+
+    test("List with special values", () => {
+      const eventProperties = {
+        specialValues: [
+          Number.MAX_SAFE_INTEGER,
+          Number.MIN_SAFE_INTEGER,
+          Number.MAX_VALUE,
+          Number.MIN_VALUE,
+          Infinity,
+          -Infinity,
+          NaN
+        ]
+      };
+
+      const res = inspector.extractSchema(eventProperties);
+      expect(res[0].propertyType).toBe("list(int)");
+    });
   });
 });
