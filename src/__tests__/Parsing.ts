@@ -101,8 +101,6 @@ describe("Schema Parsing", () => {
     // When
     const res = inspector.extractSchema(eventProperties);
 
-    // Debug: Let's see what the actual structure is
-
     // Then
     res.forEach(({ propertyName }, index) => {
       expect(propertyName).toBe(`prop${index}`);
@@ -177,7 +175,7 @@ describe("Schema Parsing", () => {
   });
 
   test("Array of objects should preserve object structure", () => {
-    // Given - this reproduces the customer issue
+    // Given
     const eventProperties = {
       users: [
         { name: "John", age: 30 },
@@ -192,7 +190,6 @@ describe("Schema Parsing", () => {
     expect(res[0].propertyName).toBe("users");
     expect(res[0].propertyType).toBe(type.LIST);
     
-    // After reverting fix: We're back to duplicates
     expect(res[0].children.length).toBe(1); // Duplicates removed!
     
   });
@@ -234,7 +231,6 @@ describe("Schema Parsing", () => {
     expect(res[0].propertyName).toBe("products");
     expect(res[0].propertyType).toBe(type.LIST);
     
-    // The bug: customers report getting empty children array
     // But they should get object schema for { id, name, category }
     expect(res[0].children.length).toBeGreaterThan(0);
   });
