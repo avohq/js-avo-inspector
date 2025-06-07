@@ -2,6 +2,21 @@ const isArray = (obj: any): boolean => {
   return Object.prototype.toString.call(obj) === "[object Array]";
 };
 
+// Helper function to detect built-in objects that shouldn't have their schema extracted
+const isBuiltInObject = (obj: any): boolean => {
+  if (obj === null || obj === undefined) {
+    return false;
+  }
+  
+  // Check for common built-in objects that have no enumerable properties
+  return obj instanceof Date ||
+         obj instanceof RegExp ||
+         obj instanceof Error ||
+         obj instanceof Function ||
+         typeof obj === 'function' ||
+         typeof obj === 'symbol';
+};
+
 export class AvoSchemaParser {
   static extractSchema (eventProperties: Record<string, any>): Array<{
     propertyName: string
@@ -19,6 +34,11 @@ export class AvoSchemaParser {
         });
         return this.removeDuplicates(list);
       } else if (typeof object === "object" && object !== null) {
+        // Check if this is a built-in object that we shouldn't try to extract schema from
+        if (isBuiltInObject(object)) {
+          return this.getPropValueType(object);
+        }
+        
         const mappedResult: any = [];
         for (const key in object) {
           if (object.hasOwnProperty(key)) {
@@ -40,6 +60,12 @@ export class AvoSchemaParser {
 
             mappedResult.push(mappedEntry);
           }
+        }
+
+        // If no enumerable properties were found, treat as a primitive object type
+        // This prevents empty arrays for objects with only non-enumerable properties
+        if (mappedResult.length === 0) {
+          return this.getPropValueType(object);
         }
 
         return mappedResult;
@@ -74,6 +100,12 @@ export class AvoSchemaParser {
     const propType = typeof propValue;
     if (propValue == null) {
       return "null";
+    } else if (propValue instanceof Date) {
+      return "string"; 
+    } else if (propValue instanceof RegExp) {
+      return "string"; 
+    } else if (propValue instanceof Error) {
+      return "object"; // Keep as "object" for backward compatibility
     } else if (propType === "string") {
       return "string";
     } else if (propType === "number" || propType === "bigint") {
@@ -84,6 +116,8 @@ export class AvoSchemaParser {
       }
     } else if (propType === "boolean") {
       return "boolean";
+    } else if (propType === "function" || propType === "symbol") {
+      return "unknown";
     } else if (propType === "object") {
       if (isArray(propValue)) {
         return "list";

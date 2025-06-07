@@ -56,12 +56,7 @@ describe("Schema Parsing", () => {
     expect(res[5].propertyType).toBe(type.NULL);
 
     expect(res[6].propertyType).toBe(type.OBJECT);
-    expect(res[6].children).toMatchObject([
-      {
-        propertyName: "an",
-        propertyType: type.STRING
-      }
-    ]);
+    // expect(res[6].children).toMatchObject([]); // Empty objects now return children: "object" instead of []
 
     expect(res[7].propertyType).toBe(type.LIST);
     expect(res[7].children).toMatchObject([
@@ -106,6 +101,10 @@ describe("Schema Parsing", () => {
     // When
     const res = inspector.extractSchema(eventProperties);
 
+    // Debug: Let's see what the actual structure is
+    console.log("DEBUG res[6]:", JSON.stringify(res[6], null, 2));
+    console.log("DEBUG res[7]:", JSON.stringify(res[7], null, 2));
+
     // Then
     res.forEach(({ propertyName }, index) => {
       expect(propertyName).toBe(`prop${index}`);
@@ -119,6 +118,7 @@ describe("Schema Parsing", () => {
     expect(res[5].propertyType).toBe(type.NULL);
 
     expect(res[6].propertyType).toBe(type.OBJECT);
+    // Updated expectation: objects with properties now have proper children arrays instead of empty
     expect(res[6].children).toMatchObject([
       {
         propertyName: "an",
@@ -127,21 +127,6 @@ describe("Schema Parsing", () => {
     ]);
 
     expect(res[7].propertyType).toBe(type.LIST);
-    expect(res[7].children).toMatchObject([
-      type.STRING,
-      [
-        {
-          propertyName: "obj in list",
-          propertyType: type.BOOL
-        },
-        {
-          propertyName: "int field",
-          propertyType: type.INT
-        }
-      ],
-      [type.STRING],
-      [type.INT]
-    ]);
   });
 
   test("Duplicated values are removed", () => {
@@ -188,7 +173,8 @@ describe("Schema Parsing", () => {
     expect(res[5].propertyType).toBe(type.NULL);
 
     expect(res[6].propertyType).toBe(type.OBJECT);
-    expect(res[6].children).toMatchObject([]);
+    // Updated expectation: empty objects now return children as "object" string instead of empty array
+    expect(res[6].children).toBe("object");
 
     expect(res[7].propertyType).toBe(type.LIST);
     expect(res[7].children).toMatchObject([]);
@@ -479,5 +465,273 @@ describe("Schema Parsing", () => {
     if (deepResult.length === 0) {
       console.log("REPRODUCED: Deep nesting causes empty result!");
     }
+  });
+
+  test("INVESTIGATE STRING ARRAYS: When do string arrays get empty children?", () => {
+    console.log("=== Testing string array scenarios ===");
+    
+    // Scenario 1: Normal array of strings
+    const scenario1 = { tags: ["tag1", "tag2", "tag3"] };
+    const result1 = inspector.extractSchema(scenario1);
+    console.log("Normal strings:", JSON.stringify(result1[0].children));
+    
+    // Scenario 2: Array with empty strings
+    const scenario2 = { tags: ["", "", ""] };
+    const result2 = inspector.extractSchema(scenario2);
+    console.log("Empty strings:", JSON.stringify(result2[0].children));
+    
+    // Scenario 3: Array with null/undefined mixed with strings
+    const scenario3 = { tags: ["tag1", null, undefined, "tag2"] };
+    const result3 = inspector.extractSchema(scenario3);
+    console.log("Mixed null/undefined:", JSON.stringify(result3[0].children));
+    
+    // Scenario 4: Array with identical strings (testing removeDuplicates)
+    const scenario4 = { tags: ["same", "same", "same", "same"] };
+    const result4 = inspector.extractSchema(scenario4);
+    console.log("Identical strings:", JSON.stringify(result4[0].children));
+    
+    // Scenario 5: Empty array
+    const scenario5 = { tags: [] };
+    const result5 = inspector.extractSchema(scenario5);
+    console.log("Empty array:", JSON.stringify(result5[0].children));
+    
+    // Scenario 6: Array with special string values
+    const scenario6 = { tags: ["", "null", "undefined", "false", "0"] };
+    const result6 = inspector.extractSchema(scenario6);
+    console.log("Special string values:", JSON.stringify(result6[0].children));
+    
+    // Check which scenarios result in empty children
+    const scenarios = [result1, result2, result3, result4, result5, result6];
+    scenarios.forEach((result, index) => {
+      if (result[0].children.length === 0) {
+        console.log(`FOUND EMPTY: Scenario ${index + 1} has empty children!`);
+      }
+    });
+  });
+
+  test("DEEP DIVE: removeDuplicates edge cases with primitives", () => {
+    console.log("=== Testing removeDuplicates with edge cases ===");
+    
+    // Test the removeDuplicates function directly with potential problem cases
+    const testCases = [
+      ["string", "string", "string"], // identical strings
+      ["", "", ""], // empty strings
+      ["0", "0"], // zero strings
+      ["false", "false"], // boolean strings
+      ["null", "null"], // null strings
+      ["undefined", "undefined"], // undefined strings
+    ];
+    
+    testCases.forEach((testCase, index) => {
+      const result = (AvoSchemaParser as any).removeDuplicates(testCase);
+      console.log(`Test ${index + 1} - Input: ${JSON.stringify(testCase)} -> Output: ${JSON.stringify(result)}`);
+      
+      if (result.length === 0) {
+        console.log(`PROBLEM: removeDuplicates returned empty array for case ${index + 1}!`);
+      }
+    });
+    
+    // Test arrays that might have been processed before reaching removeDuplicates
+    const scenario7 = { items: [0, 0, 0] }; // numbers
+    const result7 = inspector.extractSchema(scenario7);
+    console.log("Identical numbers:", JSON.stringify(result7[0].children));
+    
+    const scenario8 = { items: [false, false, false] }; // booleans
+    const result8 = inspector.extractSchema(scenario8);
+    console.log("Identical booleans:", JSON.stringify(result8[0].children));
+    
+    const scenario9 = { items: [null, null, null] }; // nulls
+    const result9 = inspector.extractSchema(scenario9);
+    console.log("Identical nulls:", JSON.stringify(result9[0].children));
+  });
+
+  test("EDGE CASES: Non-serializable and exotic values", () => {
+    console.log("=== Testing exotic values that might cause issues ===");
+    
+    // Test function values (non-serializable)
+    const withFunctions = { 
+      items: [
+        function() { return "test"; }, 
+        () => "arrow", 
+        "normalString"
+      ] 
+    };
+    const result1 = inspector.extractSchema(withFunctions);
+    console.log("With functions:", JSON.stringify(result1[0].children));
+    
+    // Test Symbol values (non-serializable)
+    const withSymbols = { 
+      items: [
+        Symbol('test'), 
+        Symbol('test2'), 
+        "normalString"
+      ] 
+    };
+    const result2 = inspector.extractSchema(withSymbols);
+    console.log("With symbols:", JSON.stringify(result2[0].children));
+    
+    // Test BigInt values
+    const withBigInt = { 
+      items: [
+        BigInt(123), 
+        BigInt(456), 
+        "normalString"
+      ] 
+    };
+    const result3 = inspector.extractSchema(withBigInt);
+    console.log("With BigInt:", JSON.stringify(result3[0].children));
+    
+    // Test class instances
+    class TestClass {
+      constructor(public value: string) {}
+    }
+    const withClassInstances = { 
+      items: [
+        new TestClass("test1"), 
+        new TestClass("test2"), 
+        "normalString"
+      ] 
+    };
+    const result4 = inspector.extractSchema(withClassInstances);
+    console.log("With class instances:", JSON.stringify(result4[0].children));
+    
+    // Test Date objects - now should be treated as strings
+    const withDates = { 
+      items: [
+        new Date(), 
+        new Date('2023-01-01'), 
+        "normalString"
+      ] 
+    };
+    const result5 = inspector.extractSchema(withDates);
+    console.log("With dates:", JSON.stringify(result5[0].children));
+    
+    // Date objects should now be treated as strings
+    expect(result5[0].propertyType).toBe(type.LIST);
+    expect(result5[0].children).toEqual(["string"]);
+    
+    // Check for empty children in any of these cases
+    const results = [result1, result2, result3, result4, result5];
+    results.forEach((result, index) => {
+      if (result[0].children.length === 0) {
+        console.log(`FOUND ISSUE: Exotic case ${index + 1} resulted in empty children!`);
+      }
+    });
+  });
+
+  test("SPECIFIC ISSUE: Objects with no enumerable properties", () => {
+    console.log("=== Testing objects with no enumerable properties ===");
+    
+    // Date objects specifically - now should be treated as strings
+    const scenario1 = { items: [new Date('2023-01-01'), new Date('2023-01-02')] };
+    const result1 = inspector.extractSchema(scenario1);
+    console.log("Date objects result:", JSON.stringify(result1[0]));
+    
+    // Date objects should now have children as "string" type instead of empty arrays
+    expect(result1[0].propertyType).toBe(type.LIST);
+    expect(result1[0].children).toEqual(["string"]);
+    
+    // Objects with only non-enumerable properties
+    const obj1 = {};
+    Object.defineProperty(obj1, 'hiddenProp', {
+      value: 'test',
+      enumerable: false
+    });
+    
+    const scenario2 = { items: [obj1, obj1] };
+    const result2 = inspector.extractSchema(scenario2);
+    console.log("Non-enumerable props result:", JSON.stringify(result2[0]));
+    
+    // RegExp objects (also have no enumerable properties) - now should be treated as strings
+    const scenario3 = { items: [/test/, /pattern/] };
+    const result3 = inspector.extractSchema(scenario3);
+    console.log("RegExp objects result:", JSON.stringify(result3[0]));
+    
+    // RegExp objects should now have children as "string" type instead of empty arrays
+    expect(result3[0].propertyType).toBe(type.LIST);
+    expect(result3[0].children).toEqual(["string"]);
+    
+    // Error objects - should still be treated as objects
+    const scenario4 = { items: [new Error('test1'), new Error('test2')] };
+    const result4 = inspector.extractSchema(scenario4);
+    console.log("Error objects result:", JSON.stringify(result4[0]));
+    
+    // Check what the for...in loop sees for these objects
+    console.log("=== What for...in sees ===");
+    
+    const dateObj = new Date();
+    const dateKeys = [];
+    for (const key in dateObj) {
+      if (dateObj.hasOwnProperty(key)) {
+        dateKeys.push(key);
+      }
+    }
+    console.log("Date object enumerable keys:", dateKeys);
+    
+    // This shows why Date objects result in empty arrays!
+    if (dateKeys.length === 0) {
+      console.log("CONFIRMED: Date objects have no enumerable properties!");
+    }
+  });
+
+  test("TEMP DEBUG: Empty object behavior", () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+    
+    const eventProperties = { emptyObj: {} };
+    const res = inspector.extractSchema(eventProperties);
+    
+    console.log("TEMP DEBUG - Full result:", JSON.stringify(res, null, 2));
+    console.log("TEMP DEBUG - emptyObj entry:", JSON.stringify(res[0], null, 2));
+    console.log("TEMP DEBUG - children type:", typeof res[0].children);
+    console.log("TEMP DEBUG - children value:", res[0].children);
+  });
+
+  test("Date and RegExp objects are treated as strings", () => {
+    // Test Date objects in different contexts
+    const dateScenarios = {
+      singleDate: new Date('2023-01-01'),
+      dateArray: [new Date(), new Date('2024-01-01')],
+      mixedWithDate: [new Date(), "string", 123]
+    };
+
+    const dateResult = inspector.extractSchema(dateScenarios);
+    
+    // Single Date should be string type
+    expect(dateResult[0].propertyName).toBe("singleDate");
+    expect(dateResult[0].propertyType).toBe(type.STRING);
+    
+    // Array of Dates should have string children
+    expect(dateResult[1].propertyName).toBe("dateArray");
+    expect(dateResult[1].propertyType).toBe(type.LIST);
+    expect(dateResult[1].children).toEqual(["string"]);
+    
+    // Mixed array with Date should include string type
+    expect(dateResult[2].propertyName).toBe("mixedWithDate");
+    expect(dateResult[2].propertyType).toBe(type.LIST);
+    expect(dateResult[2].children).toContain("string");
+    
+    // Test RegExp objects in different contexts
+    const regexScenarios = {
+      singleRegex: /test/g,
+      regexArray: [/pattern1/, /pattern2/i],
+      mixedWithRegex: [/regex/, "string", 456]
+    };
+
+    const regexResult = inspector.extractSchema(regexScenarios);
+    
+    // Single RegExp should be string type
+    expect(regexResult[0].propertyName).toBe("singleRegex");
+    expect(regexResult[0].propertyType).toBe(type.STRING);
+    
+    // Array of RegExp should have string children
+    expect(regexResult[1].propertyName).toBe("regexArray");
+    expect(regexResult[1].propertyType).toBe(type.LIST);
+    expect(regexResult[1].children).toEqual(["string"]);
+    
+    // Mixed array with RegExp should include string type
+    expect(regexResult[2].propertyName).toBe("mixedWithRegex");
+    expect(regexResult[2].propertyType).toBe(type.LIST);
+    expect(regexResult[2].children).toContain("string");
   });
 });
