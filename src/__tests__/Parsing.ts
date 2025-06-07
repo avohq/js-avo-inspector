@@ -56,7 +56,7 @@ describe("Schema Parsing", () => {
     expect(res[5].propertyType).toBe(type.NULL);
 
     expect(res[6].propertyType).toBe(type.OBJECT);
-    // expect(res[6].children).toMatchObject([]); // Empty objects now return children: "object" instead of []
+    expect(res[6].children).toMatchObject([{ propertyName: "an", propertyType: "string" }]);
 
     expect(res[7].propertyType).toBe(type.LIST);
     expect(res[7].children).toMatchObject([
