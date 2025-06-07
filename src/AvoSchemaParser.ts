@@ -12,13 +12,13 @@ export class AvoSchemaParser {
       return [];
     }
 
-    const mapping = (object: any) => {
+    const mapping = (object: any, depth: number = 0): any => {
       if (isArray(object)) {
         const list = object.map((x: any) => {
-          return mapping(x);
+          return mapping(x, depth);
         });
         return this.removeDuplicates(list);
-      } else if (typeof object === "object") {
+      } else if (typeof object === "object" && object !== null) {
         const mappedResult: any = [];
         for (const key in object) {
           if (object.hasOwnProperty(key)) {
@@ -33,8 +33,9 @@ export class AvoSchemaParser {
               propertyType: this.getPropValueType(val)
             };
 
-            if (typeof val === "object" && val != null) {
-              mappedEntry.children = mapping(val);
+            // Only recurse into children if we haven't reached max depth (4 levels)
+            if (typeof val === "object" && val != null && depth < 4) {
+              mappedEntry.children = mapping(val, depth + 1);
             }
 
             mappedResult.push(mappedEntry);
