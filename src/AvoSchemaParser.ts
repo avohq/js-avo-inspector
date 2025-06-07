@@ -8,7 +8,6 @@ const isBuiltInObject = (obj: any): boolean => {
     return false;
   }
   
-  // Check for common built-in objects that have no enumerable properties
   return obj instanceof Date ||
          obj instanceof RegExp ||
          obj instanceof Error ||
@@ -74,9 +73,8 @@ export class AvoSchemaParser {
   }
 
   private static removeDuplicates (array: any[]): any[] {
-    // XXX TODO fix any types
+    const seen = new Set<string>();
     const primitives: any = { boolean: {}, number: {}, string: {} };
-    const objects: any[] = [];
 
     return array.filter((item: any) => {
       const type: string = typeof item;
@@ -85,7 +83,12 @@ export class AvoSchemaParser {
           ? false
           : (primitives[type][item] = true);
       } else {
-        return objects.includes(item) ? false : objects.push(item);
+        const serialized = JSON.stringify(item);
+        if (seen.has(serialized)) {
+          return false;
+        }
+        seen.add(serialized);
+        return true;
       }
     });
   }
