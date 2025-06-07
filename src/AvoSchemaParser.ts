@@ -62,12 +62,6 @@ export class AvoSchemaParser {
           }
         }
 
-        // If no enumerable properties were found, treat as a primitive object type
-        // This prevents empty arrays for objects with only non-enumerable properties
-        if (mappedResult.length === 0) {
-          return this.getPropValueType(object);
-        }
-
         return mappedResult;
       } else {
         return this.getPropValueType(object);
