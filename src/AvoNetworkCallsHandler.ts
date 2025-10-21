@@ -1,5 +1,4 @@
 import AvoGuid from "./AvoGuid";
-import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoInspector } from "./AvoInspector";
 import { AvoAnonymousId } from "./AvoAnonymousId";
 
@@ -12,7 +11,6 @@ export interface BaseBody {
   libPlatform: "web"
   messageId: string
   createdAt: string
-  sessionId: string
   anonymousId: string
   samplingRate: number
 }
@@ -67,7 +65,7 @@ export class AvoNetworkCallsHandler {
 
     const events = inEvents.filter(x => x != null);
 
-    this.fixSessionAndAnonymousIds(events);
+    this.fixAnonymousIds(events);
 
     if (events.length === 0) {
       return;
@@ -124,15 +122,10 @@ export class AvoNetworkCallsHandler {
     };
   }
 
-  private fixSessionAndAnonymousIds (events: Array<SessionStartedBody | EventSchemaBody>): void {
-    let knownSessionId: string | null = null;
+  private fixAnonymousIds (events: Array<SessionStartedBody | EventSchemaBody>): void {
     let knownAnonymousId: string | null = null;
     events.forEach(
       function (event) {
-        if (event.sessionId !== null && event.sessionId !== undefined && event.sessionId !== "unknown") {
-          knownSessionId = event.sessionId;
-        }
-
         if (event.anonymousId !== null && event.anonymousId !== undefined && event.anonymousId !== "unknown") {
           knownAnonymousId = event.anonymousId;
         }
@@ -140,13 +133,6 @@ export class AvoNetworkCallsHandler {
     );
     events.forEach(
       function (event) {
-        if (event.sessionId === "unknown") {
-          if (knownSessionId != null) {
-            event.sessionId = knownSessionId;
-          } else {
-            event.sessionId = AvoSessionTracker.sessionId;
-          }
-        }
         if (event.anonymousId === "unknown") {
           if (knownAnonymousId != null) {
             event.anonymousId = knownAnonymousId;
@@ -202,7 +188,6 @@ export class AvoNetworkCallsHandler {
       libPlatform: "web",
       messageId: AvoGuid.newGuid(),
       createdAt: new Date().toISOString(),
-      sessionId: AvoSessionTracker.sessionId,
       anonymousId: AvoAnonymousId.anonymousId,
       samplingRate: this.samplingRate
     };
