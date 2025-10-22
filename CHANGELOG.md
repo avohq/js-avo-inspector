@@ -1,3 +1,7 @@
+## 2.2.0-alpha.1
+
+- Add anonymous ID support to track events without user identification
+
 ## 2.1.0
 
 - Add `set networkTimeout` setter, in ms
