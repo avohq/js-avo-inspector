@@ -10,7 +10,9 @@ export interface BaseBody {
   env: string
   libPlatform: "web"
   messageId: string
+  trackingId: string
   createdAt: string
+  sessionId: string
   anonymousId: string
   samplingRate: number
 }
@@ -187,7 +189,9 @@ export class AvoNetworkCallsHandler {
       env: this.envName,
       libPlatform: "web",
       messageId: AvoGuid.newGuid(),
+      trackingId: "",
       createdAt: new Date().toISOString(),
+      sessionId: "",
       anonymousId: AvoAnonymousId.anonymousId,
       samplingRate: this.samplingRate
     };

@@ -50,7 +50,9 @@ describe("NetworkCallsHandler", () => {
       env,
       libPlatform: "web",
       messageId: mockedReturns.GUID,
+      trackingId: "",
       createdAt: new Date().toISOString(),
+      sessionId: "",
       anonymousId: mockedReturns.INSTALLATION_ID,
       samplingRate: 1.0
     };
