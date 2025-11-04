@@ -1,6 +1,5 @@
 import { AvoInspectorEnv, type AvoInspectorEnvValueType } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
-import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoBatcher } from "./AvoBatcher";
 import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
@@ -14,7 +13,6 @@ export class AvoInspector {
   environment: AvoInspectorEnvValueType;
   avoBatcher: AvoBatcher;
   avoDeduplicator: AvoDeduplicator;
-  sessionTracker: AvoSessionTracker;
   apiKey: string;
   version: string;
 
@@ -114,30 +112,8 @@ export class AvoInspector {
       libVersion
     );
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
-    this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
     this.avoDeduplicator = new AvoDeduplicator();
 
-    try {
-      if (process.env.BROWSER) {
-        // XXX make node/browser split clearer
-        if (typeof window !== "undefined") {
-          window.addEventListener(
-            "load",
-            () => {
-              this.sessionTracker.startOrProlongSession(Date.now());
-            },
-            false
-          );
-        }
-      } else {
-        this.sessionTracker.startOrProlongSession(Date.now());
-      }
-    } catch (e) {
-      console.error(
-        "Avo Inspector: something went wrong. Please report to support@avo.app.",
-        e
-      );
-    }
   }
 
   trackSchemaFromEvent (
@@ -274,7 +250,6 @@ export class AvoInspector {
     eventHash: string | null
   ): void {
     try {
-      this.sessionTracker.startOrProlongSession(Date.now());
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
@@ -302,8 +277,6 @@ export class AvoInspector {
       children?: any
     }> {
     try {
-      this.sessionTracker.startOrProlongSession(Date.now());
-
       if (this.avoDeduplicator.hasSeenEventParams(eventProperties, true)) {
         if (shouldLogIfEnabled && AvoInspector.shouldLog) {
           console.warn(

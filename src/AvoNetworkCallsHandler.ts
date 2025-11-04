@@ -1,7 +1,6 @@
 import AvoGuid from "./AvoGuid";
-import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoInspector } from "./AvoInspector";
-import { AvoInstallationId } from "./AvoInstallationId";
+import { AvoAnonymousId } from "./AvoAnonymousId";
 
 export interface BaseBody {
   apiKey: string
@@ -14,6 +13,7 @@ export interface BaseBody {
   trackingId: string
   createdAt: string
   sessionId: string
+  anonymousId: string
   samplingRate: number
 }
 
@@ -67,7 +67,7 @@ export class AvoNetworkCallsHandler {
 
     const events = inEvents.filter(x => x != null);
 
-    this.fixSessionAndTrackingIds(events);
+    this.fixAnonymousIds(events);
 
     if (events.length === 0) {
       return;
@@ -124,34 +124,22 @@ export class AvoNetworkCallsHandler {
     };
   }
 
-  private fixSessionAndTrackingIds (events: Array<SessionStartedBody | EventSchemaBody>): void {
-    let knownSessionId: string | null = null;
-    let knownTrackingId: string | null = null;
+  private fixAnonymousIds (events: Array<SessionStartedBody | EventSchemaBody>): void {
+    let knownAnonymousId: string | null = null;
     events.forEach(
       function (event) {
-        if (event.sessionId !== null && event.sessionId !== undefined && event.sessionId !== "unknown") {
-          knownSessionId = event.sessionId;
-        }
-
-        if (event.trackingId !== null && event.trackingId !== undefined && event.trackingId !== "unknown") {
-          knownTrackingId = event.trackingId;
+        if (event.anonymousId !== null && event.anonymousId !== undefined && event.anonymousId !== "unknown") {
+          knownAnonymousId = event.anonymousId;
         }
       }
     );
     events.forEach(
       function (event) {
-        if (event.sessionId === "unknown") {
-          if (knownSessionId != null) {
-            event.sessionId = knownSessionId;
+        if (event.anonymousId === "unknown") {
+          if (knownAnonymousId != null) {
+            event.anonymousId = knownAnonymousId;
           } else {
-            event.sessionId = AvoSessionTracker.sessionId;
-          }
-        }
-        if (event.trackingId === "unknown") {
-          if (knownTrackingId != null) {
-            event.trackingId = knownTrackingId;
-          } else {
-            event.trackingId = AvoInstallationId.getInstallationId();
+            event.anonymousId = AvoAnonymousId.anonymousId;
           }
         }
       }
@@ -201,9 +189,10 @@ export class AvoNetworkCallsHandler {
       env: this.envName,
       libPlatform: "web",
       messageId: AvoGuid.newGuid(),
-      trackingId: AvoInstallationId.getInstallationId(),
+      trackingId: "",
       createdAt: new Date().toISOString(),
-      sessionId: AvoSessionTracker.sessionId,
+      sessionId: "",
+      anonymousId: AvoAnonymousId.anonymousId,
       samplingRate: this.samplingRate
     };
   }
