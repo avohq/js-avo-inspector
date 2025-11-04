@@ -1,4 +1,4 @@
-## 2.2.0-alpha.1
+## 2.2.0
 
 - Add anonymous ID support to track events without user identification
 
