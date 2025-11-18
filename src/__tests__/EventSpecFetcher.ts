@@ -136,6 +136,7 @@ describe("EventSpecFetcher", () => {
       });
 
       expect(result).not.toBeNull();
+      expect(result?.baseEvent.name).toBe("user_login");
     });
 
     test("should parse event spec with variants", async () => {
