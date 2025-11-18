@@ -1,5 +1,5 @@
-import { EventSpecCache } from "../eventSpec/cache";
-import type { EventSpec } from "../eventSpec/types";
+import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
+import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
 
 // Mock event spec for testing
 const mockEventSpec: EventSpec = {
@@ -25,14 +25,14 @@ describe("EventSpecCache", () => {
 
   describe("Basic Operations", () => {
     test("should store and retrieve event specs", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
-      const retrieved = cache.get("schema1", "source1", "event1", "main");
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
+      const retrieved = cache.get("apiKey1", "stream1", "event1");
 
       expect(retrieved).toEqual(mockEventSpec);
     });
 
     test("should return null for cache miss", () => {
-      const retrieved = cache.get("schema1", "source1", "event1", "main");
+      const retrieved = cache.get("apiKey1", "stream1", "event1");
       expect(retrieved).toBeNull();
     });
 
@@ -40,11 +40,11 @@ describe("EventSpecCache", () => {
       const spec1 = { ...mockEventSpec, baseEvent: { ...mockEventSpec.baseEvent, id: "evt_1" } };
       const spec2 = { ...mockEventSpec, baseEvent: { ...mockEventSpec.baseEvent, id: "evt_2" } };
 
-      cache.set("schema1", "source1", "event1", "main", spec1);
-      cache.set("schema1", "source1", "event2", "main", spec2);
+      cache.set("apiKey1", "stream1", "event1", spec1);
+      cache.set("apiKey1", "stream1", "event2", spec2);
 
-      const retrieved1 = cache.get("schema1", "source1", "event1", "main");
-      const retrieved2 = cache.get("schema1", "source1", "event2", "main");
+      const retrieved1 = cache.get("apiKey1", "stream1", "event1");
+      const retrieved2 = cache.get("apiKey1", "stream1", "event2");
 
       expect(retrieved1?.baseEvent.id).toBe("evt_1");
       expect(retrieved2?.baseEvent.id).toBe("evt_2");
@@ -54,11 +54,11 @@ describe("EventSpecCache", () => {
       const spec1 = { ...mockEventSpec, baseEvent: { ...mockEventSpec.baseEvent, id: "evt_main" } };
       const spec2 = { ...mockEventSpec, baseEvent: { ...mockEventSpec.baseEvent, id: "evt_dev" } };
 
-      cache.set("schema1", "source1", "event1", "main", spec1);
-      cache.set("schema1", "source1", "event1", "dev", spec2);
+      cache.set("apiKey1", "stream1", "event1", spec1);
+      cache.set("apiKey1", "stream2", "event1", spec2);
 
-      const retrieved1 = cache.get("schema1", "source1", "event1", "main");
-      const retrieved2 = cache.get("schema1", "source1", "event1", "dev");
+      const retrieved1 = cache.get("apiKey1", "stream1", "event1");
+      const retrieved2 = cache.get("apiKey1", "stream2", "event1");
 
       expect(retrieved1?.baseEvent.id).toBe("evt_main");
       expect(retrieved2?.baseEvent.id).toBe("evt_dev");
@@ -75,34 +75,34 @@ describe("EventSpecCache", () => {
     });
 
     test("should expire entries after 5 minutes", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
 
       // Initially should be cached
-      expect(cache.get("schema1", "source1", "event1", "main")).toEqual(mockEventSpec);
+      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(mockEventSpec);
 
       // Fast forward 4 minutes - should still be cached
       jest.advanceTimersByTime(4 * 60 * 1000);
-      expect(cache.get("schema1", "source1", "event1", "main")).toEqual(mockEventSpec);
+      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(mockEventSpec);
 
       // Fast forward 2 more minutes (total 6 minutes) - should be expired
       jest.advanceTimersByTime(2 * 60 * 1000);
-      expect(cache.get("schema1", "source1", "event1", "main")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
     });
 
     test("should not expire entries before TTL", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
 
       // Fast forward just under 5 minutes
       jest.advanceTimersByTime(5 * 60 * 1000 - 1);
 
-      expect(cache.get("schema1", "source1", "event1", "main")).toEqual(mockEventSpec);
+      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(mockEventSpec);
     });
   });
 
   describe("Event Count-based Rotation", () => {
     test("should increment event count for all entries", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
-      cache.set("schema1", "source1", "event2", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpec);
 
       cache.incrementEventCount();
       cache.incrementEventCount();
@@ -115,7 +115,7 @@ describe("EventSpecCache", () => {
 
     test("should evict oldest entry after 50 events", () => {
       // Add first entry
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
 
       // Simulate 10 events
       for (let i = 0; i < 10; i++) {
@@ -123,7 +123,7 @@ describe("EventSpecCache", () => {
       }
 
       // Add second entry (newer)
-      cache.set("schema1", "source1", "event2", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpec);
 
       // Simulate 40 more events (total 50)
       for (let i = 0; i < 40; i++) {
@@ -131,13 +131,13 @@ describe("EventSpecCache", () => {
       }
 
       // First entry should be evicted (oldest)
-      expect(cache.get("schema1", "source1", "event1", "main")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
       // Second entry should still be cached
-      expect(cache.get("schema1", "source1", "event2", "main")).toEqual(mockEventSpec);
+      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(mockEventSpec);
     });
 
     test("should reset global event count after rotation", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
 
       // Increment to 50 to trigger rotation
       for (let i = 0; i < 50; i++) {
@@ -149,7 +149,7 @@ describe("EventSpecCache", () => {
     });
 
     test("should expire entries that reach 50 events", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
 
       // Increment to 50
       for (let i = 0; i < 50; i++) {
@@ -157,7 +157,7 @@ describe("EventSpecCache", () => {
       }
 
       // Entry should be expired due to event count
-      expect(cache.get("schema1", "source1", "event1", "main")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
     });
   });
 
@@ -172,13 +172,13 @@ describe("EventSpecCache", () => {
 
     test("should evict oldest entry when rotating", () => {
       // Add three entries with time gaps
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
       jest.advanceTimersByTime(1000);
 
-      cache.set("schema1", "source1", "event2", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpec);
       jest.advanceTimersByTime(1000);
 
-      cache.set("schema1", "source1", "event3", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event3", mockEventSpec);
 
       // Initially, all entries should be cached
       expect(cache.size()).toBe(3);
@@ -193,7 +193,7 @@ describe("EventSpecCache", () => {
       expect(cache.size()).toBe(2);
 
       // Oldest entry (event1) should be evicted
-      expect(cache.get("schema1", "source1", "event1", "main")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
 
       // Note: event2 and event3 will also be expired when we try to get them
       // because they have eventCount >= 50. This is expected behavior.
@@ -203,7 +203,7 @@ describe("EventSpecCache", () => {
 
     test("should evict LRU entry correctly with staggered additions", () => {
       // Add first entry
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
       jest.advanceTimersByTime(1000);
 
       // Increment 10 times
@@ -212,7 +212,7 @@ describe("EventSpecCache", () => {
       }
 
       // Add second entry (newer, with lower event count)
-      cache.set("schema1", "source1", "event2", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpec);
 
       // Verify both are cached
       expect(cache.size()).toBe(2);
@@ -226,20 +226,20 @@ describe("EventSpecCache", () => {
       expect(cache.size()).toBe(1);
 
       // event1 should be evicted (oldest by timestamp)
-      expect(cache.get("schema1", "source1", "event1", "main")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
     });
   });
 
   describe("Cache Management", () => {
     test("clear should remove all entries", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
-      cache.set("schema1", "source1", "event2", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpec);
 
       cache.clear();
 
       expect(cache.size()).toBe(0);
-      expect(cache.get("schema1", "source1", "event1", "main")).toBeNull();
-      expect(cache.get("schema1", "source1", "event2", "main")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event2")).toBeNull();
     });
 
     test("clear should reset global event count", () => {
@@ -255,10 +255,10 @@ describe("EventSpecCache", () => {
     test("size should return number of cached entries", () => {
       expect(cache.size()).toBe(0);
 
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
       expect(cache.size()).toBe(1);
 
-      cache.set("schema1", "source1", "event2", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpec);
       expect(cache.size()).toBe(2);
 
       cache.clear();
@@ -276,7 +276,7 @@ describe("EventSpecCache", () => {
     });
 
     test("getStats should return accurate statistics", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
       jest.advanceTimersByTime(1000);
 
       cache.incrementEventCount();
@@ -292,9 +292,9 @@ describe("EventSpecCache", () => {
     });
 
     test("getStats should include all cached entries", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
-      cache.set("schema1", "source1", "event2", "main", mockEventSpec);
-      cache.set("schema1", "source1", "event3", "main", mockEventSpec);
+        cache.set("apiKey1", "stream1", "event1", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event3", mockEventSpec);
 
       const stats = cache.getStats();
 
@@ -306,7 +306,7 @@ describe("EventSpecCache", () => {
   describe("Edge Cases", () => {
     test("should handle empty cache gracefully", () => {
       expect(cache.size()).toBe(0);
-      expect(cache.get("schema1", "source1", "event1", "main")).toBeNull();
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
 
       const stats = cache.getStats();
       expect(stats.size).toBe(0);
@@ -314,7 +314,7 @@ describe("EventSpecCache", () => {
     });
 
     test("should handle rotation with single entry", () => {
-      cache.set("schema1", "source1", "event1", "main", mockEventSpec);
+      cache.set("apiKey1", "stream1", "event1", mockEventSpec);
 
       // Trigger rotation
       for (let i = 0; i < 50; i++) {

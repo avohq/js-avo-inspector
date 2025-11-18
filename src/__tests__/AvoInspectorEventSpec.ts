@@ -1,6 +1,6 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
-import type { EventSpec } from "../eventSpec/types";
+import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
 
 // Mock XMLHttpRequest for event spec fetching
 class MockXMLHttpRequest {
@@ -79,15 +79,13 @@ describe("AvoInspector Event Spec Integration", () => {
       expect(inspector.apiKey).toBe("test-key");
     });
 
-    test("should initialize with schemaId/sourceId (spec fetching enabled, no encryption)", () => {
+    test("should initialize with spec fetching enabled (no encryption)", () => {
       const consoleSpy = jest.spyOn(console, "log");
 
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
       expect(inspector).toBeDefined();
@@ -98,16 +96,14 @@ describe("AvoInspector Event Spec Integration", () => {
       consoleSpy.mockRestore();
     });
 
-    test("should initialize with encryption key and required params (spec fetching with encryption)", () => {
+    test("should initialize with encryption key (spec fetching with encryption)", () => {
       const consoleSpy = jest.spyOn(console, "log");
 
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        encryptionKey: "encryption-key-123",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        encryptionKey: "encryption-key-123"
       });
 
       expect(inspector).toBeDefined();
@@ -118,36 +114,18 @@ describe("AvoInspector Event Spec Integration", () => {
       consoleSpy.mockRestore();
     });
 
-    test("should not enable spec fetching without schemaId", () => {
+    test("should enable spec fetching when streamId is present", () => {
       const consoleSpy = jest.spyOn(console, "log");
 
-      new AvoInspector({
+      const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
-      // Should not log spec fetching enabled message
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("Event spec fetching enabled")
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    test("should not enable spec fetching without sourceId", () => {
-      const consoleSpy = jest.spyOn(console, "log");
-
-      new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123"
-      });
-
-      // Should not log spec fetching enabled message
-      expect(consoleSpy).not.toHaveBeenCalledWith(
+      expect(inspector).toBeDefined();
+      // Should log spec fetching enabled message since streamId comes from AvoAnonymousId
+      expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Event spec fetching enabled")
       );
 
@@ -158,9 +136,7 @@ describe("AvoInspector Event Spec Integration", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
       expect(inspector).toBeDefined();
@@ -171,10 +147,7 @@ describe("AvoInspector Event Spec Integration", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456",
-        branchId: "feature-branch"
+        version: "1.0.0"
       });
 
       expect(inspector).toBeDefined();
@@ -201,9 +174,7 @@ describe("AvoInspector Event Spec Integration", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
       const result = inspector.trackSchemaFromEvent("test_event", {
@@ -223,9 +194,7 @@ describe("AvoInspector Event Spec Integration", () => {
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        encryptionKey: "encryption-key-123",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        encryptionKey: "encryption-key-123"
       });
 
       const result = inspector.trackSchemaFromEvent("test_event", {
@@ -244,9 +213,7 @@ describe("AvoInspector Event Spec Integration", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
       // Track event - should succeed even if fetch fails
@@ -262,9 +229,7 @@ describe("AvoInspector Event Spec Integration", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
       // Track multiple events
@@ -284,9 +249,7 @@ describe("AvoInspector Event Spec Integration", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
       const schema = [
@@ -312,9 +275,7 @@ describe("AvoInspector Event Spec Integration", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        schemaId: "schema-123",
-        sourceId: "source-456"
+        version: "1.0.0"
       });
 
       // Track event - should not throw
@@ -327,12 +288,12 @@ describe("AvoInspector Event Spec Integration", () => {
       consoleSpy.mockRestore();
     });
 
-    test("should continue tracking even without schemaId/sourceId", () => {
+    test("should continue tracking even when spec fetching is enabled", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
-        // Missing schemaId and sourceId - spec fetching disabled
+        // Spec fetching is enabled by default via streamId from AvoAnonymousId
       });
 
       // Should still track without error
@@ -359,14 +320,12 @@ describe("AvoInspector Event Spec Integration", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    test("should work with existing suffix parameter and new spec fetching params", () => {
+    test("should work with existing suffix parameter", () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        suffix: "test-suffix",
-        schemaId: "schema",
-        sourceId: "source"
+        suffix: "test-suffix"
       });
 
       expect(inspector).toBeDefined();
@@ -379,9 +338,6 @@ describe("AvoInspector Event Spec Integration", () => {
         version: "1.0.0",
         suffix: "test-suffix",
         encryptionKey: "key",
-        schemaId: "schema",
-        sourceId: "source",
-        branchId: "main"
       });
 
       expect(inspector).toBeDefined();
