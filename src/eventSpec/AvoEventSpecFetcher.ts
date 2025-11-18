@@ -31,7 +31,7 @@ export class AvoEventSpecFetcher {
   
   /** Generates a unique key for tracking in-flight requests. */
   private generateRequestKey(params: FetchEventSpecParams): string {
-    return `${params.apiKey}:${params.streamId}:${params.eventName}`;
+    return `${params.streamId}:${params.eventName}`;
   }
   
   /**
@@ -52,7 +52,7 @@ export class AvoEventSpecFetcher {
     const existingRequest: Promise<EventSpec | null> | undefined = this.inFlightRequests.get(requestKey);
     if (existingRequest) {
       if (this.shouldLog) {
-        console.log(`[EventSpecFetcher] Returning existing in-flight request for: ${requestKey}`);
+        console.log(`[EventSpecFetcher] Returning existing in-flight request for streamId=${params.streamId}, eventName=${params.eventName}`);
       }
       return existingRequest;
     }
@@ -73,7 +73,7 @@ export class AvoEventSpecFetcher {
     const url: string = this.buildUrl(params);
     if (this.shouldLog) {
       console.log(`[EventSpecFetcher] Fetching event spec for: ${params.eventName}`);
-      console.log(`[EventSpecFetcher] URL: ${url}`);
+      console.log(`[EventSpecFetcher] Using base URL: ${this.baseUrl}`);
     }
     try {
       const response: any = await this.makeRequest(url);
@@ -112,7 +112,7 @@ export class AvoEventSpecFetcher {
    * Makes an HTTP GET request using XMLHttpRequest.
    * Returns the parsed JSON response or null on failure.
    */
-  private async makeRequest(url: string): Promise<any> {
+  private makeRequest(url: string): Promise<any> {
     return new Promise((resolve: (value: any) => void) => {
   const xhr: XMLHttpRequest = new XMLHttpRequest();
   xhr.open("GET", url, true);
