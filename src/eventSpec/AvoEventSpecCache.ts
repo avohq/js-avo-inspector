@@ -1,4 +1,4 @@
-import type { EventSpec, EventSpecCacheEntry } from "./types";
+import type { EventSpec, EventSpecCacheEntry } from "./AvoEventSpecFetchTypes";
 
 /**
  * EventSpecCache implements a dual-condition cache with LRU eviction.
@@ -38,12 +38,11 @@ export class EventSpecCache {
    * Generates a cache key from the provided parameters.
    */
   private generateKey(
-    schemaId: string,
-    sourceId: string,
-    eventName: string,
-    branchId: string
+    apiKey: string,
+    streamId: string,
+    eventName: string
   ): string {
-    return `${schemaId}:${sourceId}:${eventName}:${branchId}`;
+    return `${apiKey}:${streamId}:${eventName}`;
   }
 
   /**
@@ -53,12 +52,11 @@ export class EventSpecCache {
    * On cache hit, increments the hit count for this entry and the global counter.
    */
   get(
-    schemaId: string,
-    sourceId: string,
-    eventName: string,
-    branchId: string
+    apiKey: string,
+    streamId: string,
+    eventName: string
   ): EventSpec | null {
-    const key = this.generateKey(schemaId, sourceId, eventName, branchId);
+    const key = this.generateKey(apiKey, streamId, eventName);
     const entry = this.cache.get(key);
 
     if (!entry) {
@@ -98,13 +96,12 @@ export class EventSpecCache {
    * Stores an event spec in the cache.
    */
   set(
-    schemaId: string,
-    sourceId: string,
+    apiKey: string,
+    streamId: string,
     eventName: string,
-    branchId: string,
     spec: EventSpec
   ): void {
-    const key = this.generateKey(schemaId, sourceId, eventName, branchId);
+    const key = this.generateKey(apiKey, streamId, eventName);
 
     const entry: EventSpecCacheEntry = {
       spec,

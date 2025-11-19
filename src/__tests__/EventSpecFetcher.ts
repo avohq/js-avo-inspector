@@ -1,5 +1,5 @@
-import { EventSpecFetcher } from "../eventSpec/fetcher";
-import type { EventSpec } from "../eventSpec/types";
+import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
+import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
 
 // Mock XMLHttpRequest
 class MockXMLHttpRequest {
@@ -94,7 +94,7 @@ const mockEventSpec: EventSpec = {
 
 describe("EventSpecFetcher", () => {
   let originalXMLHttpRequest: any;
-  let fetcher: EventSpecFetcher;
+  let fetcher: AvoEventSpecFetcher;
 
   beforeAll(() => {
     originalXMLHttpRequest = (global as any).XMLHttpRequest;
@@ -106,14 +106,14 @@ describe("EventSpecFetcher", () => {
   });
 
   beforeEach(() => {
-    fetcher = new EventSpecFetcher(2000, false);
+    fetcher = new AvoEventSpecFetcher(2000, false);
   });
 
   describe("Successful Fetches", () => {
     test("should fetch event spec successfully", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -124,33 +124,34 @@ describe("EventSpecFetcher", () => {
 
     test("should use default branchId when not provided", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
       expect(result).not.toBeNull();
     });
 
-    test("should use provided branchId", async () => {
+    test("should use provided parameters in URL", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
-        eventName: "success",
-        branchId: "dev"
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
       });
 
       expect(result).not.toBeNull();
       expect(result?.baseEvent.name).toBe("user_login");
 
-      // Verify branchId=dev is included in the URL query parameters
-      expect(MockXMLHttpRequest.lastCalledUrl).toContain("branchId=dev");
+      // Verify all required parameters are included in the URL query
+      expect(MockXMLHttpRequest.lastCalledUrl).toContain("apiKey=apiKey1");
+      expect(MockXMLHttpRequest.lastCalledUrl).toContain("streamId=stream1");
+      expect(MockXMLHttpRequest.lastCalledUrl).toContain("eventName=success");
     });
 
     test("should parse event spec with variants", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -163,8 +164,8 @@ describe("EventSpecFetcher", () => {
   describe("Failed Fetches", () => {
     test("should return null on network error", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "error"
       });
 
@@ -173,8 +174,8 @@ describe("EventSpecFetcher", () => {
 
     test("should return null on timeout", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "timeout"
       });
 
@@ -183,8 +184,8 @@ describe("EventSpecFetcher", () => {
 
     test("should return null on 404 status", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "404"
       });
 
@@ -193,8 +194,8 @@ describe("EventSpecFetcher", () => {
 
     test("should return null on invalid response", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "invalid"
       });
 
@@ -205,14 +206,14 @@ describe("EventSpecFetcher", () => {
   describe("In-flight Request Deduplication", () => {
     test("should deduplicate concurrent requests for same event", async () => {
       const promise1 = fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
       const promise2 = fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -224,14 +225,14 @@ describe("EventSpecFetcher", () => {
 
     test("should not deduplicate requests for different events", async () => {
       const promise1 = fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success1"
       });
 
       const promise2 = fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success2"
       });
 
@@ -247,8 +248,8 @@ describe("EventSpecFetcher", () => {
     test("should validate baseEvent structure", async () => {
       // This test uses the mock which returns valid structure
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -260,8 +261,8 @@ describe("EventSpecFetcher", () => {
 
     test("should validate property specs", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -274,8 +275,8 @@ describe("EventSpecFetcher", () => {
 
     test("should validate variant structure when present", async () => {
       const result = await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -293,10 +294,9 @@ describe("EventSpecFetcher", () => {
       // We can't directly test URL building, but we can verify the fetch succeeds
       // which means the URL was built correctly
       const result = await fetcher.fetch({
-        schemaId: "schema_test",
-        sourceId: "source_test",
-        eventName: "success",
-        branchId: "feature-branch"
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
       });
 
       expect(result).not.toBeNull();
@@ -308,8 +308,8 @@ describe("EventSpecFetcher", () => {
       const consoleSpy = jest.spyOn(console, "log");
 
       await fetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -319,11 +319,11 @@ describe("EventSpecFetcher", () => {
 
     test("should log when shouldLog is true", async () => {
       const consoleSpy = jest.spyOn(console, "log");
-      const logFetcher = new EventSpecFetcher(2000, true);
+      const logFetcher = new AvoEventSpecFetcher(2000, true);
 
       await logFetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 
@@ -334,15 +334,15 @@ describe("EventSpecFetcher", () => {
 
   describe("Custom Base URL", () => {
     test("should use custom base URL when provided", async () => {
-      const customFetcher = new EventSpecFetcher(
+      const customFetcher = new AvoEventSpecFetcher(
         2000,
         false,
         "https://custom.api.example.com/v1"
       );
 
       const result = await customFetcher.fetch({
-        schemaId: "schema1",
-        sourceId: "source1",
+        apiKey: "apiKey1",
+        streamId: "stream1",
         eventName: "success"
       });
 

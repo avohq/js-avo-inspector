@@ -1,4 +1,10 @@
 /**
+ * This file is generated. Internal development changes should be made in the generator
+ * and the file should be re-generated. External contributions are welcome to submit
+ * changes directly to this file, and we'll apply them to the generator internally.
+ */
+
+/**
  * Represents the specification for a single property in an event.
  * Supports recursive nesting for object types.
  */
@@ -14,14 +20,12 @@ export interface PropertySpec {
   /** Maximum value (for numeric types) */
   max?: number;
   /** Enum values (allowed values for the property) */
-  v?: string[];
+  v?: Array<string>;
   /** Regex pattern for string validation */
   rx?: string;
 }
 
-/**
- * Represents a variant of an event with additional or modified properties.
- */
+/** Represents a variant of an event with additional or modified properties. */
 export interface EventVariant {
   /** Unique identifier for this variant */
   variantId: string;
@@ -39,21 +43,12 @@ export interface EventVariant {
  */
 export interface EventSpec {
   /** Base event specification */
-  baseEvent: {
-    /** Name of the event */
-    name: string;
-    /** Unique identifier for the event */
-    id: string;
-    /** Properties defined for the base event */
-    props: Record<string, PropertySpec>;
-  };
+  baseEvent: { name: string; id: string; props: Record<string, PropertySpec>; };
   /** Optional variants of this event with additional/modified properties */
-  variants?: EventVariant[];
+  variants?: Array<EventVariant>;
 }
 
-/**
- * Cache entry for storing event specs with metadata.
- */
+/** Cache entry for storing event specs with metadata. */
 export interface EventSpecCacheEntry {
   /** The cached event specification */
   spec: EventSpec;
@@ -63,16 +58,12 @@ export interface EventSpecCacheEntry {
   eventCount: number;
 }
 
-/**
- * Parameters for fetching event specifications from the API.
- */
+/** Parameters for fetching event specifications from the API. */
 export interface FetchEventSpecParams {
-  /** The workspace/schema ID */
-  schemaId: string;
-  /** The source ID */
-  sourceId: string;
+  /** The API key */
+  apiKey: string;
+  /** The stream ID */
+  streamId: string;
   /** The name of the event */
   eventName: string;
-  /** The branch ID (defaults to "main") */
-  branchId?: string;
 }
