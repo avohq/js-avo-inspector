@@ -21,11 +21,14 @@ export class AvoEventSpecFetcher {
   private inFlightRequests: Map<string, Promise<EventSpec | null>>;
   /** Whether to log debug information */
   private readonly shouldLog: boolean;
+  /** Environment name */
+  private readonly env: string;
   
-  constructor(timeout: number = 2000, shouldLog: boolean = false, baseUrl: string = "https://us-central1-avo-web-app.cloudfunctions.net") {
+  constructor(timeout: number = 2000, shouldLog: boolean = false, env: string, baseUrl: string = "https://us-central1-avo-web-app.cloudfunctions.net") {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
     this.shouldLog = shouldLog;
+    this.env = env;
     this.inFlightRequests = new Map();
   }
   
@@ -70,6 +73,9 @@ export class AvoEventSpecFetcher {
   
   /** Internal fetch implementation. */
   private async fetchInternal(params: FetchEventSpecParams): Promise<EventSpec | null> {
+    if ((!((this.env === "dev") || (this.env === "staging"))) || true) {
+      return null;
+    }
     const url: string = this.buildUrl(params);
     if (this.shouldLog) {
       console.log(`[EventSpecFetcher] Fetching event spec for: ${params.eventName}`);

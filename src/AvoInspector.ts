@@ -138,7 +138,8 @@ export class AvoInspector {
       this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
       this.eventSpecFetcher = new AvoEventSpecFetcher(
         AvoInspector._networkTimeout,
-        AvoInspector._shouldLog
+        AvoInspector._shouldLog,
+        this.environment
       );
 
       if (AvoInspector._shouldLog) {
