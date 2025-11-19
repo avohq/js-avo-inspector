@@ -10,7 +10,7 @@ import type { EventSpec, FetchEventSpecParams } from "./AvoEventSpecFetchTypes";
  * EventSpecFetcher handles fetching event specifications from the Avo API.
  *
  * Endpoint: GET /getEventSpec
- * Base URL: https://api.avo.app/inspector/v1
+ * Base URL: https://us-central1-avo-web-app.cloudfunctions.net
  */
 export class AvoEventSpecFetcher {
   /** Base URL for the event spec API */
@@ -22,7 +22,7 @@ export class AvoEventSpecFetcher {
   /** Whether to log debug information */
   private readonly shouldLog: boolean;
   
-  constructor(timeout: number = 2000, shouldLog: boolean = false, baseUrl: string = "https://api.avo.app/inspector/v1") {
+  constructor(timeout: number = 2000, shouldLog: boolean = false, baseUrl: string = "https://us-central1-avo-web-app.cloudfunctions.net") {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
     this.shouldLog = shouldLog;
