@@ -92,7 +92,7 @@ describe("AvoInspector Event Spec Integration", () => {
 
       expect(inspector).toBeDefined();
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("validation only, property values will not be sent")
+        expect.stringContaining("Phase 1: fetch/cache only, validation in Phase 2")
       );
 
       consoleSpy.mockRestore();
@@ -112,7 +112,7 @@ describe("AvoInspector Event Spec Integration", () => {
 
       expect(inspector).toBeDefined();
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("property values will be encrypted")
+        expect.stringContaining("Phase 1: fetch/cache only, validation in Phase 2")
       );
 
       consoleSpy.mockRestore();

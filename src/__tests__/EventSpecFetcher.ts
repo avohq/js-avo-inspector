@@ -14,9 +14,13 @@ class MockXMLHttpRequest {
   private method: string = "";
   private headers: Record<string, string> = {};
 
+  // Track last called URL for test assertions
+  static lastCalledUrl: string = "";
+
   open(method: string, url: string): void {
     this.method = method;
     this.url = url;
+    MockXMLHttpRequest.lastCalledUrl = url;
   }
 
   setRequestHeader(name: string, value: string): void {
@@ -138,6 +142,9 @@ describe("EventSpecFetcher", () => {
 
       expect(result).not.toBeNull();
       expect(result?.baseEvent.name).toBe("user_login");
+
+      // Verify branchId=dev is included in the URL query parameters
+      expect(MockXMLHttpRequest.lastCalledUrl).toContain("branchId=dev");
     });
 
     test("should parse event spec with variants", async () => {
