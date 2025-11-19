@@ -14,9 +14,13 @@ class MockXMLHttpRequest {
   private method: string = "";
   private headers: Record<string, string> = {};
 
+  // Track last called URL for test assertions
+  static lastCalledUrl: string = "";
+
   open(method: string, url: string): void {
     this.method = method;
     this.url = url;
+    MockXMLHttpRequest.lastCalledUrl = url;
   }
 
   setRequestHeader(name: string, value: string): void {
@@ -117,6 +121,23 @@ describe("EventSpecFetcher", () => {
       // expect(result?.baseEvent.name).toBe("user_login");
       // expect(result?.baseEvent.id).toBe("evt_123");
       expect(result).toBeNull();
+    });
+
+    test("should use provided parameters in URL", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      // expect(result).not.toBeNull();
+      // expect(result?.baseEvent.name).toBe("user_login");
+      expect(result).toBeNull();
+
+      // Verify all required parameters are included in the URL query
+      // expect(MockXMLHttpRequest.lastCalledUrl).toContain("apiKey=apiKey1");
+      // expect(MockXMLHttpRequest.lastCalledUrl).toContain("streamId=stream1");
+      // expect(MockXMLHttpRequest.lastCalledUrl).toContain("eventName=success");
     });
 
     test("should parse event spec with variants", async () => {

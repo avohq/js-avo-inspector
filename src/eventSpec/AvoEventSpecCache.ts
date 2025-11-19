@@ -4,11 +4,14 @@ import type { EventSpec, EventSpecCacheEntry } from "./AvoEventSpecFetchTypes";
  * EventSpecCache implements a dual-condition cache with LRU eviction.
  *
  * Cache Policy:
- * - Entries expire after 5 minutes OR 50 events, whichever comes first
- * - When 50 events are processed, the oldest cached entry is evicted
- * - Each cache entry tracks: spec, timestamp, and eventCount
+ * - Entries expire after 5 minutes OR 50 cache hits, whichever comes first
+ * - When 50 cache hits occur globally, the oldest cached entry is evicted
+ * - Each cache entry tracks: spec, timestamp, and hit count
  *
  * Cache Key Format: ${schemaId}:${sourceId}:${eventName}:${branchId}
+ *
+ * Note: Event count only increments on cache hits, not on every tracked event.
+ * This ensures the cache evicts based on actual usage, not overall tracking volume.
  */
 export class EventSpecCache {
   /** Cache storage: key -> CacheEntry */
@@ -17,10 +20,10 @@ export class EventSpecCache {
   /** Time-to-live in milliseconds (5 minutes) */
   private readonly TTL_MS = 5 * 60 * 1000;
 
-  /** Maximum event count before rotating cache (50 events) */
+  /** Maximum cache hit count before rotating cache (50 hits) */
   private readonly MAX_EVENT_COUNT = 50;
 
-  /** Global event counter to track when to rotate cache */
+  /** Global cache hit counter to track when to rotate cache */
   private globalEventCount: number = 0;
 
   /** Whether to log debug information */
@@ -45,6 +48,8 @@ export class EventSpecCache {
   /**
    * Retrieves an event spec from the cache if it exists and is valid.
    * Returns null if the entry is missing, expired, or has exceeded event count.
+   *
+   * On cache hit, increments the hit count for this entry and the global counter.
    */
   get(
     apiKey: string,
@@ -74,6 +79,16 @@ export class EventSpecCache {
       console.log(`[EventSpecCache] Cache hit for key: ${key}`);
     }
 
+    // Increment hit count for this entry
+    entry.eventCount++;
+    this.globalEventCount++;
+
+    // Check if we need to evict the oldest entry
+    if (this.globalEventCount >= this.MAX_EVENT_COUNT) {
+      this.evictOldest();
+      this.globalEventCount = 0;
+    }
+
     return entry.spec;
   }
 
@@ -101,29 +116,11 @@ export class EventSpecCache {
     }
   }
 
-  /**
-   * Increments the event count for all cached entries and triggers
-   * eviction if the global event count reaches MAX_EVENT_COUNT.
-   */
-  incrementEventCount(): void {
-    this.globalEventCount++;
-
-    // Increment count for all cached entries
-    this.cache.forEach((entry) => {
-      entry.eventCount++;
-    });
-
-    // Check if we need to evict the oldest entry
-    if (this.globalEventCount >= this.MAX_EVENT_COUNT) {
-      this.evictOldest();
-      this.globalEventCount = 0; // Reset counter after rotation
-    }
-  }
 
   /**
    * Determines if a cache entry should be evicted based on:
    * - Age (older than 5 minutes)
-   * - Event count (50 or more events processed)
+   * - Hit count (50 or more cache hits)
    */
   private shouldEvict(entry: EventSpecCacheEntry): boolean {
     const age = Date.now() - entry.timestamp;
