@@ -26,3 +26,10 @@ yarn-error.log*
 
 .vscode
 .cache
+
+# Exploration/context documentation
+ARCHITECTURE_DIAGRAM.md
+CODEBASE_STRUCTURE.md
+DOCUMENTATION_INDEX.md
+EXPLORATION_SUMMARY.md
+QUICK_REFERENCE.md

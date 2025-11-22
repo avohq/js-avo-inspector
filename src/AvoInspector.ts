@@ -4,8 +4,12 @@ import { AvoBatcher } from "./AvoBatcher";
 import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
+import { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
+import { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
+import { AvoAnonymousId } from "./AvoAnonymousId";
 
 import { isValueEmpty } from "./utils";
+import { EventSpec } from "eventSpec";
 
 const libVersion = require("../package.json").version;
 
@@ -15,6 +19,18 @@ export class AvoInspector {
   avoDeduplicator: AvoDeduplicator;
   apiKey: string;
   version: string;
+
+  // Event spec fetching fields (Phase 1: Fetch & Cache Only)
+  // Phase 1 (Current): Fetch event specs from API and cache them for future use
+  // Phase 2 (Future): Validate event properties against fetched specs and optionally encrypt/send values
+  //
+  // encryptionKey: Reserved for Phase 2 - will control whether property values are encrypted and sent
+  // schemaId/sourceId: Required for spec fetching to work
+  // branchId: Branch to fetch specs from (defaults to "main")
+  private encryptionKey?: string;
+  private streamId?: string;
+  private eventSpecCache?: EventSpecCache;
+  private eventSpecFetcher?: AvoEventSpecFetcher;
 
   static avoStorage: AvoStorage;
 
@@ -61,6 +77,7 @@ export class AvoInspector {
     version: string
     appName?: string
     suffix?: string
+    encryptionKey?: string
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -114,6 +131,33 @@ export class AvoInspector {
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.avoDeduplicator = new AvoDeduplicator();
 
+    // Initialize event spec fetching (Phase 1: Fetch & Cache Only)
+    // Phase 1: Fetch event specs from API and cache them - no validation yet
+    // Phase 2: Will add validation of event properties against specs
+    this.encryptionKey = options.encryptionKey;
+    this.streamId = AvoAnonymousId.anonymousId;
+
+    // Enable event spec fetching if streamId is present (and not "unknown")
+    if (this.streamId) {
+      this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
+      this.eventSpecFetcher = new AvoEventSpecFetcher(
+        AvoInspector._networkTimeout,
+        AvoInspector._shouldLog,
+        this.environment
+      );
+
+      if (AvoInspector._shouldLog) {
+        if (this.encryptionKey) {
+          console.log(
+            "[Avo Inspector] Event spec fetching enabled with encryption key (Phase 1: fetch/cache only, validation in Phase 2)"
+          );
+        } else {
+          console.log(
+            "[Avo Inspector] Event spec fetching enabled (Phase 1: fetch/cache only, validation in Phase 2)"
+          );
+        }
+      }
+    }
   }
 
   trackSchemaFromEvent (
@@ -140,6 +184,10 @@ export class AvoInspector {
             JSON.stringify(eventProperties)
           );
         }
+
+        // Fetch event spec if spec fetching is enabled (async, non-blocking)
+        this.fetchEventSpecIfNeeded(eventName);
+
         const eventSchema = this.extractSchema(eventProperties, false);
         this.trackSchemaInternal(eventName, eventSchema, null, null);
         return eventSchema;
@@ -184,6 +232,10 @@ export class AvoInspector {
             JSON.stringify(eventProperties)
           );
         }
+
+        // Fetch event spec if spec fetching is enabled (async, non-blocking)
+        this.fetchEventSpecIfNeeded(eventName);
+
         const eventSchema = this.extractSchema(eventProperties, false);
         this.trackSchemaInternal(eventName, eventSchema, eventId, eventHash);
         return eventSchema;
@@ -225,6 +277,10 @@ export class AvoInspector {
             JSON.stringify(eventSchema)
           );
         }
+
+        // Fetch event spec if spec fetching is enabled (async, non-blocking)
+        this.fetchEventSpecIfNeeded(eventName);
+
         this.trackSchemaInternal(eventName, eventSchema, null, null);
       } else {
         if (AvoInspector.shouldLog) {
@@ -311,4 +367,76 @@ export class AvoInspector {
   setBatchFlushSeconds (newBatchFlushSeconds: number): void {
     AvoInspector._batchFlushSeconds = newBatchFlushSeconds;
   }
+
+  /**
+   * Fetches the event spec if spec fetching is enabled (schemaId/sourceId provided).
+   * This is async and non-blocking - failures are logged but don't prevent tracking.
+   *
+   * Phase 1 (Current): Fetches and caches event specs from API
+   * Phase 2 (Future): Will use cached specs to validate event properties
+   *
+   * Note: Spec fetching happens regardless of encryption key presence.
+   * The encryption key is reserved for Phase 2 (validation + optional encryption).
+   */
+  private fetchEventSpecIfNeeded(eventName: string): void {
+    // Only fetch if we have the required infrastructure
+    if (
+      !this.eventSpecCache ||
+      !this.eventSpecFetcher ||
+      !this.streamId
+    ) {
+      return;
+    }
+
+    try {
+      // Check cache first
+      const cachedSpec = this.eventSpecCache.get(
+        this.apiKey,
+        this.streamId,
+        eventName
+      );
+
+      if (cachedSpec) {
+        // Cache hit - no need to fetch
+        return;
+      }
+
+      // Cache miss - fetch from API (async, non-blocking)
+      this.eventSpecFetcher
+        .fetch({
+          apiKey: this.apiKey,
+          streamId: this.streamId,
+          eventName
+        })
+        .then((spec: EventSpec | null) => {
+          if (spec && this.eventSpecCache && this.streamId) {
+            // Store in cache
+            this.eventSpecCache.set(
+              this.apiKey,
+              this.streamId,
+              eventName,
+              spec
+            );
+          }
+        })
+        .catch((error: any) => {
+          // Graceful degradation - log but don't fail
+          if (AvoInspector.shouldLog) {
+            console.error(
+              `[Avo Inspector] Failed to fetch event spec for ${eventName}:`,
+              error
+            );
+          }
+        });
+    } catch (error) {
+      // Graceful degradation - log but don't fail
+      if (AvoInspector.shouldLog) {
+        console.error(
+          `[Avo Inspector] Error in fetchEventSpecIfNeeded for ${eventName}:`,
+          error
+        );
+      }
+    }
+  }
+
 }
