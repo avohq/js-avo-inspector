@@ -1,4 +1,5 @@
-import { encryptValue, decryptValue } from "../AvoEncryption";
+import { encryptValue } from "../AvoEncryption";
+import { generateKeyPair, decryptValue } from "./helpers/encryptionHelpers";
 const JSEncrypt = require("jsencrypt");
 
 describe("AvoEncryption", () => {

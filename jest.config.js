@@ -9,6 +9,7 @@ module.exports = {
     "**/src/__tests__/**/*.ts",
     "!**/src/__tests__/setup.ts",
     "!**/src/__tests__/constants.ts",
+    "!**/src/__tests__/helpers/**",
   ],
   testPathIgnorePatterns: [
     "/node_modules/",

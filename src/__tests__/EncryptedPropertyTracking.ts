@@ -1,6 +1,6 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
-import { decryptValue } from "../AvoEncryption";
+import { decryptValue } from "./helpers/encryptionHelpers";
 import { type } from "./constants";
 const JSEncrypt = require("jsencrypt");
 

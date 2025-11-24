@@ -70,9 +70,6 @@ function generateKeys() {
     console.log('     version: "1.0.0",');
     console.log('     publicKey: process.env.AVO_PUBLIC_KEY');
     console.log('   });\n');
-    console.log('4. To decrypt values later (client-side only):');
-    console.log('   import { decryptValue } from "avo-inspector";');
-    console.log('   const original = decryptValue(encrypted, process.env.AVO_PRIVATE_KEY);\n');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.log('ℹ️  Note: Property encryption only works in dev/staging environments.');
     console.log('   Production data is never encrypted for performance.\n');

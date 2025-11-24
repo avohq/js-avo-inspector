@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RSA Property Value Encryption**: Optional `publicKey` parameter on SDK initialization enables zero-knowledge encryption of property values in dev/staging environments. Avo never has access to the private key, ensuring complete data privacy.
   - Only encrypts in dev/staging environments (production sends schema only)
   - Adds optional `encryptedPropertyValue` field to event schema
-  - Export `generateKeyPair()` and `decryptValue()` functions for client-side key management
-  - CLI tool for easy key generation: `npx avo-inspector generate-keys`
+  - CLI tool for key generation: `npx avo-inspector generate-keys`
+  - Note: Key generation and decryption are not exported from SDK (use CLI tool for keys, decryption happens in Avo's dashboard)
 
 - **EventSpec Fetching**: Automatically fetches and caches event specifications from Avo API in dev/staging environments
   - Non-blocking async API calls

@@ -1,6 +1,7 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
+import { generateKeyPair } from "./helpers/encryptionHelpers";
 const JSEncrypt = require("jsencrypt");
 
 // Mock XMLHttpRequest for event spec fetching
@@ -192,9 +193,7 @@ describe("AvoInspector Event Spec Integration", () => {
 
     test("should track events and fetch spec WITH encryption key", async () => {
       // Generate a real RSA key pair for this test
-      const keyPair = new JSEncrypt({ default_key_size: "2048" });
-      keyPair.getKey();
-      const testPublicKey = keyPair.getPublicKey();
+      const { publicKey: testPublicKey } = generateKeyPair();
 
       const inspector = new AvoInspector({
         apiKey: "test-key",
