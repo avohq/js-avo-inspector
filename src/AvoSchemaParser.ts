@@ -1,16 +1,29 @@
+import { encryptValue } from "./AvoEncryption";
+
 const isArray = (obj: any): boolean => {
   return Object.prototype.toString.call(obj) === "[object Array]";
 };
 
 export class AvoSchemaParser {
-  static extractSchema (eventProperties: Record<string, any>): Array<{
+  static extractSchema (
+    eventProperties: Record<string, any>,
+    publicKey?: string,
+    env?: string
+  ): Array<{
     propertyName: string
     propertyType: string
+    encryptedPropertyValue?: string
     children?: any
   }> {
     if (eventProperties === null || eventProperties === undefined) {
       return [];
     }
+
+    // Determine if encryption should be enabled
+    // Encrypt only if: publicKey is set AND env is dev or staging
+    const shouldEncrypt = publicKey != null &&
+                         publicKey !== "" &&
+                         (env === "dev" || env === "staging");
 
     const mapping = (object: any) => {
       if (isArray(object)) {
@@ -27,11 +40,17 @@ export class AvoSchemaParser {
             const mappedEntry: {
               propertyName: string
               propertyType: string
+              encryptedPropertyValue?: string
               children?: any
             } = {
               propertyName: key,
               propertyType: this.getPropValueType(val)
             };
+
+            // Encrypt the property value if encryption is enabled
+            if (shouldEncrypt && publicKey) {
+              mappedEntry.encryptedPropertyValue = encryptValue(val, publicKey);
+            }
 
             if (typeof val === "object" && val != null) {
               mappedEntry.children = mapping(val);
