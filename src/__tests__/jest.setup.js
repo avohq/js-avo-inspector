@@ -1,3 +1,8 @@
+// Polyfill TextEncoder and TextDecoder for eciesjs and other crypto libraries
+const { TextEncoder, TextDecoder } = require('util');
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 // Set process.env.BROWSER so BrowserAvoStorage uses localStorage in tests
 process.env.BROWSER = "true";
 

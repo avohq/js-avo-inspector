@@ -9,7 +9,7 @@ import { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
 import { AvoAnonymousId } from "./AvoAnonymousId";
 
 import { isValueEmpty } from "./utils";
-import { EventSpec } from "eventSpec";
+import { EventSpec } from "./eventSpec/AvoEventSpecFetchTypes";
 
 const libVersion = require("../package.json").version;
 
@@ -24,10 +24,10 @@ export class AvoInspector {
   // Phase 1 (Current): Fetch event specs from API and cache them for future use
   // Phase 2 (Future): Validate event properties against fetched specs and optionally encrypt/send values
   //
-  // encryptionKey: Reserved for Phase 2 - will control whether property values are encrypted and sent
+  // publicEncryptionKey: RSA public key for encrypting property values - client keeps private key for decryption
   // schemaId/sourceId: Required for spec fetching to work
   // branchId: Branch to fetch specs from (defaults to "main")
-  private encryptionKey?: string;
+  private publicEncryptionKey?: string;
   private streamId?: string;
   private eventSpecCache?: EventSpecCache;
   private eventSpecFetcher?: AvoEventSpecFetcher;
@@ -77,7 +77,7 @@ export class AvoInspector {
     version: string
     appName?: string
     suffix?: string
-    encryptionKey?: string
+    publicEncryptionKey?: string
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -134,7 +134,7 @@ export class AvoInspector {
     // Initialize event spec fetching (Phase 1: Fetch & Cache Only)
     // Phase 1: Fetch event specs from API and cache them - no validation yet
     // Phase 2: Will add validation of event properties against specs
-    this.encryptionKey = options.encryptionKey;
+    this.publicEncryptionKey = options.publicEncryptionKey;
     this.streamId = AvoAnonymousId.anonymousId;
 
     // Enable event spec fetching if streamId is present (and not "unknown")
@@ -147,9 +147,9 @@ export class AvoInspector {
       );
 
       if (AvoInspector._shouldLog) {
-        if (this.encryptionKey) {
+        if (this.publicEncryptionKey) {
           console.log(
-            "[Avo Inspector] Event spec fetching enabled with encryption key (Phase 1: fetch/cache only, validation in Phase 2)"
+            "[Avo Inspector] Event spec fetching enabled with public key for encryption (Phase 1: fetch/cache only, validation in Phase 2)"
           );
         } else {
           console.log(
@@ -166,6 +166,7 @@ export class AvoInspector {
   ): Array<{
       propertyName: string
       propertyType: string
+      encryptedPropertyValue?: string
       children?: any
     }> {
     try {
@@ -214,6 +215,7 @@ export class AvoInspector {
   ): Array<{
       propertyName: string
       propertyType: string
+      encryptedPropertyValue?: string
       children?: any
     }> {
     try {
@@ -259,6 +261,7 @@ export class AvoInspector {
     eventSchema: Array<{
       propertyName: string
       propertyType: string
+      encryptedPropertyValue?: string
       children?: any
     }>
   ): void {
@@ -300,6 +303,7 @@ export class AvoInspector {
     eventSchema: Array<{
       propertyName: string
       propertyType: string
+      encryptedPropertyValue?: string
       children?: any
     }>,
     eventId: string | null,
@@ -330,6 +334,7 @@ export class AvoInspector {
   ): Array<{
       propertyName: string
       propertyType: string
+      encryptedPropertyValue?: string
       children?: any
     }> {
     try {
@@ -350,7 +355,11 @@ export class AvoInspector {
         );
       }
 
-      return AvoSchemaParser.extractSchema(eventProperties);
+      return AvoSchemaParser.extractSchema(
+        eventProperties,
+        this.publicEncryptionKey,
+        this.environment
+      );
     } catch (e) {
       console.error(
         "Avo Inspector: something went wrong. Please report to support@avo.app.",
@@ -375,10 +384,15 @@ export class AvoInspector {
    * Phase 1 (Current): Fetches and caches event specs from API
    * Phase 2 (Future): Will use cached specs to validate event properties
    *
-   * Note: Spec fetching happens regardless of encryption key presence.
-   * The encryption key is reserved for Phase 2 (validation + optional encryption).
+   * Note: EventSpec fetching only happens in dev/staging environments.
+   * Production environment does not fetch specs - it only sends schema (no values).
    */
   private fetchEventSpecIfNeeded(eventName: string): void {
+    // Only fetch specs in dev/staging environments (NOT in production)
+    if (this.environment === AvoInspectorEnv.Prod) {
+      return;
+    }
+
     // Only fetch if we have the required infrastructure
     if (
       !this.eventSpecCache ||

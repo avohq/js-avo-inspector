@@ -27,6 +27,7 @@ export interface EventSchemaBody extends BaseBody {
   eventProperties: Array<{
     propertyName: string
     propertyType: string
+    encryptedPropertyValue?: string
     children?: any
   }>
   avoFunction: boolean

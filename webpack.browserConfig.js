@@ -4,7 +4,7 @@ module.exports = {
   mode: 'production',
   entry: './src/browser.js',
   resolve: {
-    extensions: [".ts"],
+    extensions: [".ts", ".js"],
   },
   module: {
     rules: [

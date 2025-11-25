@@ -1,16 +1,53 @@
+import { encryptValue } from "./AvoEncryption";
+
 const isArray = (obj: any): boolean => {
   return Object.prototype.toString.call(obj) === "[object Array]";
 };
 
 export class AvoSchemaParser {
-  static extractSchema (eventProperties: Record<string, any>): Array<{
+  /**
+   * Returns true only if we have a valid encryption key and can send encrypted values.
+   * If no key is present, returns false and no property values will be sent.
+   */
+  private static canSendEncryptedValues(
+    publicEncryptionKey: string | undefined,
+    env: string | undefined
+  ): boolean {
+    const hasEncryptionKey = publicEncryptionKey != null && publicEncryptionKey !== "";
+    const isDevOrStaging = env === "dev" || env === "staging";
+    return hasEncryptionKey && isDevOrStaging;
+  }
+
+  /**
+   * Returns the encrypted property value if encryption is enabled, otherwise undefined.
+   * Never returns unencrypted values - only encrypted or nothing.
+   */
+  private static getEncryptedPropertyValueIfEnabled(
+    propertyValue: any,
+    canEncrypt: boolean,
+    publicEncryptionKey: string | undefined
+  ): string | undefined {
+    if (!canEncrypt || !publicEncryptionKey) {
+      return undefined; // No encryption key: do not send any property values
+    }
+    return encryptValue(propertyValue, publicEncryptionKey); // Only send encrypted values
+  }
+
+  static extractSchema (
+    eventProperties: Record<string, any>,
+    publicEncryptionKey?: string,
+    env?: string
+  ): Array<{
     propertyName: string
     propertyType: string
+    encryptedPropertyValue?: string
     children?: any
   }> {
     if (eventProperties === null || eventProperties === undefined) {
       return [];
     }
+
+    const canSendEncryptedValues = this.canSendEncryptedValues(publicEncryptionKey, env);
 
     const mapping = (object: any) => {
       if (isArray(object)) {
@@ -27,11 +64,22 @@ export class AvoSchemaParser {
             const mappedEntry: {
               propertyName: string
               propertyType: string
+              encryptedPropertyValue?: string
               children?: any
             } = {
               propertyName: key,
               propertyType: this.getPropValueType(val)
             };
+
+            // Only set encryptedPropertyValue if we can encrypt. Never send unencrypted values.
+            const encryptedValue = this.getEncryptedPropertyValueIfEnabled(
+              val,
+              canSendEncryptedValues,
+              publicEncryptionKey
+            );
+            if (encryptedValue !== undefined) {
+              mappedEntry.encryptedPropertyValue = encryptedValue;
+            }
 
             if (typeof val === "object" && val != null) {
               mappedEntry.children = mapping(val);

@@ -1,10 +1,13 @@
 {
   "name": "avo-inspector",
-  "version": "2.2.0",
+  "version": "2.2.1-alpha",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "avo-inspector": "./bin/avo-inspector.js"
+  },
   "scripts": {
     "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js",
     "build-for-script-tag": "tsc --outDir dist-browser --emitDeclarationOnly && webpack --config webpack.browserConfig.js",
@@ -32,6 +35,9 @@
     "url": "https://github.com/avohq/web-avo-inspector/issues"
   },
   "homepage": "https://github.com/avohq/web-avo-inspector#readme",
+  "dependencies": {
+    "eciesjs": "^0.4.11"
+  },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",

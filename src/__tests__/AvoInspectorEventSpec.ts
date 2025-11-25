@@ -1,6 +1,7 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
+import { generateKeyPair } from "./helpers/encryptionHelpers";
 
 // Mock XMLHttpRequest for event spec fetching
 class MockXMLHttpRequest {
@@ -103,7 +104,7 @@ describe("AvoInspector Event Spec Integration", () => {
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        encryptionKey: "encryption-key-123"
+        publicEncryptionKey: "encryption-key-123"
       });
 
       expect(inspector).toBeDefined();
@@ -190,11 +191,14 @@ describe("AvoInspector Event Spec Integration", () => {
     });
 
     test("should track events and fetch spec WITH encryption key", async () => {
+      // Generate a real RSA key pair for this test
+      const { publicKey: testPublicKey } = generateKeyPair();
+
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        encryptionKey: "encryption-key-123"
+        publicEncryptionKey: testPublicKey
       });
 
       const result = inspector.trackSchemaFromEvent("test_event", {
@@ -337,7 +341,7 @@ describe("AvoInspector Event Spec Integration", () => {
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
         suffix: "test-suffix",
-        encryptionKey: "key",
+        publicEncryptionKey: "key",
       });
 
       expect(inspector).toBeDefined();
