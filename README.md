@@ -138,7 +138,7 @@ let inspector = new Inspector.AvoInspector({
 
 **Note:** The public key is not a secret - you can hardcode it, store it in `.env`, or configure it however you prefer. The SDK only uses the public key to encrypt values before sending them to Avo.
 
-**Private key:** Save it securely (password manager, secure notes). The SDK never uses it - you only need it when viewing encrypted values in Avo's dashboard.
+**Private key:** Save it securely (password manager, secure notes). Never expose it to the SDK. You only need it when viewing encrypted values in Avo's dashboard.
 
 When encryption is enabled:
 - Property values are encrypted before being sent to Avo
