@@ -1,13 +1,9 @@
 import { encryptValue } from "../AvoEncryption";
 import { generateKeyPair, decryptValue } from "./helpers/encryptionHelpers";
-const JSEncrypt = require("jsencrypt");
 
 describe("AvoEncryption", () => {
-  // Generate a test RSA key pair (2048-bit to handle larger payloads)
-  const keyPair = new JSEncrypt({ default_key_size: "2048" });
-  keyPair.getKey();
-  const testPublicKey = keyPair.getPublicKey();
-  const testPrivateKey = keyPair.getPrivateKey();
+  // Generate a test ECC key pair
+  const { publicKey: testPublicKey, privateKey: testPrivateKey } = generateKeyPair();
 
   describe("encryptValue", () => {
     test("should encrypt and decrypt a string value", () => {
@@ -64,13 +60,8 @@ describe("AvoEncryption", () => {
       const value = "test";
 
       // Generate two different key pairs
-      const keyPair1 = new JSEncrypt({ default_key_size: "2048" });
-      keyPair1.getKey();
-      const publicKey1 = keyPair1.getPublicKey();
-
-      const keyPair2 = new JSEncrypt({ default_key_size: "2048" });
-      keyPair2.getKey();
-      const publicKey2 = keyPair2.getPublicKey();
+      const { publicKey: publicKey1 } = generateKeyPair();
+      const { publicKey: publicKey2 } = generateKeyPair();
 
       const encrypted1 = encryptValue(value, publicKey1);
       const encrypted2 = encryptValue(value, publicKey2);
@@ -85,6 +76,72 @@ describe("AvoEncryption", () => {
       // Base64 string should only contain alphanumeric chars, +, /, =, and newlines
       expect(encrypted).toMatch(/^[A-Za-z0-9+/=\n\r]+$/);
     });
+
+    test("should encrypt and decrypt large payloads (1KB+)", () => {
+      // Create a large object that would exceed RSA-2048's ~245 byte limit
+      const largeObject = {
+        description: "A".repeat(500), // 500 character string
+        metadata: {
+          tags: Array(50).fill("tag"),
+          properties: Array(20).fill({ key: "value", count: 123 })
+        },
+        items: Array(30).fill({
+          id: "item-12345",
+          name: "Test Item",
+          price: 99.99,
+          inStock: true
+        })
+      };
+
+      // This should be well over 1KB when JSON stringified
+      const jsonSize = JSON.stringify(largeObject).length;
+      expect(jsonSize).toBeGreaterThan(1000);
+
+      // Should successfully encrypt and decrypt without errors
+      const encrypted = encryptValue(largeObject, testPublicKey);
+      const decrypted = decryptValue(encrypted, testPrivateKey);
+
+      expect(decrypted).toEqual(largeObject);
+    });
+
+    test("should encrypt and decrypt very large payloads (5KB+)", () => {
+      // Create an even larger object
+      const veryLargeObject = {
+        data: "X".repeat(5000), // 5000 character string
+        list: Array(100).fill({
+          id: "item-123456789",
+          description: "Long description text here",
+          metadata: { a: 1, b: 2, c: 3, d: 4, e: 5 }
+        })
+      };
+
+      const jsonSize = JSON.stringify(veryLargeObject).length;
+      expect(jsonSize).toBeGreaterThan(5000);
+
+      // ECIES should handle this without any issues
+      const encrypted = encryptValue(veryLargeObject, testPublicKey);
+      const decrypted = decryptValue(encrypted, testPrivateKey);
+
+      expect(decrypted).toEqual(veryLargeObject);
+    });
+
+    test("should produce different ciphertexts for the same plaintext (ephemeral keys)", () => {
+      const value = "test";
+
+      // Encrypt the same value twice with the same public key
+      // ECIES uses ephemeral keys, so the ciphertext should be different each time
+      const encrypted1 = encryptValue(value, testPublicKey);
+      const encrypted2 = encryptValue(value, testPublicKey);
+
+      expect(encrypted1).not.toBe(encrypted2);
+
+      // But both should decrypt to the same value
+      const decrypted1 = decryptValue(encrypted1, testPrivateKey);
+      const decrypted2 = decryptValue(encrypted2, testPrivateKey);
+
+      expect(decrypted1).toBe(value);
+      expect(decrypted2).toBe(value);
+    });
   });
 
   describe("decryptValue", () => {
@@ -92,9 +149,7 @@ describe("AvoEncryption", () => {
       const value = "test";
 
       // Generate another key pair with different private key
-      const wrongKeyPair = new JSEncrypt({ default_key_size: "2048" });
-      wrongKeyPair.getKey();
-      const wrongPrivateKey = wrongKeyPair.getPrivateKey();
+      const { privateKey: wrongPrivateKey } = generateKeyPair();
 
       const encrypted = encryptValue(value, testPublicKey);
 

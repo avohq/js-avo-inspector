@@ -2,7 +2,6 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
 import { generateKeyPair } from "./helpers/encryptionHelpers";
-const JSEncrypt = require("jsencrypt");
 
 // Mock XMLHttpRequest for event spec fetching
 class MockXMLHttpRequest {

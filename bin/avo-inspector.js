@@ -1,22 +1,18 @@
 #!/usr/bin/env node
 
-// Use jsencrypt directly since the dist bundle is webpack-minified
-const JSEncrypt = require('jsencrypt');
+// Use eciesjs directly for ECC key generation
+const { PrivateKey } = require('eciesjs');
 
-function generateKeyPair(keySize = 2048) {
-  const keyPair = new JSEncrypt({ default_key_size: keySize.toString() });
-  keyPair.getKey();
+function generateKeyPair() {
+  // Generate a new random private key (32 bytes / 256 bits)
+  const privateKey = new PrivateKey();
 
-  const publicKey = keyPair.getPublicKey();
-  const privateKey = keyPair.getPrivateKey();
-
-  if (!publicKey || !privateKey) {
-    throw new Error("Failed to generate RSA key pair");
-  }
+  // Derive the public key from the private key
+  const publicKey = privateKey.publicKey;
 
   return {
-    publicKey,
-    privateKey
+    publicKey: publicKey.toHex(),
+    privateKey: privateKey.toHex()
   };
 }
 
@@ -32,7 +28,7 @@ Usage:
   npx avo-inspector <command>
 
 Commands:
-  generate-keys    Generate RSA key pair for property encryption
+  generate-keys    Generate ECC key pair for property encryption
   help            Show this help message
 
 Examples:
@@ -43,7 +39,7 @@ Examples:
 function generateKeys() {
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║           Generating RSA Key Pair (2048-bit)...              ║
+║           Generating ECC Key Pair (secp256k1)...             ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 
@@ -59,17 +55,17 @@ function generateKeys() {
     console.log(privateKey);
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.log('📝 Next Steps:\n');
-    console.log('1. Add these keys to your .env file:\n');
-    console.log('   AVO_PUBLIC_KEY="<paste public key above>"');
-    console.log('   AVO_PRIVATE_KEY="<paste private key above>"\n');
-    console.log('2. Add .env to .gitignore (if not already)\n');
-    console.log('3. Use in your code:\n');
+    console.log('1. Use the PUBLIC KEY in your SDK initialization:\n');
     console.log('   const inspector = new AvoInspector({');
-    console.log('     apiKey: process.env.AVO_API_KEY,');
+    console.log('     apiKey: "your-api-key",');
     console.log('     env: AvoInspectorEnv.Dev,');
     console.log('     version: "1.0.0",');
-    console.log('     publicKey: process.env.AVO_PUBLIC_KEY');
+    console.log('     publicKey: "<paste public key above>"');
     console.log('   });\n');
+    console.log('   💡 The public key is not a secret - you can hardcode it or use .env\n');
+    console.log('2. Save the PRIVATE KEY externally (password manager, secure notes)');
+    console.log('   - The SDK never uses the private key');
+    console.log('   - You only need it to decrypt values in Avo\'s dashboard\n');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.log('ℹ️  Note: Property encryption only works in dev/staging environments.');
     console.log('   Production data is never encrypted for performance.\n');

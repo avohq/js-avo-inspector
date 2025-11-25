@@ -1,15 +1,11 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
-import { decryptValue } from "./helpers/encryptionHelpers";
+import { generateKeyPair, decryptValue } from "./helpers/encryptionHelpers";
 import { type } from "./constants";
-const JSEncrypt = require("jsencrypt");
 
 describe("Encrypted Property Tracking", () => {
-  // Generate a test RSA key pair (2048-bit to handle larger payloads)
-  const keyPair = new JSEncrypt({ default_key_size: "2048" });
-  keyPair.getKey();
-  const testPublicKey = keyPair.getPublicKey();
-  const testPrivateKey = keyPair.getPrivateKey();
+  // Generate a test ECC key pair
+  const { publicKey: testPublicKey, privateKey: testPrivateKey } = generateKeyPair();
 
   describe("with encryption enabled in dev environment", () => {
     const inspector = new AvoInspector({

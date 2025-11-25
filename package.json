@@ -36,7 +36,7 @@
   },
   "homepage": "https://github.com/avohq/web-avo-inspector#readme",
   "dependencies": {
-    "jsencrypt": "^3.3.2"
+    "eciesjs": "^0.4.11"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

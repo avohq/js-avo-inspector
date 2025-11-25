@@ -98,6 +98,54 @@ let schema = inspector.extractSchema({
 
 You can experiment with this method to see how more complex schemas look, for example with nested lists and objects.
 
+# Property Value Encryption (Dev/Staging Only)
+
+Inspector supports encrypting property values in development and staging environments. This allows you to see actual property values in Avo's debugging tools without exposing sensitive data, since only you hold the private decryption key.
+
+## Key Features
+
+- Uses ECC (Elliptic Curve Cryptography) with secp256k1 for strong security
+- Zero-knowledge architecture: Avo never has access to your private key
+- No message size limitations
+- Only active in dev/staging environments (production is unaffected)
+
+## Generating Keys
+
+Use the built-in CLI tool to generate a key pair:
+
+```bash
+npx avo-inspector generate-keys
+```
+
+This will output:
+- **Public key**: Pass this to the SDK to enable encryption
+- **Private key**: Save this externally (you'll use it to decrypt values in Avo's dashboard)
+
+## Using Encryption
+
+Pass the `publicKey` parameter when initializing Inspector:
+
+```javascript
+import * as Inspector from "avo-inspector";
+
+let inspector = new Inspector.AvoInspector({
+  apiKey: "your api key",
+  env: Inspector.AvoInspectorEnv.Dev,
+  version: "1.0.0",
+  publicKey: "your-public-key-hex-string" // Enable encryption
+});
+```
+
+**Note:** The public key is not a secret - you can hardcode it, store it in `.env`, or configure it however you prefer. The SDK only uses the public key to encrypt values before sending them to Avo.
+
+**Private key:** Save it securely (password manager, secure notes). The SDK never uses it - you only need it when viewing encrypted values in Avo's dashboard.
+
+When encryption is enabled:
+- Property values are encrypted before being sent to Avo
+- You can decrypt them in Avo's dashboard using your private key
+- Works with all data types: strings, numbers, booleans, objects, arrays, null
+- Handles large payloads (1KB+) without issues
+
 # Batching control
 
 In order to ensure our SDK doesn't have a large impact on performance or battery life it supports event schemas batching.
