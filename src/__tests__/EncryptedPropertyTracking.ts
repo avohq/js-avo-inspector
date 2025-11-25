@@ -12,7 +12,7 @@ describe("Encrypted Property Tracking", () => {
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Dev,
       version: "1",
-      publicKey: testPublicKey
+      publicEncryptionKey: testPublicKey
     });
 
     beforeAll(() => {
@@ -113,7 +113,7 @@ describe("Encrypted Property Tracking", () => {
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Staging,
       version: "1",
-      publicKey: testPublicKey
+      publicEncryptionKey: testPublicKey
     });
 
     beforeAll(() => {
@@ -138,7 +138,7 @@ describe("Encrypted Property Tracking", () => {
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Prod,
       version: "1",
-      publicKey: testPublicKey
+      publicEncryptionKey: testPublicKey
     });
 
     beforeAll(() => {
@@ -183,7 +183,7 @@ describe("Encrypted Property Tracking", () => {
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Dev,
       version: "1",
-      publicKey: ""
+      publicEncryptionKey: ""
     });
 
     beforeAll(() => {
@@ -206,7 +206,7 @@ describe("Encrypted Property Tracking", () => {
       apiKey: "api-key-xxx",
       env: AvoInspectorEnv.Dev,
       version: "1",
-      publicKey: testPublicKey
+      publicEncryptionKey: testPublicKey
     });
 
     beforeAll(() => {

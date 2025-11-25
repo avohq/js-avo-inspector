@@ -24,10 +24,10 @@ export class AvoInspector {
   // Phase 1 (Current): Fetch event specs from API and cache them for future use
   // Phase 2 (Future): Validate event properties against fetched specs and optionally encrypt/send values
   //
-  // publicKey: RSA public key for encrypting property values - client keeps private key for decryption
+  // publicEncryptionKey: RSA public key for encrypting property values - client keeps private key for decryption
   // schemaId/sourceId: Required for spec fetching to work
   // branchId: Branch to fetch specs from (defaults to "main")
-  private publicKey?: string;
+  private publicEncryptionKey?: string;
   private streamId?: string;
   private eventSpecCache?: EventSpecCache;
   private eventSpecFetcher?: AvoEventSpecFetcher;
@@ -77,7 +77,7 @@ export class AvoInspector {
     version: string
     appName?: string
     suffix?: string
-    publicKey?: string
+    publicEncryptionKey?: string
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -134,7 +134,7 @@ export class AvoInspector {
     // Initialize event spec fetching (Phase 1: Fetch & Cache Only)
     // Phase 1: Fetch event specs from API and cache them - no validation yet
     // Phase 2: Will add validation of event properties against specs
-    this.publicKey = options.publicKey;
+    this.publicEncryptionKey = options.publicEncryptionKey;
     this.streamId = AvoAnonymousId.anonymousId;
 
     // Enable event spec fetching if streamId is present (and not "unknown")
@@ -147,7 +147,7 @@ export class AvoInspector {
       );
 
       if (AvoInspector._shouldLog) {
-        if (this.publicKey) {
+        if (this.publicEncryptionKey) {
           console.log(
             "[Avo Inspector] Event spec fetching enabled with public key for encryption (Phase 1: fetch/cache only, validation in Phase 2)"
           );
@@ -357,7 +357,7 @@ export class AvoInspector {
 
       return AvoSchemaParser.extractSchema(
         eventProperties,
-        this.publicKey,
+        this.publicEncryptionKey,
         this.environment
       );
     } catch (e) {

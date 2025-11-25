@@ -7,7 +7,7 @@ const isArray = (obj: any): boolean => {
 export class AvoSchemaParser {
   static extractSchema (
     eventProperties: Record<string, any>,
-    publicKey?: string,
+    publicEncryptionKey?: string,
     env?: string
   ): Array<{
     propertyName: string
@@ -20,9 +20,9 @@ export class AvoSchemaParser {
     }
 
     // Determine if encryption should be enabled
-    // Encrypt only if: publicKey is set AND env is dev or staging
-    const shouldEncrypt = publicKey != null &&
-                         publicKey !== "" &&
+    // Encrypt only if: publicEncryptionKey is set AND env is dev or staging
+    const shouldEncrypt = publicEncryptionKey != null &&
+                         publicEncryptionKey !== "" &&
                          (env === "dev" || env === "staging");
 
     const mapping = (object: any) => {
@@ -48,8 +48,8 @@ export class AvoSchemaParser {
             };
 
             // Encrypt the property value if encryption is enabled
-            if (shouldEncrypt && publicKey) {
-              mappedEntry.encryptedPropertyValue = encryptValue(val, publicKey);
+            if (shouldEncrypt && publicEncryptionKey) {
+              mappedEntry.encryptedPropertyValue = encryptValue(val, publicEncryptionKey);
             }
 
             if (typeof val === "object" && val != null) {

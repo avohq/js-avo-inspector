@@ -20,19 +20,21 @@ export function generateKeyPair(): { publicKey: string; privateKey: string } {
  */
 export function decryptValue(encryptedValue: string, privateKey: string): any {
   try {
-    // Convert encrypted value from base64 to Buffer
-    const encryptedBuffer = Buffer.from(encryptedValue, "base64");
+    // Convert encrypted value from base64 to Uint8Array
+    // Note: We use Uint8Array directly instead of Buffer because in some environments
+    // (like jsdom), Buffer instanceof Uint8Array returns false due to different realms
+    const encryptedBuffer = new Uint8Array(Buffer.from(encryptedValue, "base64"));
 
-    // eciesjs decrypt expects a hex string for the private key and a Buffer for data
+    // eciesjs decrypt expects a hex string for the private key and a Uint8Array for data
     // Ensure privateKey is a string
     const privateKeyStr = typeof privateKey === "string" ? privateKey : String(privateKey);
 
-    // Decrypt using ECIES (returns Buffer)
-    // Note: eciesjs expects hex string directly, not Buffer
+    // Decrypt using ECIES (returns Uint8Array)
     const decrypted = eciesDecrypt(privateKeyStr, encryptedBuffer);
 
     // Convert to string and parse JSON
-    const stringValue = decrypted.toString("utf8");
+    // Use Buffer.from() to handle both Buffer and Uint8Array return types across environments
+    const stringValue = Buffer.from(decrypted).toString("utf8");
     return JSON.parse(stringValue);
   } catch (error) {
     throw new Error(

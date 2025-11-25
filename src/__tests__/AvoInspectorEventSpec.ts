@@ -104,7 +104,7 @@ describe("AvoInspector Event Spec Integration", () => {
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        publicKey: "encryption-key-123"
+        publicEncryptionKey: "encryption-key-123"
       });
 
       expect(inspector).toBeDefined();
@@ -198,7 +198,7 @@ describe("AvoInspector Event Spec Integration", () => {
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        publicKey: testPublicKey
+        publicEncryptionKey: testPublicKey
       });
 
       const result = inspector.trackSchemaFromEvent("test_event", {
@@ -341,7 +341,7 @@ describe("AvoInspector Event Spec Integration", () => {
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
         suffix: "test-suffix",
-        publicKey: "key",
+        publicEncryptionKey: "key",
       });
 
       expect(inspector).toBeDefined();
