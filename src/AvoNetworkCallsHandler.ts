@@ -2,6 +2,7 @@ import AvoGuid from "./AvoGuid";
 import { AvoInspector } from "./AvoInspector";
 import { AvoAnonymousId } from "./AvoAnonymousId";
 import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { ValidationIssue } from "./eventSpec/EventValidator";
 
 export interface BaseBody {
   apiKey: string
@@ -20,35 +21,6 @@ export interface BaseBody {
 
 export interface SessionStartedBody extends BaseBody {
   type: "sessionStarted"
-}
-
-/**
- * Validation issue codes for client-side validation.
- */
-export type ValidationIssueCode =
-  | "RequiredMissing"
-  | "ValueBelowMin"
-  | "ValueAboveMax"
-  | "RegexMismatch"
-  | "NotInAllowedValues"
-  | "UnexpectedProperty"
-  | "UnexpectedEvent"
-  | "TypeMismatch";
-
-/**
- * Represents a validation issue found during event validation.
- */
-export interface ValidationIssue {
-  /** The type of validation issue */
-  code: ValidationIssueCode;
-  /** Property ID (preferred over name) */
-  propertyId?: string;
-  /** Property name (fallback when ID is not available) */
-  propertyName?: string;
-  /** Expected value for the validation rule */
-  expected?: string | number | boolean;
-  /** Received value that caused the validation failure */
-  received?: string | number | boolean;
 }
 
 export interface EventSchemaBody extends BaseBody {
@@ -115,14 +87,13 @@ export class AvoNetworkCallsHandler {
     }
 
     const events = inEvents.filter(x => x != null);
-
     this.fixAnonymousIds(events);
 
     if (events.length === 0) {
       return;
     }
 
-    if (Math.random() > this.samplingRate) {
+    if (this.shouldDropBySampling()) {
       if (AvoInspector.shouldLog) {
         console.log("Avo Inspector: last event schema dropped due to sampling rate.");
       }
@@ -131,46 +102,20 @@ export class AvoNetworkCallsHandler {
 
     if (AvoInspector.shouldLog) {
       console.log("Avo Inspector: events", events);
-
-      events.forEach(
-        function (event) {
-          if (event.type === "sessionStarted") {
-            console.log("Avo Inspector: sending session started event.");
-          } else if (event.type === "event") {
-            const schemaEvent: EventSchemaBody = event;
-            console.log("Avo Inspector: sending event " + schemaEvent.eventName + " with schema " + JSON.stringify(schemaEvent.eventProperties));
-          }
+      events.forEach((event) => {
+        if (event.type === "sessionStarted") {
+          console.log("Avo Inspector: sending session started event.");
+        } else if (event.type === "event") {
+          console.log("Avo Inspector: sending event " + event.eventName + " with schema " + JSON.stringify(event.eventProperties));
         }
-      );
+      });
     }
 
     this.sending = true;
-    const xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
-    xmlhttp.setRequestHeader("Content-Type", "text/plain");
-    xmlhttp.timeout = AvoInspector.networkTimeout;
-    xmlhttp.send(JSON.stringify(events));
-    xmlhttp.onload = () => {
-      if (xmlhttp.status !== 200) {
-        onCompleted(new Error(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`));
-      } else {
-        const samplingRate = JSON.parse(xmlhttp.response).samplingRate;
-        if (samplingRate !== undefined) {
-          this.samplingRate = samplingRate;
-        }
-
-        onCompleted(null);
-      }
+    this.callInspectorApi(events, (error) => {
       this.sending = false;
-    };
-    xmlhttp.onerror = () => {
-      onCompleted(new Error("Request failed"));
-      this.sending = false;
-    };
-    xmlhttp.ontimeout = () => {
-      onCompleted(new Error("Request timed out"));
-      this.sending = false;
-    };
+      onCompleted(error);
+    });
   }
 
   private fixAnonymousIds (events: Array<SessionStartedBody | EventSchemaBody>): void {
@@ -259,6 +204,69 @@ export class AvoNetworkCallsHandler {
       sessionId: "",
       anonymousId: AvoAnonymousId.anonymousId,
       samplingRate: this.samplingRate
+    };
+  }
+
+  /**
+   * Calls Inspector API immediately with a single event (bypasses batching).
+   * Used when event spec validation is available.
+   * Note: Does not drop due to sampling - validated events are always sent.
+   */
+  callInspectorImmediately (
+    eventBody: EventSchemaBody,
+    onCompleted: (error: Error | null) => any
+  ): void {
+    // Fix anonymous ID if needed
+    if (eventBody.anonymousId === "unknown") {
+      eventBody.anonymousId = AvoAnonymousId.anonymousId;
+    }
+
+    if (AvoInspector.shouldLog) {
+      console.log("Avo Inspector: calling inspector immediately (with validation)", eventBody.eventName);
+      console.log("Avo Inspector: event body", eventBody);
+    }
+
+    this.callInspectorApi([eventBody], onCompleted);
+  }
+
+  /**
+   * Check if event should be dropped based on sampling rate.
+   */
+  private shouldDropBySampling (): boolean {
+    return Math.random() > this.samplingRate;
+  }
+
+  /**
+   * Core Inspector API call logic shared by batch and immediate calls.
+   */
+  private callInspectorApi (
+    events: Array<SessionStartedBody | EventSchemaBody>,
+    onCompleted: (error: Error | null) => any
+  ): void {
+    const xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
+    xmlhttp.setRequestHeader("Content-Type", "text/plain");
+    xmlhttp.timeout = AvoInspector.networkTimeout;
+    xmlhttp.send(JSON.stringify(events));
+
+    xmlhttp.onload = () => {
+      if (xmlhttp.status !== 200) {
+        onCompleted(new Error(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`));
+      } else {
+        const response = JSON.parse(xmlhttp.response);
+        if (response.samplingRate !== undefined) {
+          this.samplingRate = response.samplingRate;
+        }
+        onCompleted(null);
+      }
+    };
+
+    xmlhttp.onerror = () => {
+      onCompleted(new Error("Request failed"));
+    };
+
+    xmlhttp.ontimeout = () => {
+      onCompleted(new Error("Request timed out"));
     };
   }
 }

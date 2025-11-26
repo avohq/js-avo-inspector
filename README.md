@@ -146,6 +146,53 @@ When encryption is enabled:
 - Works with all data types: strings, numbers, booleans, objects, arrays, null
 - Handles large payloads (1KB+) without issues
 
+# Client-Side Validation (Dev/Staging Only)
+
+When initialized with a `publicKey` in dev or staging environments, Inspector performs client-side validation of your events against your Avo Tracking Plan.
+
+## How It Works
+
+1. **Event Spec Fetching**: When you track an event, Inspector fetches the event specification from Avo's backend (results are cached for performance).
+
+2. **Event Matching**: Inspector matches your event to the closest event in your tracking plan, considering event names, mapped names, and variant-specific properties.
+
+3. **Property Validation**: Your event properties are validated against the spec rules:
+   - Required properties are present
+   - Property types match (string, int, float, boolean, object, list)
+   - Numeric values are within min/max bounds
+   - String values match regex patterns
+   - Enum values are in the allowed list
+   - Pinned values match exactly (variant-specific fixed values)
+   - No unexpected properties are sent
+
+4. **Immediate Reporting**: Validated events bypass batching and are sent immediately to Inspector, ensuring you get real-time feedback.
+
+## Validation Errors
+
+If logging is enabled, validation errors are logged to the console:
+
+```javascript
+inspector.enableLogging(true);
+
+// If "User Signed Up" requires an "email" property:
+inspector.trackSchemaFromEvent("User Signed Up", { name: "John" });
+// Console: [Avo Inspector] Validation errors for event "User Signed Up": [{ code: "RequiredMissing", propertyName: "email" }]
+```
+
+## Important: trackSchema Does Not Validate
+
+**Note:** Client-side validation only works with `trackSchemaFromEvent`, which has access to actual property values needed for validation.
+
+The `trackSchema` method only sends pre-extracted schemas and **does not perform client-side validation** - it goes through the normal batching flow.
+
+```javascript
+// ✅ Validates against tracking plan (when publicKey is provided)
+inspector.trackSchemaFromEvent("Event Name", { prop: "value" });
+
+// ❌ Does NOT validate - only sends schema, uses batching
+inspector.trackSchema("Event Name", [{ propertyName: "prop", propertyType: "string" }]);
+```
+
 # Batching control
 
 In order to ensure our SDK doesn't have a large impact on performance or battery life it supports event schemas batching.

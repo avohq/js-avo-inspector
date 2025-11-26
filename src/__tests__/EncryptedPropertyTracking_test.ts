@@ -1,11 +1,21 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 import { generateKeyPair, decryptValue } from "./helpers/encryptionHelpers";
 import { type } from "./constants";
+
+// Mock eventSpecFetcher to return null so batched flow is used
+jest.mock("../eventSpec/AvoEventSpecFetcher");
 
 describe("Encrypted Property Tracking", () => {
   // Generate a test ECC key pair
   const { publicKey: testPublicKey, privateKey: testPrivateKey } = generateKeyPair();
+
+  beforeAll(() => {
+    (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+      fetch: jest.fn().mockResolvedValue(null)
+    }));
+  });
 
   describe("with encryption enabled in dev environment", () => {
     const inspector = new AvoInspector({
@@ -213,14 +223,14 @@ describe("Encrypted Property Tracking", () => {
       inspector.enableLogging(false);
     });
 
-    test("should return schema with encrypted values from trackSchemaFromEvent", () => {
+    test("should return schema with encrypted values from trackSchemaFromEvent", async () => {
       const eventName = "Test Event";
       const eventProperties = {
         prop1: "value1",
         prop2: 42
       };
 
-      const schema = inspector.trackSchemaFromEvent(eventName, eventProperties);
+      const schema = await inspector.trackSchemaFromEvent(eventName, eventProperties);
 
       expect(schema.length).toBe(2);
       expect(schema[0].encryptedPropertyValue).toBeDefined();

@@ -344,7 +344,7 @@ describe("EventSpecFetcher", () => {
 
   describe("Logging", () => {
     test("should not log when shouldLog is false", async () => {
-      const consoleSpy = jest.spyOn(console, "log");
+      (console.log as jest.Mock).mockClear();
 
       await fetcher.fetch({
         apiKey: "apiKey1",
@@ -352,12 +352,11 @@ describe("EventSpecFetcher", () => {
         eventName: "success"
       });
 
-      expect(consoleSpy).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(console.log).not.toHaveBeenCalled();
     });
 
     test("should log when shouldLog is true", async () => {
-      const consoleSpy = jest.spyOn(console, "log");
+      (console.log as jest.Mock).mockClear();
       const logFetcher = new AvoEventSpecFetcher(2000, true, "dev");
 
       await logFetcher.fetch({
@@ -366,8 +365,7 @@ describe("EventSpecFetcher", () => {
         eventName: "success"
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(console.log).toHaveBeenCalled();
     });
   });
 

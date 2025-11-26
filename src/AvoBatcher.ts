@@ -4,6 +4,8 @@ import {
   type AvoNetworkCallsHandler
 } from "./AvoNetworkCallsHandler";
 import { AvoInspector } from "./AvoInspector";
+import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { ValidationIssue } from "./eventSpec/EventValidator";
 
 export interface AvoBatcherType {
   handleSessionStarted: () => void
@@ -16,7 +18,10 @@ export interface AvoBatcherType {
       children?: any
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    variantId?: string | null,
+    eventSpecMetadata?: EventSpecMetadata,
+    validationErrors?: ValidationIssue[]
   ) => void
 }
 
@@ -66,14 +71,20 @@ export class AvoBatcher implements AvoBatcherType {
       children?: any
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    variantId?: string | null,
+    eventSpecMetadata?: EventSpecMetadata,
+    validationErrors?: ValidationIssue[]
   ): void {
     this.events.push(
       this.networkCallsHandler.bodyForEventSchemaCall(
         eventName,
         schema,
         eventId,
-        eventHash
+        eventHash,
+        variantId,
+        eventSpecMetadata,
+        validationErrors
       )
     );
     this.saveEvents();

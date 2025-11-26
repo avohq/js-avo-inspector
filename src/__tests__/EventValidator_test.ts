@@ -515,7 +515,8 @@ describe("validateProperties", () => {
 
       const error = errors.find(e => e.code === "TypeMismatch");
       expect(error).toBeDefined();
-      expect(error?.received).toBe("array");
+      expect(error?.expected).toBe("string");
+      // Note: received value is not included to avoid sending user data
     });
   });
 
@@ -536,7 +537,7 @@ describe("validateProperties", () => {
       expect(errors.some(e => e.code === "ValueBelowMin")).toBe(true);
       const error = errors.find(e => e.code === "ValueBelowMin");
       expect(error?.expected).toBe(0);
-      expect(error?.received).toBe(-5);
+      // Note: received value is not included to avoid sending user data
     });
 
     test("should report value above max", () => {
@@ -555,7 +556,7 @@ describe("validateProperties", () => {
       expect(errors.some(e => e.code === "ValueAboveMax")).toBe(true);
       const error = errors.find(e => e.code === "ValueAboveMax");
       expect(error?.expected).toBe(5);
-      expect(error?.received).toBe(10);
+      // Note: received value is not included to avoid sending user data
     });
 
     test("should accept value within range", () => {
@@ -610,7 +611,8 @@ describe("validateProperties", () => {
 
       expect(errors.some(e => e.code === "NotInAllowedValues")).toBe(true);
       const error = errors.find(e => e.code === "NotInAllowedValues");
-      expect(error?.received).toBe("unknown");
+      expect(error?.expected).toBe("active, inactive, pending");
+      // Note: received value is not included to avoid sending user data
     });
 
     test("should accept value in allowed list", () => {
@@ -941,6 +943,40 @@ describe("validateProperties", () => {
       const errors = validateProperties({ method: "x" }, event, variant);
 
       expect(errors.some(e => e.code === "NotInAllowedValues")).toBe(false);
+    });
+
+    test("should validate pinned value (single allowed value) in variant", () => {
+      const event = createEventSpec({
+        props: {
+          action: createPropertySpec({
+            id: "prop_action",
+            t: { type: "primitive", value: "string" }
+          })
+        }
+      });
+
+      // Variant with pinned value (single allowed value)
+      const variant = createVariantSpec({
+        props: {
+          action: createPropertySpec({
+            id: "prop_action_pinned",
+            t: { type: "primitive", value: "string" },
+            v: ["click"] // Pinned to single value
+          })
+        }
+      });
+
+      // Should pass when pinned value matches
+      const validErrors = validateProperties({ action: "click" }, event, variant);
+      expect(validErrors.some(e => e.code === "NotInAllowedValues")).toBe(false);
+
+      // Should fail when pinned value doesn't match
+      const invalidErrors = validateProperties({ action: "scroll" }, event, variant);
+      expect(invalidErrors.some(e => e.code === "NotInAllowedValues")).toBe(true);
+      const error = invalidErrors.find(e => e.code === "NotInAllowedValues");
+      expect(error?.propertyName).toBe("action");
+      expect(error?.expected).toBe("click");
+      // Note: received value is not included to avoid sending user data
     });
   });
 });

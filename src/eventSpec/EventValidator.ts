@@ -14,7 +14,41 @@ import type {
   PropertySpec,
   PropertyTypeSpec
 } from "./AvoEventSpecFetchTypes";
-import type { ValidationIssue } from "../AvoNetworkCallsHandler";
+
+// =============================================================================
+// VALIDATION TYPES
+// =============================================================================
+
+/**
+ * Validation issue codes for client-side validation.
+ */
+export type ValidationIssueCode =
+  | "RequiredMissing"
+  | "ValueBelowMin"
+  | "ValueAboveMax"
+  | "RegexMismatch"
+  | "NotInAllowedValues"
+  | "UnexpectedProperty"
+  | "UnexpectedEvent"
+  | "TypeMismatch";
+
+/**
+ * Represents a validation issue found during event validation.
+ * 
+ * Note: We do NOT include the received value to avoid sending user data to the backend.
+ * The backend can correlate issues with encrypted values via propertyName matching
+ * against eventProperties.encryptedPropertyValue in the payload.
+ */
+export interface ValidationIssue {
+  /** The type of validation issue */
+  code: ValidationIssueCode;
+  /** Property ID (preferred over name) */
+  propertyId?: string;
+  /** Property name - used to correlate with encryptedPropertyValue in eventProperties */
+  propertyName?: string;
+  /** Expected value for the validation rule (from spec, not user data) */
+  expected?: string | number | boolean;
+}
 
 /**
  * Result of the validation process.
@@ -370,10 +404,9 @@ function validateProperty(
 
   // Check: TypeMismatch
   if (!isTypeMatch(value, spec.t)) {
-    errors.push(createIssue("TypeMismatch", propName, spec, {
-      expected: spec.t.type === "primitive" ? String(spec.t.value) : "object",
-      received: getRuntimeType(value)
-    }));
+    errors.push(createIssue("TypeMismatch", propName, spec,
+      spec.t.type === "primitive" ? String(spec.t.value) : "object"
+    ));
     // Continue checking other rules even if type doesn't match
   }
 
@@ -384,20 +417,14 @@ function validateProperty(
     // Check: ValueBelowMin
     if (spec.min !== undefined && typeof val === "number") {
       if (val < spec.min) {
-        errors.push(createIssue("ValueBelowMin", propName, spec, {
-          expected: spec.min,
-          received: val
-        }));
+        errors.push(createIssue("ValueBelowMin", propName, spec, spec.min));
       }
     }
 
     // Check: ValueAboveMax
     if (spec.max !== undefined && typeof val === "number") {
       if (val > spec.max) {
-        errors.push(createIssue("ValueAboveMax", propName, spec, {
-          expected: spec.max,
-          received: val
-        }));
+        errors.push(createIssue("ValueAboveMax", propName, spec, spec.max));
       }
     }
 
@@ -405,10 +432,7 @@ function validateProperty(
     if (spec.v && spec.v.length > 0) {
       const stringVal = String(val);
       if (!spec.v.includes(stringVal)) {
-        errors.push(createIssue("NotInAllowedValues", propName, spec, {
-          expected: spec.v.join(", "),
-          received: stringVal
-        }));
+        errors.push(createIssue("NotInAllowedValues", propName, spec, spec.v.join(", ")));
       }
     }
 
@@ -417,10 +441,7 @@ function validateProperty(
       try {
         const regex = new RegExp(spec.rx);
         if (!regex.test(val)) {
-          errors.push(createIssue("RegexMismatch", propName, spec, {
-            expected: spec.rx,
-            received: val
-          }));
+          errors.push(createIssue("RegexMismatch", propName, spec, spec.rx));
         }
       } catch {
         // Invalid regex in spec - skip this check
@@ -529,12 +550,13 @@ export function eventExistsInSpec(eventName: string, specResponse: EventSpecResp
 
 /**
  * Creates a ValidationIssue with common fields populated.
+ * Note: We don't include 'received' to avoid sending user data to the backend.
  */
 function createIssue(
   code: ValidationIssue["code"],
   propName: string,
   spec?: PropertySpec,
-  extra?: { expected?: string | number | boolean; received?: string | number | boolean }
+  expected?: string | number | boolean
 ): ValidationIssue {
   const issue: ValidationIssue = {
     code,
@@ -545,12 +567,8 @@ function createIssue(
     issue.propertyId = spec.id;
   }
 
-  if (extra?.expected !== undefined) {
-    issue.expected = extra.expected;
-  }
-
-  if (extra?.received !== undefined) {
-    issue.received = extra.received;
+  if (expected !== undefined) {
+    issue.expected = expected;
   }
 
   return issue;

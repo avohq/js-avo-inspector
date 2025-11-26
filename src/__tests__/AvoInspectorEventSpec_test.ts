@@ -89,8 +89,8 @@ describe("AvoInspector Event Spec Integration", () => {
       expect(inspector.apiKey).toBe("test-key");
     });
 
-    test("should initialize with spec fetching enabled (no encryption)", () => {
-      const consoleSpy = jest.spyOn(console, "log");
+    test("should initialize with spec fetching disabled when no encryption key", () => {
+      (console.log as jest.Mock).mockClear();
 
       const inspector = new AvoInspector({
         apiKey: "test-key",
@@ -99,15 +99,13 @@ describe("AvoInspector Event Spec Integration", () => {
       });
 
       expect(inspector).toBeDefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Phase 1: fetch/cache only, validation in Phase 2")
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Event spec fetching and validation disabled")
       );
-
-      consoleSpy.mockRestore();
     });
 
     test("should initialize with encryption key (spec fetching with encryption)", () => {
-      const consoleSpy = jest.spyOn(console, "log");
+      (console.log as jest.Mock).mockClear();
 
       const inspector = new AvoInspector({
         apiKey: "test-key",
@@ -117,15 +115,13 @@ describe("AvoInspector Event Spec Integration", () => {
       });
 
       expect(inspector).toBeDefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Phase 1: fetch/cache only, validation in Phase 2")
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Event spec fetching and validation enabled with encryption")
       );
-
-      consoleSpy.mockRestore();
     });
 
-    test("should enable spec fetching when streamId is present", () => {
-      const consoleSpy = jest.spyOn(console, "log");
+    test("should log spec status when streamId is present", () => {
+      (console.log as jest.Mock).mockClear();
 
       const inspector = new AvoInspector({
         apiKey: "test-key",
@@ -134,12 +130,10 @@ describe("AvoInspector Event Spec Integration", () => {
       });
 
       expect(inspector).toBeDefined();
-      // Should log spec fetching enabled message since streamId comes from AvoAnonymousId
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Event spec fetching enabled")
+      // Should log spec fetching status message since streamId comes from AvoAnonymousId
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Event spec fetching and validation")
       );
-
-      consoleSpy.mockRestore();
     });
 
     test("should use default branchId when not provided", () => {
@@ -165,14 +159,14 @@ describe("AvoInspector Event Spec Integration", () => {
   });
 
   describe("Event Tracking with Spec Fetching", () => {
-    test("should track events normally without spec fetching params", () => {
+    test("should track events normally without spec fetching params", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
       });
 
-      const result = inspector.trackSchemaFromEvent("test_event", {
+      const result = await inspector.trackSchemaFromEvent("test_event", {
         test_prop: "test_value"
       });
 
@@ -187,16 +181,12 @@ describe("AvoInspector Event Spec Integration", () => {
         version: "1.0.0"
       });
 
-      const result = inspector.trackSchemaFromEvent("test_event", {
+      const result = await inspector.trackSchemaFromEvent("test_event", {
         test_prop: "test_value"
       });
 
-      // Tracking should succeed immediately (non-blocking)
       expect(result).toBeDefined();
       expect(result.length).toBeGreaterThan(0);
-
-      // Wait for async spec fetch to complete
-      await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
     test("should track events and fetch spec WITH encryption key", async () => {
@@ -210,16 +200,12 @@ describe("AvoInspector Event Spec Integration", () => {
         publicEncryptionKey: testPublicKey
       });
 
-      const result = inspector.trackSchemaFromEvent("test_event", {
+      const result = await inspector.trackSchemaFromEvent("test_event", {
         test_prop: "test_value"
       });
 
-      // Tracking should succeed immediately (non-blocking)
       expect(result).toBeDefined();
       expect(result.length).toBeGreaterThan(0);
-
-      // Wait for async spec fetch to complete
-      await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
     test("should not block tracking if spec fetch fails (invalid status code)", async () => {
@@ -230,7 +216,7 @@ describe("AvoInspector Event Spec Integration", () => {
       });
 
       // Track event - should succeed even if fetch fails
-      const result = inspector.trackSchemaFromEvent("failing_event", {
+      const result = await inspector.trackSchemaFromEvent("failing_event", {
         test_prop: "test_value"
       });
 
@@ -246,14 +232,12 @@ describe("AvoInspector Event Spec Integration", () => {
       });
 
       // Track multiple events
-      inspector.trackSchemaFromEvent("event1", { prop: "value1" });
-      inspector.trackSchemaFromEvent("event2", { prop: "value2" });
-      inspector.trackSchemaFromEvent("event3", { prop: "value3" });
+      await inspector.trackSchemaFromEvent("event1", { prop: "value1" });
+      await inspector.trackSchemaFromEvent("event2", { prop: "value2" });
+      await inspector.trackSchemaFromEvent("event3", { prop: "value3" });
 
       // All should succeed
       expect(true).toBe(true);
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
     });
   });
 
@@ -272,36 +256,28 @@ describe("AvoInspector Event Spec Integration", () => {
         }
       ];
 
-      inspector.trackSchema("test_event", schema);
+      await inspector.trackSchema("test_event", schema);
 
       // Should not throw error
       expect(true).toBe(true);
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
     });
   });
 
   describe("Error Handling", () => {
     test("should handle spec fetch errors gracefully", async () => {
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
-
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
       });
 
-      // Track event - should not throw
-      expect(() => {
-        inspector.trackSchemaFromEvent("test_event", { prop: "value" });
-      }).not.toThrow();
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      consoleSpy.mockRestore();
+      // Track event - should not throw (console.error is globally mocked)
+      await expect(
+        inspector.trackSchemaFromEvent("test_event", { prop: "value" })
+      ).resolves.not.toThrow();
     });
 
-    test("should continue tracking even when spec fetching is enabled", () => {
+    test("should continue tracking even when spec fetching is enabled", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
@@ -310,14 +286,14 @@ describe("AvoInspector Event Spec Integration", () => {
       });
 
       // Should still track without error
-      expect(() => {
-        inspector.trackSchemaFromEvent("test_event", { prop: "value" });
-      }).not.toThrow();
+      await expect(
+        inspector.trackSchemaFromEvent("test_event", { prop: "value" })
+      ).resolves.not.toThrow();
     });
   });
 
   describe("Backwards Compatibility", () => {
-    test("should maintain existing behavior without new params", () => {
+    test("should maintain existing behavior without new params", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Prod,
@@ -325,7 +301,7 @@ describe("AvoInspector Event Spec Integration", () => {
         appName: "TestApp"
       });
 
-      const result = inspector.trackSchemaFromEvent("legacy_event", {
+      const result = await inspector.trackSchemaFromEvent("legacy_event", {
         prop: "value"
       });
 

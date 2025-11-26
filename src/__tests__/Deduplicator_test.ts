@@ -2,7 +2,11 @@ import { AvoDeduplicator } from "../AvoDeduplicator";
 import { deepEquals } from "../utils";
 import { AvoSchemaParser } from "../AvoSchemaParser";
 import { AvoInspector } from "../AvoInspector";
+import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 import { defaultOptions } from "./constants";
+
+// Mock eventSpecFetcher to return null so batched flow is used
+jest.mock("../eventSpec/AvoEventSpecFetcher");
 
 describe("Deduplicator", () => {
   const deduplicator = new AvoDeduplicator();
@@ -13,6 +17,12 @@ describe("Deduplicator", () => {
     2: [["str", true]],
     3: { avo: [1.1, 2.2, 3.3] }
   };
+
+  beforeAll(() => {
+    (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+      fetch: jest.fn().mockResolvedValue(null)
+    }));
+  });
 
   test("AvoDeduplicator.deepEqual tests", () => {
     const secondObject = {
@@ -55,54 +65,54 @@ describe("Deduplicator", () => {
     expect(shouldRegisterSchemaManual).toBe(false);
   });
 
-  test("Inspector deduplicates only one event when track manually, in avo and then manually again", () => {
+  test("Inspector deduplicates only one event when track manually, in avo and then manually again", async () => {
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
 
-    const manuallyTrackedSchema = inspector.trackSchemaFromEvent("test", testObject);
+    const manuallyTrackedSchema = await inspector.trackSchemaFromEvent("test", testObject);
     // @ts-expect-error
-    const avoTrackedSchema = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
-    const manuallyTrackedSchemaAgain = inspector.trackSchemaFromEvent("test", testObject);
+    const avoTrackedSchema = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+    const manuallyTrackedSchemaAgain = await inspector.trackSchemaFromEvent("test", testObject);
 
     expect(manuallyTrackedSchema.length).toBe(4);
     expect(avoTrackedSchema.length).toBe(0);
     expect(manuallyTrackedSchemaAgain.length).toBe(4);
   });
 
-  test("Inspector deduplicates only one event when track in avo, manually and then in avo again", () => {
+  test("Inspector deduplicates only one event when track in avo, manually and then in avo again", async () => {
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
 
     // @ts-expect-error
-    const avoTrackedSchema = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
-    const manuallyTrackedSchema = inspector.trackSchemaFromEvent("test", testObject);
+    const avoTrackedSchema = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+    const manuallyTrackedSchema = await inspector.trackSchemaFromEvent("test", testObject);
     // @ts-expect-error
-    const avoTrackedSchemaAgain = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+    const avoTrackedSchemaAgain = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
 
     expect(avoTrackedSchema.length).toBe(4);
     expect(manuallyTrackedSchema.length).toBe(0);
     expect(avoTrackedSchemaAgain.length).toBe(4);
   });
 
-  test("Allows two same manual events in a row", () => {
+  test("Allows two same manual events in a row", async () => {
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
 
-    const manuallyTrackedSchema = inspector.trackSchemaFromEvent("test", testObject);
-    const manuallyTrackedSchemaAgain = inspector.trackSchemaFromEvent("test", testObject);
+    const manuallyTrackedSchema = await inspector.trackSchemaFromEvent("test", testObject);
+    const manuallyTrackedSchemaAgain = await inspector.trackSchemaFromEvent("test", testObject);
 
     expect(manuallyTrackedSchema.length).toBe(4);
     expect(manuallyTrackedSchemaAgain.length).toBe(4);
   });
 
-  test("Allows two same avo events in a row", () => {
+  test("Allows two same avo events in a row", async () => {
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
 
     // @ts-expect-error
-    const avoTrackedSchema = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+    const avoTrackedSchema = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
     // @ts-expect-error
-    const avoTrackedSchemaAgain = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+    const avoTrackedSchemaAgain = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
 
     expect(avoTrackedSchema.length).toBe(4);
     expect(avoTrackedSchemaAgain.length).toBe(4);
