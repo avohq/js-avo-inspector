@@ -1,4 +1,4 @@
-import type { EventSpec, EventSpecCacheEntry } from "./AvoEventSpecFetchTypes";
+import type { EventSpecResponse, EventSpecCacheEntry } from "./AvoEventSpecFetchTypes";
 
 /**
  * EventSpecCache implements a dual-condition cache with LRU eviction.
@@ -46,7 +46,7 @@ export class EventSpecCache {
   }
 
   /**
-   * Retrieves an event spec from the cache if it exists and is valid.
+   * Retrieves an event spec response from the cache if it exists and is valid.
    * Returns null if the entry is missing, expired, or has exceeded event count.
    *
    * On cache hit, increments the hit count for this entry and the global counter.
@@ -55,7 +55,7 @@ export class EventSpecCache {
     apiKey: string,
     streamId: string,
     eventName: string
-  ): EventSpec | null {
+  ): EventSpecResponse | null {
     const key = this.generateKey(apiKey, streamId, eventName);
     const entry = this.cache.get(key);
 
@@ -93,13 +93,13 @@ export class EventSpecCache {
   }
 
   /**
-   * Stores an event spec in the cache.
+   * Stores an event spec response in the cache.
    */
   set(
     apiKey: string,
     streamId: string,
     eventName: string,
-    spec: EventSpec
+    spec: EventSpecResponse
   ): void {
     const key = this.generateKey(apiKey, streamId, eventName);
 

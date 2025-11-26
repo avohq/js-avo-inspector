@@ -9,7 +9,7 @@ import { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
 import { AvoAnonymousId } from "./AvoAnonymousId";
 
 import { isValueEmpty } from "./utils";
-import { EventSpec } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { EventSpecResponse } from "./eventSpec/AvoEventSpecFetchTypes";
 
 const libVersion = require("../package.json").version;
 
@@ -422,14 +422,14 @@ export class AvoInspector {
           streamId: this.streamId,
           eventName
         })
-        .then((spec: EventSpec | null) => {
-          if (spec && this.eventSpecCache && this.streamId) {
+        .then((response: EventSpecResponse | null) => {
+          if (response && this.eventSpecCache && this.streamId) {
             // Store in cache
             this.eventSpecCache.set(
               this.apiKey,
               this.streamId,
               eventName,
-              spec
+              response
             );
           }
         })

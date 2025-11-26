@@ -1,6 +1,7 @@
 import AvoGuid from "./AvoGuid";
 import { AvoInspector } from "./AvoInspector";
 import { AvoAnonymousId } from "./AvoAnonymousId";
+import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
 
 export interface BaseBody {
   apiKey: string
@@ -21,17 +22,64 @@ export interface SessionStartedBody extends BaseBody {
   type: "sessionStarted"
 }
 
+/**
+ * Validation issue codes for client-side validation.
+ */
+export type ValidationIssueCode =
+  | "RequiredMissing"
+  | "ValueBelowMin"
+  | "ValueAboveMax"
+  | "RegexMismatch"
+  | "NotInAllowedValues"
+  | "UnexpectedProperty"
+  | "UnexpectedEvent"
+  | "TypeMismatch";
+
+/**
+ * Represents a validation issue found during event validation.
+ */
+export interface ValidationIssue {
+  /** The type of validation issue */
+  code: ValidationIssueCode;
+  /** Property ID (preferred over name) */
+  propertyId?: string;
+  /** Property name (fallback when ID is not available) */
+  propertyName?: string;
+  /** Expected value for the validation rule */
+  expected?: string | number | boolean;
+  /** Received value that caused the validation failure */
+  received?: string | number | boolean;
+}
+
 export interface EventSchemaBody extends BaseBody {
   type: "event"
-  eventName: string
+
+  // Identification
+  /** ID of the matched base event */
+  eventId: string | null
+  /** ID of the matched variant (if any) */
+  variantId?: string | null
+  /** Name seen in code */
+  eventName?: string
+
+  // Context
+  /** Event spec metadata from EventSpecResponse */
+  eventSpecMetadata?: EventSpecMetadata
+
+  // Validation Results
+  /** Array of validation issues found during validation */
+  validationErrors?: ValidationIssue[]
+
+  // Existing Runtime Properties
   eventProperties: Array<{
     propertyName: string
     propertyType: string
     encryptedPropertyValue?: string
     children?: any
   }>
+
+  // Legacy fields
   avoFunction: boolean
-  eventId: string | null
   eventHash: string | null
 }
 
@@ -161,7 +209,10 @@ export class AvoNetworkCallsHandler {
       children?: any
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    variantId?: string | null,
+    eventSpecMetadata?: EventSpecMetadata,
+    validationErrors?: ValidationIssue[]
   ): EventSchemaBody {
     const eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
@@ -176,6 +227,19 @@ export class AvoNetworkCallsHandler {
       eventSchemaBody.avoFunction = false;
       eventSchemaBody.eventId = null;
       eventSchemaBody.eventHash = null;
+    }
+
+    // Set new fields if provided
+    if (variantId !== undefined) {
+      eventSchemaBody.variantId = variantId;
+    }
+
+    if (eventSpecMetadata) {
+      eventSchemaBody.eventSpecMetadata = eventSpecMetadata;
+    }
+
+    if (validationErrors && validationErrors.length > 0) {
+      eventSchemaBody.validationErrors = validationErrors;
     }
 
     return eventSchemaBody;

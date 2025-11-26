@@ -1,6 +1,6 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
-import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
+import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
 import { generateKeyPair } from "./helpers/encryptionHelpers";
 
 // Mock XMLHttpRequest for event spec fetching
@@ -35,16 +35,25 @@ class MockXMLHttpRequest {
       } else if (this.url.includes("/getEventSpec")) {
         // Mock event spec endpoint response
         this.status = 200;
-        const mockSpec: EventSpec = {
-          baseEvent: {
-            name: "test_event",
-            id: "evt_test",
-            props: {
-              test_prop: {
-                t: "string",
-                r: true
-              }
+        const mockSpec: EventSpecResponse = {
+          events: [
+            {
+              id: "evt_test",
+              name: "test_event",
+              props: {
+                test_prop: {
+                  id: "prop_test",
+                  t: { type: "primitive", value: "string" },
+                  r: true
+                }
+              },
+              variants: []
             }
+          ],
+          metadata: {
+            schemaId: "schema_test",
+            branchId: "main",
+            latestActionId: "action_test"
           }
         };
         const responseBody = JSON.stringify(mockSpec);
