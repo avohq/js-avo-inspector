@@ -127,7 +127,7 @@ export class AvoEventSpecFetcher {
       const xhr: XMLHttpRequest = new XMLHttpRequest();
       xhr.open("GET", url, true);
       xhr.timeout = this.timeout;
-      xhr.setRequestHeader("Content-Type", "application/json");
+      // Note: Don't set Content-Type for GET requests - it triggers CORS preflight
       
       xhr.onload = () => {
         if (xhr.status === 200) {
