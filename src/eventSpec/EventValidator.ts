@@ -443,8 +443,9 @@ function validateProperty(
         if (!regex.test(val)) {
           errors.push(createIssue("RegexMismatch", propName, spec, spec.rx));
         }
-      } catch {
-        // Invalid regex in spec - skip this check
+      } catch (e) {
+        // Invalid regex in spec - skip this check but log warning
+        console.warn(`[Avo Inspector] Invalid regex pattern "${spec.rx}" for property "${propName}": ${e}`);
       }
     }
 
@@ -521,16 +522,6 @@ function matchesPrimitiveType(value: RuntimePropertyValue, expectedType: string)
       // Try to be lenient with unknown types
       return actualType === expectedType;
   }
-}
-
-/**
- * Gets a string representation of the runtime type.
- */
-function getRuntimeType(value: RuntimePropertyValue): string {
-  if (value === null) return "null";
-  if (value === undefined) return "undefined";
-  if (Array.isArray(value)) return "array";
-  return typeof value;
 }
 
 // =============================================================================

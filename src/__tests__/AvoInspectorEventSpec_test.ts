@@ -100,7 +100,7 @@ describe("AvoInspector Event Spec Integration", () => {
 
       expect(inspector).toBeDefined();
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining("Event spec fetching and validation disabled")
+        expect.stringContaining("Event spec fetching and validation enabled")
       );
     });
 
@@ -116,7 +116,10 @@ describe("AvoInspector Event Spec Integration", () => {
 
       expect(inspector).toBeDefined();
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining("Event spec fetching and validation enabled with encryption")
+        expect.stringContaining("Event spec fetching and validation enabled")
+      );
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Property value encryption enabled")
       );
     });
 

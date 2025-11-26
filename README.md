@@ -132,7 +132,7 @@ let inspector = new Inspector.AvoInspector({
   apiKey: "your api key",
   env: Inspector.AvoInspectorEnv.Dev,
   version: "1.0.0",
-  publicKey: "your-public-key-hex-string" // Enable encryption
+  publicEncryptionKey: "your-public-key-hex-string" // Enable encryption
 });
 ```
 

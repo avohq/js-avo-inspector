@@ -143,13 +143,12 @@ export class AvoInspector {
       );
 
       if (AvoInspector._shouldLog) {
+        console.log(
+          "[Avo Inspector] Event spec fetching and validation enabled"
+        );
         if (this.publicEncryptionKey) {
           console.log(
-            "[Avo Inspector] Event spec fetching and validation enabled with encryption"
-          );
-        } else {
-          console.log(
-            "[Avo Inspector] Event spec fetching and validation disabled (no public encryption key provided)"
+            "[Avo Inspector] Property value encryption enabled"
           );
         }
       }
