@@ -590,14 +590,11 @@ export class AvoInspector {
       }
     }
 
-    // Use baseEventId from validation result, or eventId from Avo Functions
-    const baseEventId = validationResult.baseEventId ?? eventId;
-
     // Create the event body with validation data
     const eventBody = this.avoNetworkCallsHandler.bodyForEventSchemaCall(
       eventName,
       eventSchema,
-      baseEventId,
+      eventId,
       eventHash,
       validationResult.metadata ?? undefined
     );

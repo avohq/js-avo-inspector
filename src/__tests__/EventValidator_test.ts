@@ -15,25 +15,6 @@ import {
 
 describe("validateEvent", () => {
   describe("Basic Functionality", () => {
-    test("should return baseEventId from first event in response", () => {
-      const specResponse = createEventSpecResponse([
-        createEventSpecEntry({ baseEventId: "evt_first" }),
-        createEventSpecEntry({ baseEventId: "evt_second" })
-      ]);
-
-      const result = validateEvent({}, specResponse);
-
-      expect(result.baseEventId).toBe("evt_first");
-    });
-
-    test("should return null baseEventId when no events in response", () => {
-      const specResponse = createEventSpecResponse([]);
-
-      const result = validateEvent({}, specResponse);
-
-      expect(result.baseEventId).toBeNull();
-    });
-
     test("should return metadata from response", () => {
       const specResponse = createEventSpecResponse([
         createEventSpecEntry({})
@@ -90,8 +71,8 @@ describe("validateEvent", () => {
 
       // Unknown property has empty result
       expect(result.propertyResults["unknown_prop"]).toEqual({});
-      // Known property has validation result (failed because "google" !== "email")
-      expect(result.propertyResults["method"]).toBeDefined();
+      // Known property failed validation because "google" !== "email" (the pinned value)
+      expect(result.propertyResults["method"]).toEqual({ failedEventIds: ["evt_1"] });
     });
   });
 
@@ -680,7 +661,6 @@ describe("Edge Cases", () => {
 
     // Property not in any spec, so empty result
     expect(result.propertyResults["any_prop"]).toEqual({});
-    expect(result.baseEventId).toBeNull();
   });
 
   test("should handle null and undefined values", () => {

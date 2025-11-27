@@ -82,12 +82,7 @@ export function validateEvent(
     }
   }
 
-  // Get first baseEventId for backwards compatibility
-  const baseEventId =
-    specResponse.events.length > 0 ? specResponse.events[0].baseEventId : null;
-
   return {
-    baseEventId,
     metadata: specResponse.metadata,
     propertyResults
   };

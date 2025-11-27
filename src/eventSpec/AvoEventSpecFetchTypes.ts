@@ -161,8 +161,6 @@ export interface PropertyValidationResult {
  * Maps property name to its validation result.
  */
 export interface ValidationResult {
-  /** First baseEventId from the spec (for backwards compatibility) */
-  baseEventId: string | null;
   /** Event spec metadata */
   metadata: EventSpecMetadata | null;
   /** Validation results per property */
