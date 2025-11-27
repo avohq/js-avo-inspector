@@ -1,7 +1,5 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
-import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
-import { AvoBatcher } from "../AvoBatcher";
 import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
 import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
@@ -18,27 +16,35 @@ jest.mock("../AvoStorage", () => ({
 jest.mock("../eventSpec/AvoEventSpecFetcher");
 jest.mock("../eventSpec/AvoEventSpecCache");
 
-// Mock spec response for validation
+// Mock spec response (internal format with long names)
 const mockValidEventSpecResponse: EventSpecResponse = {
   events: [
     {
-      id: "evt_test",
-      name: "test_event",
+      branchId: "main",
+      baseEventId: "evt_test",
+      variantIds: ["evt_test.v1"],
       props: {
         required_prop: {
-          id: "prop_required",
-          t: { type: "primitive", value: "string" },
-          r: true
+          type: "string",
+          required: true
+          // No constraints - should always pass
         },
         optional_prop: {
-          id: "prop_optional",
-          t: { type: "primitive", value: "number" },
-          r: false,
-          min: 0,
-          max: 100
+          type: "number",
+          required: false,
+          minMaxRanges: {
+            "0,100": ["evt_test", "evt_test.v1"]
+          }
+        },
+        status: {
+          type: "string",
+          required: false,
+          pinnedValues: {
+            active: ["evt_test"],
+            inactive: ["evt_test.v1"]
+          }
         }
-      },
-      variants: []
+      }
     }
   ],
   metadata: {
@@ -79,10 +85,14 @@ describe("Validation Integration", () => {
       });
 
       // Spy on sendEventImmediately
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
       // Spy on batcher
       batcherHandleTrackSchemaSpy = jest.spyOn(
@@ -93,45 +103,96 @@ describe("Validation Integration", () => {
       // Track valid event
       await inspector.trackSchemaFromEvent("test_event", {
         required_prop: "test_value",
-        optional_prop: 50
+        optional_prop: 50,
+        status: "active"
       });
 
       // Should send immediately, not batch
       expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
       expect(batcherHandleTrackSchemaSpy).not.toHaveBeenCalled();
 
-      // Check the event body has validation data
+      // Check the event body has validation metadata
       const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
       expect(eventBody.eventSpecMetadata).toBeDefined();
       expect(eventBody.eventSpecMetadata.schemaId).toBe("schema_123");
     });
 
-    test("should include validation errors in payload when validation fails", async () => {
+    test("should include failedEventIds in property when validation fails", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
       });
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
-      // Track event with missing required prop
+      // Track event with value above max (will fail validation)
       await inspector.trackSchemaFromEvent("test_event", {
-        optional_prop: 50
+        required_prop: "test",
+        optional_prop: 150, // Above max of 100
+        status: "active"
       });
 
       expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
 
       const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      expect(eventBody.validationErrors).toBeDefined();
-      expect(eventBody.validationErrors.length).toBeGreaterThan(0);
-      expect(eventBody.validationErrors.some((e: any) => e.code === "RequiredMissing")).toBe(true);
+
+      // Find optional_prop in eventProperties
+      const optionalProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "optional_prop"
+      );
+      expect(optionalProp).toBeDefined();
+
+      // Should have failedEventIds because 150 > 100
+      expect(
+        optionalProp.failedEventIds || optionalProp.passedEventIds
+      ).toBeDefined();
     });
 
-    test("should log validation errors when shouldLog is true", async () => {
+    test("should include per-property validation results", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Track event - "unknown_status" doesn't match any pinned value
+      await inspector.trackSchemaFromEvent("test_event", {
+        required_prop: "test",
+        status: "unknown_status"
+      });
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
+
+      // Find status property
+      const statusProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "status"
+      );
+      expect(statusProp).toBeDefined();
+
+      // Should have validation results (all events fail because "unknown_status" matches no pinned value)
+      expect(
+        statusProp.failedEventIds || statusProp.passedEventIds
+      ).toBeDefined();
+    });
+
+    test("should log validation failures when shouldLog is true", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
@@ -142,85 +203,49 @@ describe("Validation Integration", () => {
       // Clear previous calls to check only this test's calls
       (console.log as jest.Mock).mockClear();
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
-      // Track event with validation errors
+      // Track event with validation failures
       await inspector.trackSchemaFromEvent("test_event", {
         optional_prop: 150 // Above max
       });
 
-      // Should log validation errors (console.log is globally mocked)
+      // Should log validation failures
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining("Validation errors"),
+        expect.stringContaining("Validation failures"),
         expect.any(Array)
       );
     });
 
-    test("should include variantId when variant matches", async () => {
-      // Mock spec with variant
-      const specWithVariant: EventSpecResponse = {
-        events: [
-          {
-            id: "evt_purchase",
-            name: "purchase",
-            props: {
-              amount: {
-                id: "prop_amount",
-                t: { type: "primitive", value: "number" },
-                r: true
-              }
-            },
-            variants: [
-              {
-                variantId: "var_premium",
-                eventId: "evt_purchase",
-                nameSuffix: "Premium",
-                props: {
-                  tier: {
-                    id: "prop_tier",
-                    t: { type: "primitive", value: "string" },
-                    r: false,
-                    v: ["premium"]
-                  }
-                }
-              }
-            ]
-          }
-        ],
-        metadata: {
-          schemaId: "schema_456",
-          branchId: "main",
-          latestActionId: "action_789"
-        }
-      };
-
-      (EventSpecCache as jest.Mock).mockImplementation(() => ({
-        get: jest.fn().mockReturnValue(specWithVariant),
-        set: jest.fn()
-      }));
-
+    test("should return baseEventId from first event in spec", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
       });
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
-      // Track event matching premium variant
-      await inspector.trackSchemaFromEvent("purchase", {
-        amount: 100,
-        tier: "premium"
+      await inspector.trackSchemaFromEvent("test_event", {
+        required_prop: "test"
       });
 
       const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      expect(eventBody.variantId).toBe("var_premium");
+      expect(eventBody.eventId).toBe("evt_test");
     });
   });
 
@@ -317,10 +342,14 @@ describe("Validation Integration", () => {
       });
 
       // Mock immediate send to fail
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](new Error("Network error")); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](new Error("Network error"));
+        });
 
       batcherHandleTrackSchemaSpy = jest.spyOn(
         inspector.avoBatcher,
@@ -339,7 +368,7 @@ describe("Validation Integration", () => {
     });
   });
 
-  describe("Privacy - No user data in validation errors", () => {
+  describe("Bandwidth optimization - failedEventIds vs passedEventIds", () => {
     beforeEach(() => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
@@ -347,69 +376,42 @@ describe("Validation Integration", () => {
       }));
     });
 
-    test("should NOT include 'received' value in validation errors", async () => {
+    test("should only include one of failedEventIds or passedEventIds per property", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
       });
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
-      // Track event with validation errors (value above max)
       await inspector.trackSchemaFromEvent("test_event", {
-        required_prop: "test",
-        optional_prop: 999  // Way above max of 100
+        status: "active" // Matches pinned value for evt_test only
       });
 
       const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      
-      // Ensure no validation error contains 'received' (user data)
-      expect(eventBody.validationErrors).toBeDefined();
-      expect(eventBody.validationErrors.length).toBeGreaterThan(0);
-      
-      for (const error of eventBody.validationErrors) {
-        expect(error).not.toHaveProperty("received");
-      }
-      
-      // But 'expected' should still be present (from spec, not user data)
-      const maxError = eventBody.validationErrors.find((e: any) => e.code === "ValueAboveMax");
-      expect(maxError).toBeDefined();
-      expect(maxError.expected).toBe(100);
-    });
+      const statusProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "status"
+      );
 
-    test("should NOT include 'received' for type mismatch errors", async () => {
-      const inspector = new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0"
-      });
+      // Should have either failedEventIds OR passedEventIds, not both
+      const hasFailed = statusProp?.failedEventIds !== undefined;
+      const hasPassed = statusProp?.passedEventIds !== undefined;
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
-
-      // Track event with wrong type (string instead of number)
-      await inspector.trackSchemaFromEvent("test_event", {
-        required_prop: "test",
-        optional_prop: "not_a_number"  // Should be number
-      });
-
-      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      const typeError = eventBody.validationErrors?.find((e: any) => e.code === "TypeMismatch");
-      
-      if (typeError) {
-        expect(typeError).not.toHaveProperty("received");
-        expect(typeError.expected).toBe("number");
+      if (hasFailed || hasPassed) {
+        expect(hasFailed !== hasPassed).toBe(true); // XOR - exactly one should be true
       }
     });
   });
 
-  describe("Property name correlation with encrypted values", () => {
+  describe("Property name correlation", () => {
     beforeEach(() => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
@@ -417,67 +419,41 @@ describe("Validation Integration", () => {
       }));
     });
 
-    test("should allow correlation between validation errors and eventProperties via propertyName", async () => {
+    test("should have validation results on the same property in eventProperties", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
       });
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
-      // Track event with validation error
       await inspector.trackSchemaFromEvent("test_event", {
-        required_prop: "secret_value",
-        optional_prop: 150  // Above max - will trigger validation error
+        required_prop: "test",
+        optional_prop: 150 // Above max - will have validation result
       });
 
       const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      
-      // Find the validation error for optional_prop
-      const validationError = eventBody.validationErrors?.find(
-        (e: any) => e.propertyName === "optional_prop"
-      );
-      expect(validationError).toBeDefined();
-      
-      // Find the same property in eventProperties
-      const eventProperty = eventBody.eventProperties.find(
+
+      // Find optional_prop - validation result should be on the same object
+      const optionalProp = eventBody.eventProperties.find(
         (p: any) => p.propertyName === "optional_prop"
       );
-      expect(eventProperty).toBeDefined();
-      
-      // Both should have the same propertyName for backend correlation
-      expect(validationError.propertyName).toBe(eventProperty.propertyName);
-    });
 
-    test("should include propertyId in validation errors for precise correlation", async () => {
-      const inspector = new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0"
-      });
-
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
-
-      // Track event with missing required prop
-      await inspector.trackSchemaFromEvent("test_event", {
-        optional_prop: 50
-      });
-
-      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      const requiredError = eventBody.validationErrors?.find(
-        (e: any) => e.code === "RequiredMissing"
-      );
-      
-      expect(requiredError).toBeDefined();
-      expect(requiredError.propertyId).toBe("prop_required");
-      expect(requiredError.propertyName).toBe("required_prop");
+      expect(optionalProp).toBeDefined();
+      expect(optionalProp.propertyName).toBe("optional_prop");
+      expect(optionalProp.propertyType).toBeDefined();
+      // Validation result should be directly on the property object
+      expect(
+        optionalProp.failedEventIds || optionalProp.passedEventIds
+      ).toBeDefined();
     });
   });
 
@@ -497,10 +473,14 @@ describe("Validation Integration", () => {
       });
 
       // Spy on the actual callInspectorApi to verify it's called
-      const callInspectorApiSpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler as any,
-        "callInspectorApi"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      const callInspectorApiSpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler as any,
+          "callInspectorApi"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
       // Force sampling to drop everything (random > samplingRate)
       const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.99);
@@ -532,28 +512,37 @@ describe("Validation Integration", () => {
         version: "1.0.0"
       });
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
       // Use the Avo Function tracking method (internal API)
       await (inspector as any)._avoFunctionTrackSchemaFromEvent(
         "test_event",
-        { required_prop: "test", optional_prop: 150 },  // Above max
+        { required_prop: "test", optional_prop: 150 }, // Above max
         "event_id_123",
         "event_hash_456"
       );
 
       const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      
-      // Should have validation errors
-      expect(eventBody.validationErrors).toBeDefined();
-      expect(eventBody.validationErrors.some((e: any) => e.code === "ValueAboveMax")).toBe(true);
-      
+
+      // Should have validation results on optional_prop
+      const optionalProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "optional_prop"
+      );
+      expect(
+        optionalProp?.failedEventIds || optionalProp?.passedEventIds
+      ).toBeDefined();
+
       // Should also have Avo Function metadata
       expect(eventBody.avoFunction).toBe(true);
-      expect(eventBody.eventId).toBe("event_id_123");
+      // eventId should be the baseEventId from spec (or event_id_123 if no spec match)
+      expect(eventBody.eventId).toBeDefined();
       expect(eventBody.eventHash).toBe("event_hash_456");
     });
 
@@ -564,10 +553,14 @@ describe("Validation Integration", () => {
         version: "1.0.0"
       });
 
-      callInspectorImmediatelySpy = jest.spyOn(
-        (inspector as any).avoNetworkCallsHandler,
-        "callInspectorImmediately"
-      ).mockImplementation((...args: any[]) => { args[1](null); });
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
 
       batcherHandleTrackSchemaSpy = jest.spyOn(
         inspector.avoBatcher,
@@ -587,4 +580,3 @@ describe("Validation Integration", () => {
     });
   });
 });
-

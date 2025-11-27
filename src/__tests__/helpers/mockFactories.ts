@@ -4,161 +4,117 @@
  */
 
 import type {
-  PropertySpec,
-  PropertyTypeSpec,
-  VariantSpec,
-  EventSpec,
+  PropertyConstraints,
+  EventSpecEntry,
   EventSpecResponse,
   EventSpecMetadata
 } from "../../eventSpec/AvoEventSpecFetchTypes";
 
 // =============================================================================
-// PROPERTY SPEC FACTORIES
+// PROPERTY CONSTRAINTS FACTORIES
 // =============================================================================
 
 /**
- * Creates a PropertyTypeSpec with defaults.
+ * Creates a PropertyConstraints with defaults.
  */
-export function createPropertyTypeSpec(
-  overrides: Partial<PropertyTypeSpec> = {}
-): PropertyTypeSpec {
+export function createPropertyConstraints(
+  overrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
   return {
-    type: "primitive",
-    value: "string",
+    type: "string",
+    required: false,
     ...overrides
   };
 }
 
 /**
- * Creates a PropertySpec with sensible defaults.
+ * Creates a property with pinned values constraint.
+ * pinnedValues maps each exact value to the eventIds that require it.
  */
-export function createPropertySpec(
-  overrides: Partial<PropertySpec> = {}
-): PropertySpec {
-  return {
-    id: "prop_default",
-    t: createPropertyTypeSpec(),
-    r: false,
-    ...overrides
-  };
-}
-
-/**
- * Creates a required string property.
- */
-export function createRequiredStringProperty(
-  id: string,
-  extraOverrides: Partial<PropertySpec> = {}
-): PropertySpec {
-  return createPropertySpec({
-    id,
-    t: { type: "primitive", value: "string" },
-    r: true,
+export function createPinnedValueProperty(
+  pinnedValues: Record<string, string[]>,
+  extraOverrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
+  return createPropertyConstraints({
+    pinnedValues,
     ...extraOverrides
   });
 }
 
 /**
- * Creates an optional number property.
+ * Creates a property with allowed values constraint.
+ * allowedValues maps each JSON array string to the eventIds that accept those values.
  */
-export function createNumberProperty(
-  id: string,
-  extraOverrides: Partial<PropertySpec> = {}
-): PropertySpec {
-  return createPropertySpec({
-    id,
-    t: { type: "primitive", value: "number" },
-    r: false,
+export function createAllowedValuesProperty(
+  allowedValues: Record<string, string[]>,
+  extraOverrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
+  return createPropertyConstraints({
+    allowedValues,
     ...extraOverrides
   });
 }
 
 /**
- * Creates an enum property with allowed values.
+ * Creates a property with regex pattern constraint.
+ * regexPatterns maps each pattern to the eventIds that require matching.
  */
-export function createEnumProperty(
-  id: string,
-  allowedValues: string[],
-  extraOverrides: Partial<PropertySpec> = {}
-): PropertySpec {
-  return createPropertySpec({
-    id,
-    t: { type: "primitive", value: "string" },
-    v: allowedValues,
+export function createRegexProperty(
+  regexPatterns: Record<string, string[]>,
+  extraOverrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
+  return createPropertyConstraints({
+    regexPatterns,
+    ...extraOverrides
+  });
+}
+
+/**
+ * Creates a property with min/max range constraint.
+ * minMaxRanges maps each "min,max" string to the eventIds that require that range.
+ */
+export function createMinMaxProperty(
+  minMaxRanges: Record<string, string[]>,
+  extraOverrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
+  return createPropertyConstraints({
+    type: "number",
+    minMaxRanges,
     ...extraOverrides
   });
 }
 
 // =============================================================================
-// VARIANT SPEC FACTORIES
+// EVENT SPEC ENTRY FACTORIES
 // =============================================================================
 
 /**
- * Creates a VariantSpec with defaults.
+ * Creates an EventSpecEntry with defaults.
  */
-export function createVariantSpec(
-  overrides: Partial<VariantSpec> = {}
-): VariantSpec {
+export function createEventSpecEntry(
+  overrides: Partial<EventSpecEntry> = {}
+): EventSpecEntry {
   return {
-    variantId: "var_default",
-    eventId: "evt_default",
-    nameSuffix: "Default",
+    branchId: "main",
+    baseEventId: "evt_default",
+    variantIds: [],
     props: {},
     ...overrides
   };
 }
 
-// =============================================================================
-// EVENT SPEC FACTORIES
-// =============================================================================
-
 /**
- * Creates an EventSpec with defaults.
+ * Creates an event with variants.
  */
-export function createEventSpec(
-  overrides: Partial<EventSpec> = {}
-): EventSpec {
-  return {
-    id: "evt_default",
-    name: "default_event",
-    props: {},
-    variants: [],
-    ...overrides
-  };
-}
-
-/**
- * Creates an EventSpec with common properties for testing.
- */
-export function createUserLoginEventSpec(): EventSpec {
-  return createEventSpec({
-    id: "evt_login",
-    name: "user_login",
-    props: {
-      login_method: createEnumProperty("prop_login_method", ["email", "google", "facebook"]),
-      user_email: createPropertySpec({
-        id: "prop_user_email",
-        t: { type: "primitive", value: "string" },
-        r: true,
-        rx: "^[\\w-\\.]+@[\\w-]+\\.[a-z]{2,}$"
-      })
-    },
-    variants: [
-      createVariantSpec({
-        variantId: "var_enterprise",
-        eventId: "evt_login",
-        nameSuffix: "Enterprise",
-        props: {
-          login_method: createEnumProperty("prop_login_method_ent", ["saml", "ldap"]),
-          company_domain: createPropertySpec({
-            id: "prop_company_domain",
-            t: { type: "primitive", value: "string" },
-            r: true,
-            rx: "^[a-z0-9-]+\\.com$"
-          })
-        }
-      })
-    ]
+export function createEventWithVariants(
+  baseEventId: string,
+  variantIds: string[],
+  props: Record<string, PropertyConstraints> = {}
+): EventSpecEntry {
+  return createEventSpecEntry({
+    baseEventId,
+    variantIds,
+    props
   });
 }
 
@@ -189,7 +145,7 @@ export function createEventSpecMetadata(
  * Creates an EventSpecResponse with defaults.
  */
 export function createEventSpecResponse(
-  events: EventSpec[] = [],
+  events: EventSpecEntry[] = [],
   metadataOverrides: Partial<EventSpecMetadata> = {}
 ): EventSpecResponse {
   return {
@@ -202,19 +158,43 @@ export function createEventSpecResponse(
  * Creates a simple EventSpecResponse with one event for basic testing.
  */
 export function createSimpleEventSpecResponse(
-  eventName: string = "test_event"
+  baseEventId: string = "evt_test",
+  variantIds: string[] = []
 ): EventSpecResponse {
   return createEventSpecResponse([
-    createEventSpec({
-      id: `evt_${eventName}`,
-      name: eventName,
+    createEventSpecEntry({
+      baseEventId,
+      variantIds,
       props: {
-        test_prop: createPropertySpec({
-          id: "prop_test",
-          r: true
-        })
+        test_prop: createPropertyConstraints({ required: true })
       }
     })
   ]);
 }
 
+/**
+ * Creates an EventSpecResponse with multiple events (simulating name-mapped events).
+ */
+export function createMultiEventSpecResponse(): EventSpecResponse {
+  return createEventSpecResponse([
+    createEventSpecEntry({
+      baseEventId: "evt_signup",
+      variantIds: ["evt_signup.v1", "evt_signup.v2"],
+      props: {
+        method: createPinnedValueProperty({
+          email: ["evt_signup", "evt_signup.v1"],
+          google: ["evt_signup.v2"]
+        })
+      }
+    }),
+    createEventSpecEntry({
+      baseEventId: "evt_any_action",
+      variantIds: ["evt_any_action.v1"],
+      props: {
+        method: createPinnedValueProperty({
+          any: ["evt_any_action", "evt_any_action.v1"]
+        })
+      }
+    })
+  ]);
+}

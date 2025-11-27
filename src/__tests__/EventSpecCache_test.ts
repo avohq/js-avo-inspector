@@ -1,21 +1,22 @@
 import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
 import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
 
-// Mock event spec response for testing
+// Mock event spec response for testing (internal format with long names)
 const mockEventSpecResponse: EventSpecResponse = {
   events: [
     {
-      id: "evt_123",
-      name: "user_login",
+      branchId: "main",
+      baseEventId: "evt_123",
+      variantIds: [],
       props: {
         login_method: {
-          id: "prop_login_method",
-          t: { type: "primitive", value: "string" },
-          r: true,
-          v: ["email", "google", "facebook"]
+          type: "string",
+          required: true,
+          allowedValues: {
+            '["email","google","facebook"]': ["evt_123"]
+          }
         }
-      },
-      variants: []
+      }
     }
   ],
   metadata: {
@@ -48,11 +49,11 @@ describe("EventSpecCache", () => {
     test("should distinguish between different cache keys", () => {
       const spec1: EventSpecResponse = {
         ...mockEventSpecResponse,
-        events: [{ ...mockEventSpecResponse.events[0], id: "evt_1" }]
+        events: [{ ...mockEventSpecResponse.events[0], baseEventId: "evt_1" }]
       };
       const spec2: EventSpecResponse = {
         ...mockEventSpecResponse,
-        events: [{ ...mockEventSpecResponse.events[0], id: "evt_2" }]
+        events: [{ ...mockEventSpecResponse.events[0], baseEventId: "evt_2" }]
       };
 
       cache.set("apiKey1", "stream1", "event1", spec1);
@@ -61,18 +62,22 @@ describe("EventSpecCache", () => {
       const retrieved1 = cache.get("apiKey1", "stream1", "event1");
       const retrieved2 = cache.get("apiKey1", "stream1", "event2");
 
-      expect(retrieved1?.events[0].id).toBe("evt_1");
-      expect(retrieved2?.events[0].id).toBe("evt_2");
+      expect(retrieved1?.events[0].baseEventId).toBe("evt_1");
+      expect(retrieved2?.events[0].baseEventId).toBe("evt_2");
     });
 
     test("should distinguish between different apiKeys", () => {
       const spec1: EventSpecResponse = {
         ...mockEventSpecResponse,
-        events: [{ ...mockEventSpecResponse.events[0], id: "evt_key1" }]
+        events: [
+          { ...mockEventSpecResponse.events[0], baseEventId: "evt_key1" }
+        ]
       };
       const spec2: EventSpecResponse = {
         ...mockEventSpecResponse,
-        events: [{ ...mockEventSpecResponse.events[0], id: "evt_key2" }]
+        events: [
+          { ...mockEventSpecResponse.events[0], baseEventId: "evt_key2" }
+        ]
       };
 
       cache.set("apiKey1", "stream1", "event1", spec1);
@@ -81,8 +86,8 @@ describe("EventSpecCache", () => {
       const retrieved1 = cache.get("apiKey1", "stream1", "event1");
       const retrieved2 = cache.get("apiKey2", "stream1", "event1");
 
-      expect(retrieved1?.events[0].id).toBe("evt_key1");
-      expect(retrieved2?.events[0].id).toBe("evt_key2");
+      expect(retrieved1?.events[0].baseEventId).toBe("evt_key1");
+      expect(retrieved2?.events[0].baseEventId).toBe("evt_key2");
     });
   });
 
@@ -99,11 +104,15 @@ describe("EventSpecCache", () => {
       cache.set("apiKey1", "stream1", "event1", mockEventSpecResponse);
 
       // Initially should be cached
-      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(
+        mockEventSpecResponse
+      );
 
       // Fast forward 4 minutes - should still be cached
       jest.advanceTimersByTime(4 * 60 * 1000);
-      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(
+        mockEventSpecResponse
+      );
 
       // Fast forward 2 more minutes (total 6 minutes) - should be expired
       jest.advanceTimersByTime(2 * 60 * 1000);
@@ -116,7 +125,9 @@ describe("EventSpecCache", () => {
       // Fast forward just under 5 minutes
       jest.advanceTimersByTime(5 * 60 * 1000 - 1);
 
-      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(
+        mockEventSpecResponse
+      );
     });
   });
 
@@ -154,7 +165,9 @@ describe("EventSpecCache", () => {
 
       // After 50 hits, next get should trigger eviction of the oldest entry
       // First entry should be evicted (oldest timestamp)
-      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(
+        mockEventSpecResponse
+      );
       // The cache should have rotated after 50 hits
       expect(cache.size()).toBe(1);
     });
@@ -226,8 +239,12 @@ describe("EventSpecCache", () => {
       expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
 
       // event2 and event3 should still be accessible (lower individual hit counts)
-      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(mockEventSpecResponse);
-      expect(cache.get("apiKey1", "stream1", "event3")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(
+        mockEventSpecResponse
+      );
+      expect(cache.get("apiKey1", "stream1", "event3")).toEqual(
+        mockEventSpecResponse
+      );
     });
 
     test("should evict LRU entry correctly with staggered additions", () => {
@@ -257,7 +274,9 @@ describe("EventSpecCache", () => {
       // event1 should be evicted (oldest by timestamp)
       expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
       // event2 should still be there
-      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(
+        mockEventSpecResponse
+      );
     });
   });
 
@@ -399,12 +418,20 @@ describe("EventSpecCache", () => {
       expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
 
       // Hot events 2 and 3 should still be cached
-      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(mockEventSpecResponse);
-      expect(cache.get("apiKey1", "stream1", "event3")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(
+        mockEventSpecResponse
+      );
+      expect(cache.get("apiKey1", "stream1", "event3")).toEqual(
+        mockEventSpecResponse
+      );
 
       // Cold events should still be cached (low individual hit counts)
-      expect(cache.get("apiKey1", "stream1", "event4")).toEqual(mockEventSpecResponse);
-      expect(cache.get("apiKey1", "stream1", "event10")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event4")).toEqual(
+        mockEventSpecResponse
+      );
+      expect(cache.get("apiKey1", "stream1", "event10")).toEqual(
+        mockEventSpecResponse
+      );
     });
 
     test("should handle mixed hit patterns without premature eviction", () => {
@@ -430,9 +457,15 @@ describe("EventSpecCache", () => {
 
       // All should still be cached (under 50 total hits)
       expect(cache.size()).toBe(3);
-      expect(cache.get("apiKey1", "stream1", "popular")).toEqual(mockEventSpecResponse); // 41 hits now
-      expect(cache.get("apiKey1", "stream1", "occasional")).toEqual(mockEventSpecResponse); // 9 hits now
-      expect(cache.get("apiKey1", "stream1", "rare")).toEqual(mockEventSpecResponse); // 2 hits now (total 52)
+      expect(cache.get("apiKey1", "stream1", "popular")).toEqual(
+        mockEventSpecResponse
+      ); // 41 hits now
+      expect(cache.get("apiKey1", "stream1", "occasional")).toEqual(
+        mockEventSpecResponse
+      ); // 9 hits now
+      expect(cache.get("apiKey1", "stream1", "rare")).toEqual(
+        mockEventSpecResponse
+      ); // 2 hits now (total 52)
 
       // After 50+ hits, oldest should be evicted
       expect(cache.size()).toBe(2);
@@ -461,10 +494,18 @@ describe("EventSpecCache", () => {
 
       // Now oldest (event1) is evicted, others remain
       expect(cache.size()).toBe(4);
-      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(mockEventSpecResponse);
-      expect(cache.get("apiKey1", "stream1", "event3")).toEqual(mockEventSpecResponse);
-      expect(cache.get("apiKey1", "stream1", "event4")).toEqual(mockEventSpecResponse);
-      expect(cache.get("apiKey1", "stream1", "event5")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event2")).toEqual(
+        mockEventSpecResponse
+      );
+      expect(cache.get("apiKey1", "stream1", "event3")).toEqual(
+        mockEventSpecResponse
+      );
+      expect(cache.get("apiKey1", "stream1", "event4")).toEqual(
+        mockEventSpecResponse
+      );
+      expect(cache.get("apiKey1", "stream1", "event5")).toEqual(
+        mockEventSpecResponse
+      );
     });
   });
 });

@@ -1,6 +1,6 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
-import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
+import type { EventSpecResponseWire } from "../eventSpec/AvoEventSpecFetchTypes";
 import { generateKeyPair } from "./helpers/encryptionHelpers";
 
 // Mock XMLHttpRequest for event spec fetching
@@ -33,21 +33,22 @@ class MockXMLHttpRequest {
         this.response = responseBody;
         if (this.onload) this.onload();
       } else if (this.url.includes("/getEventSpec")) {
-        // Mock event spec endpoint response
+        // Mock event spec endpoint response (wire format)
         this.status = 200;
-        const mockSpec: EventSpecResponse = {
+        const mockSpec: EventSpecResponseWire = {
           events: [
             {
-              id: "evt_test",
-              name: "test_event",
-              props: {
+              b: "main", // branchId
+              id: "evt_test", // baseEventId
+              vids: [], // variantIds
+              p: {
+                // props
                 test_prop: {
-                  id: "prop_test",
-                  t: { type: "primitive", value: "string" },
-                  r: true
+                  t: "string", // type
+                  r: true // required
+                  // No constraints
                 }
-              },
-              variants: []
+              }
             }
           ],
           metadata: {
@@ -329,7 +330,7 @@ describe("AvoInspector Event Spec Integration", () => {
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
         suffix: "test-suffix",
-        publicEncryptionKey: "key",
+        publicEncryptionKey: "key"
       });
 
       expect(inspector).toBeDefined();
