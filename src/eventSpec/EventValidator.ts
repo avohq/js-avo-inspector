@@ -362,6 +362,15 @@ function checkMinMaxRanges(
     return;
   }
 
+  // NaN values fail all min/max constraints (comparisons with NaN are always false)
+  if (Number.isNaN(value)) {
+    console.warn(`[Avo Inspector] NaN value fails min/max constraint`);
+    for (const eventIds of Object.values(minMaxRanges)) {
+      addIdsToSet(eventIds, failedIds);
+    }
+    return;
+  }
+
   for (const [rangeStr, eventIds] of Object.entries(minMaxRanges)) {
     const [minStr, maxStr] = rangeStr.split(",");
     const min = parseFloat(minStr);

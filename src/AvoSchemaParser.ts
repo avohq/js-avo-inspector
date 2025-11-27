@@ -1,4 +1,5 @@
 import { encryptValue } from "./AvoEncryption";
+import type { EventProperty, SchemaChild } from "./AvoNetworkCallsHandler";
 
 const isArray = (obj: any): boolean => {
   return Object.prototype.toString.call(obj) === "[object Array]";
@@ -37,36 +38,26 @@ export class AvoSchemaParser {
     eventProperties: Record<string, any>,
     publicEncryptionKey?: string,
     env?: string
-  ): Array<{
-    propertyName: string
-    propertyType: string
-    encryptedPropertyValue?: string
-    children?: any
-  }> {
+  ): EventProperty[] {
     if (eventProperties === null || eventProperties === undefined) {
       return [];
     }
 
     const canSendEncryptedValues = this.canSendEncryptedValues(publicEncryptionKey, env);
 
-    const mapping = (object: any) => {
+    const mapping = (object: any): SchemaChild => {
       if (isArray(object)) {
         const list = object.map((x: any) => {
           return mapping(x);
         });
         return this.removeDuplicates(list);
       } else if (typeof object === "object") {
-        const mappedResult: any = [];
+        const mappedResult: EventProperty[] = [];
         for (const key in object) {
           if (object.hasOwnProperty(key)) {
             const val = object[key];
 
-            const mappedEntry: {
-              propertyName: string
-              propertyType: string
-              encryptedPropertyValue?: string
-              children?: any
-            } = {
+            const mappedEntry: EventProperty = {
               propertyName: key,
               propertyType: this.getPropValueType(val)
             };
@@ -82,7 +73,8 @@ export class AvoSchemaParser {
             }
 
             if (typeof val === "object" && val != null) {
-              mappedEntry.children = mapping(val);
+              // When val is object/array, mapping returns SchemaChild[] (EventProperty[] or array of children)
+              mappedEntry.children = mapping(val) as SchemaChild[];
             }
 
             mappedResult.push(mappedEntry);
@@ -95,19 +87,19 @@ export class AvoSchemaParser {
       }
     };
 
-    const mappedEventProps = mapping(eventProperties);
+    // eventProperties is always an object (Record), so mapping returns EventProperty[]
+    const mappedEventProps = mapping(eventProperties) as EventProperty[];
 
     return mappedEventProps;
   }
 
-  private static removeDuplicates (array: any[]): any[] {
-    // XXX TODO fix any types
-    const primitives: any = { boolean: {}, number: {}, string: {} };
-    const objects: any[] = [];
+  private static removeDuplicates (array: SchemaChild[]): SchemaChild[] {
+    const primitives: Record<string, Record<string, boolean>> = { boolean: {}, number: {}, string: {} };
+    const objects: SchemaChild[] = [];
 
-    return array.filter((item: any) => {
+    return array.filter((item: SchemaChild) => {
       const type: string = typeof item;
-      if (type in primitives) {
+      if (type in primitives && typeof item === "string") {
         return primitives[type].hasOwnProperty(item)
           ? false
           : (primitives[type][item] = true);

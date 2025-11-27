@@ -4,13 +4,20 @@ import { AvoAnonymousId } from "./AvoAnonymousId";
 import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
 
 /**
+ * Recursive type for schema children.
+ * - For object properties: array of EventProperty objects
+ * - For list properties: array of strings (primitive types) or nested structures
+ */
+export type SchemaChild = string | EventProperty | SchemaChild[];
+
+/**
  * Property schema with optional validation results.
  */
 export interface EventProperty {
   propertyName: string;
   propertyType: string;
   encryptedPropertyValue?: string;
-  children?: any;
+  children?: SchemaChild[];
   /** Event/variant IDs that FAILED validation (present if smaller or equal to passed) */
   failedEventIds?: string[];
   /** Event/variant IDs that PASSED validation (present if smaller than failed) */
@@ -259,8 +266,23 @@ export class AvoNetworkCallsHandler {
       if (xmlhttp.status !== 200) {
         onCompleted(new Error(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`));
       } else {
-        const response = JSON.parse(xmlhttp.response);
-        if (response.samplingRate !== undefined) {
+        let response: any;
+        try {
+          response = JSON.parse(xmlhttp.response);
+        } catch (e) {
+          onCompleted(
+            new Error(
+              `Failed to parse response: ${e instanceof Error ? e.message : String(e)}`
+            )
+          );
+          return;
+        }
+
+        if (
+          response != null &&
+          typeof response.samplingRate === "number" &&
+          !isNaN(response.samplingRate)
+        ) {
           this.samplingRate = response.samplingRate;
         }
         onCompleted(null);

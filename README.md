@@ -123,7 +123,7 @@ This will output:
 
 ## Using Encryption
 
-Pass the `publicKey` parameter when initializing Inspector:
+Pass the `publicEncryptionKey` parameter when initializing Inspector:
 
 ```javascript
 import * as Inspector from "avo-inspector";
@@ -148,7 +148,7 @@ When encryption is enabled:
 
 # Client-Side Validation (Dev/Staging Only)
 
-When initialized with a `publicKey` in dev or staging environments, Inspector performs client-side validation of your events against your Avo Tracking Plan.
+When initialized with a `publicEncryptionKey` in dev or staging environments, Inspector performs client-side validation of your events against your Avo Tracking Plan.
 
 ## How It Works
 
@@ -186,12 +186,47 @@ inspector.trackSchemaFromEvent("User Signed Up", { name: "John" });
 The `trackSchema` method only sends pre-extracted schemas and **does not perform client-side validation** - it goes through the normal batching flow.
 
 ```javascript
-// ✅ Validates against tracking plan (when publicKey is provided)
+// ✅ Validates against tracking plan (when publicEncryptionKey is provided)
 inspector.trackSchemaFromEvent("Event Name", { prop: "value" });
 
 // ❌ Does NOT validate - only sends schema, uses batching
 inspector.trackSchema("Event Name", [{ propertyName: "prop", propertyType: "string" }]);
 ```
+
+## Accessing Validation Results
+
+`trackSchemaFromEvent` returns a `Promise<EventProperty[]>` that resolves with the validated properties. You can use this in two ways:
+
+### Fire-and-Forget (Default)
+
+Call without `await` for non-blocking behavior. The event is tracked asynchronously and validation happens in the background:
+
+```javascript
+// Non-blocking - validation runs in background
+inspector.trackSchemaFromEvent("Event Name", { prop: "value" });
+```
+
+### Await for Validation Results
+
+If you need to access validation results (e.g., for testing or debugging), you can `await` the call:
+
+```javascript
+// Blocking - wait for validation to complete
+const validatedProperties = await inspector.trackSchemaFromEvent("Event Name", { 
+  email: "user@example.com",
+  age: 25 
+});
+
+// Each property includes validation results:
+// {
+//   propertyName: "email",
+//   propertyType: "string",
+//   failedEventIds: [],    // Event IDs where this property failed validation
+//   passedEventIds: ["abc123"]  // Event IDs where this property passed validation
+// }
+```
+
+**Note:** Awaiting will block until the event spec is fetched (if not cached) and validation completes. For production use, fire-and-forget is recommended to avoid impacting your application's performance.
 
 # Batching control
 
