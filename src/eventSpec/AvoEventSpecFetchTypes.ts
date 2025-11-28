@@ -4,10 +4,6 @@
  * changes directly to this file, and we'll apply them to the generator internally.
  */
 
-// =============================================================================
-// WIRE FORMAT TYPES (short names - from API for bandwidth efficiency)
-// =============================================================================
-
 /**
  * Wire format - Property constraints with short field names.
  * At most one constraint type will be present per property.
@@ -18,13 +14,13 @@ export interface PropertyConstraintsWire {
   /** Required flag (for reference only, not validated) */
   r: boolean;
   /** Pinned values: pinnedValue -> eventIds that require this exact value */
-  p?: Record<string, string[]>;
+  p?: Record<string, Array<string>>;
   /** Allowed values: JSON array string -> eventIds that accept these values */
-  v?: Record<string, string[]>;
+  v?: Record<string, Array<string>>;
   /** Regex patterns: pattern -> eventIds that require matching this regex */
-  rx?: Record<string, string[]>;
+  rx?: Record<string, Array<string>>;
   /** Min/max ranges: "min,max" -> eventIds that require value in this range */
-  minmax?: Record<string, string[]>;
+  minmax?: Record<string, Array<string>>;
 }
 
 /**
@@ -38,7 +34,7 @@ export interface EventSpecEntryWire {
   /** Base event ID */
   id: string;
   /** Variant IDs (baseEventId + variantIds = complete set) */
-  vids: string[];
+  vids: Array<string>;
   /** Property constraints keyed by property name */
   p: Record<string, PropertyConstraintsWire>;
 }
@@ -49,14 +45,10 @@ export interface EventSpecEntryWire {
  */
 export interface EventSpecResponseWire {
   /** Array of events matching the requested name */
-  events: EventSpecEntryWire[];
+  events: Array<EventSpecEntryWire>;
   /** Schema metadata (keeps long names - small, one per response) */
   metadata: EventSpecMetadata;
 }
-
-// =============================================================================
-// INTERNAL TYPES (long names - for code readability)
-// =============================================================================
 
 /**
  * Internal - Property constraints with meaningful field names.
@@ -68,13 +60,13 @@ export interface PropertyConstraints {
   /** Required flag (for reference only, not validated) */
   required: boolean;
   /** Pinned values: pinnedValue -> eventIds that require this exact value */
-  pinnedValues?: Record<string, string[]>;
+  pinnedValues?: Record<string, Array<string>>;
   /** Allowed values: JSON array string -> eventIds that accept these values */
-  allowedValues?: Record<string, string[]>;
+  allowedValues?: Record<string, Array<string>>;
   /** Regex patterns: pattern -> eventIds that require matching this regex */
-  regexPatterns?: Record<string, string[]>;
+  regexPatterns?: Record<string, Array<string>>;
   /** Min/max ranges: "min,max" -> eventIds that require value in this range */
-  minMaxRanges?: Record<string, string[]>;
+  minMaxRanges?: Record<string, Array<string>>;
 }
 
 /**
@@ -87,7 +79,7 @@ export interface EventSpecEntry {
   /** Base event ID */
   baseEventId: string;
   /** Variant IDs (baseEventId + variantIds = complete set) */
-  variantIds: string[];
+  variantIds: Array<string>;
   /** Property constraints keyed by property name */
   props: Record<string, PropertyConstraints>;
 }
@@ -98,18 +90,12 @@ export interface EventSpecEntry {
  */
 export interface EventSpecResponse {
   /** Array of events matching the requested name */
-  events: EventSpecEntry[];
+  events: Array<EventSpecEntry>;
   /** Schema metadata */
   metadata: EventSpecMetadata;
 }
 
-// =============================================================================
-// SHARED TYPES (used by both wire and internal formats)
-// =============================================================================
-
-/**
- * Metadata returned with the event spec response.
- */
+/** Metadata returned with the event spec response. */
 export interface EventSpecMetadata {
   /** Schema identifier */
   schemaId: string;
@@ -141,19 +127,15 @@ export interface FetchEventSpecParams {
   eventName: string;
 }
 
-// =============================================================================
-// VALIDATION RESULT TYPES
-// =============================================================================
-
 /**
  * Result of validating a single property.
  * Contains either failedEventIds or passedEventIds (whichever is smaller for bandwidth).
  */
 export interface PropertyValidationResult {
   /** Event/variant IDs that FAILED validation (present if smaller or equal to passed) */
-  failedEventIds?: string[];
+  failedEventIds?: Array<string>;
   /** Event/variant IDs that PASSED validation (present if smaller than failed) */
-  passedEventIds?: string[];
+  passedEventIds?: Array<string>;
 }
 
 /**
