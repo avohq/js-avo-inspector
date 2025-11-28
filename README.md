@@ -123,7 +123,7 @@ This will output:
 
 ## Using Encryption
 
-Pass the `publicKey` parameter when initializing Inspector:
+Pass the `publicEncryptionKey` parameter when initializing Inspector:
 
 ```javascript
 import * as Inspector from "avo-inspector";
@@ -132,7 +132,7 @@ let inspector = new Inspector.AvoInspector({
   apiKey: "your api key",
   env: Inspector.AvoInspectorEnv.Dev,
   version: "1.0.0",
-  publicKey: "your-public-key-hex-string" // Enable encryption
+  publicEncryptionKey: "your-public-key-hex-string" // Enable encryption
 });
 ```
 
@@ -145,6 +145,88 @@ When encryption is enabled:
 - You can decrypt them in Avo's dashboard using your private key
 - Works with all data types: strings, numbers, booleans, objects, arrays, null
 - Handles large payloads (1KB+) without issues
+
+# Client-Side Validation (Dev/Staging Only)
+
+When initialized with a `publicEncryptionKey` in dev or staging environments, Inspector performs client-side validation of your events against your Avo Tracking Plan.
+
+## How It Works
+
+1. **Event Spec Fetching**: When you track an event, Inspector fetches the event specification from Avo's backend (results are cached for performance).
+
+2. **Event Matching**: Inspector matches your event to the closest event in your tracking plan, considering event names, mapped names, and variant-specific properties.
+
+3. **Property Validation**: Your event properties are validated against the spec rules:
+   - Required properties are present
+   - Property types match (string, int, float, boolean, object, list)
+   - Numeric values are within min/max bounds
+   - String values match regex patterns
+   - Enum values are in the allowed list
+   - Pinned values match exactly (variant-specific fixed values)
+   - No unexpected properties are sent
+
+4. **Immediate Reporting**: Validated events bypass batching and are sent immediately to Inspector, ensuring you get real-time feedback.
+
+## Validation Errors
+
+If logging is enabled, validation errors are logged to the console:
+
+```javascript
+inspector.enableLogging(true);
+
+// If "User Signed Up" requires an "email" property:
+inspector.trackSchemaFromEvent("User Signed Up", { name: "John" });
+// Console: [Avo Inspector] Validation errors for event "User Signed Up": [{ code: "RequiredMissing", propertyName: "email" }]
+```
+
+## Important: trackSchema Does Not Validate
+
+**Note:** Client-side validation only works with `trackSchemaFromEvent`, which has access to actual property values needed for validation.
+
+The `trackSchema` method only sends pre-extracted schemas and **does not perform client-side validation** - it goes through the normal batching flow.
+
+```javascript
+// ✅ Validates against tracking plan (when publicEncryptionKey is provided)
+inspector.trackSchemaFromEvent("Event Name", { prop: "value" });
+
+// ❌ Does NOT validate - only sends schema, uses batching
+inspector.trackSchema("Event Name", [{ propertyName: "prop", propertyType: "string" }]);
+```
+
+## Accessing Validation Results
+
+`trackSchemaFromEvent` returns a `Promise<EventProperty[]>` that resolves with the validated properties. You can use this in two ways:
+
+### Fire-and-Forget (Default)
+
+Call without `await` for non-blocking behavior. The event is tracked asynchronously and validation happens in the background:
+
+```javascript
+// Non-blocking - validation runs in background
+inspector.trackSchemaFromEvent("Event Name", { prop: "value" });
+```
+
+### Await for Validation Results
+
+If you need to access validation results (e.g., for testing or debugging), you can `await` the call:
+
+```javascript
+// Blocking - wait for validation to complete
+const validatedProperties = await inspector.trackSchemaFromEvent("Event Name", { 
+  email: "user@example.com",
+  age: 25 
+});
+
+// Each property includes validation results:
+// {
+//   propertyName: "email",
+//   propertyType: "string",
+//   failedEventIds: [],    // Event IDs where this property failed validation
+//   passedEventIds: ["abc123"]  // Event IDs where this property passed validation
+// }
+```
+
+**Note:** Awaiting will block until the event spec is fetched (if not cached) and validation completes. For production use, fire-and-forget is recommended to avoid impacting your application's performance.
 
 # Batching control
 

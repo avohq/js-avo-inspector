@@ -34,3 +34,34 @@ jest.mock("react-native", () => ({
     OS: "ios",
   },
 }));
+
+// Suppress console output during tests (keeps test output clean)
+// Tests that need to verify console calls can use (console.log as jest.Mock).mockClear() 
+// and then check calls
+jest.spyOn(console, 'log').mockImplementation();
+jest.spyOn(console, 'warn').mockImplementation();
+jest.spyOn(console, 'error').mockImplementation();
+
+// Track active XHR requests for cleanup - exported for setupFilesAfterEnv
+global.__activeXHRRequests = new Set();
+global.__localStorageMock = localStorageMock;
+
+const OriginalXMLHttpRequest = global.XMLHttpRequest;
+
+// Wrap XMLHttpRequest to track active requests
+class TrackedXMLHttpRequest extends OriginalXMLHttpRequest {
+  constructor() {
+    super();
+    global.__activeXHRRequests.add(this);
+    this.addEventListener('loadend', () => {
+      global.__activeXHRRequests.delete(this);
+    });
+  }
+  
+  abort() {
+    global.__activeXHRRequests.delete(this);
+    super.abort();
+  }
+}
+
+global.XMLHttpRequest = TrackedXMLHttpRequest;

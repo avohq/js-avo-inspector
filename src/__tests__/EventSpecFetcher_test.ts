@@ -1,5 +1,5 @@
 import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
-import type { EventSpec } from "../eventSpec/AvoEventSpecFetchTypes";
+import type { EventSpecResponseWire } from "../eventSpec/AvoEventSpecFetchTypes";
 
 // Mock XMLHttpRequest
 class MockXMLHttpRequest {
@@ -32,7 +32,7 @@ class MockXMLHttpRequest {
     setTimeout(() => {
       if (this.url.includes("success")) {
         this.status = 200;
-        this.responseText = JSON.stringify(mockEventSpec);
+        this.responseText = JSON.stringify(mockEventSpecResponseWire);
         if (this.onload) this.onload();
       } else if (this.url.includes("invalid")) {
         this.status = 200;
@@ -47,49 +47,53 @@ class MockXMLHttpRequest {
         if (this.onload) this.onload();
       } else {
         this.status = 200;
-        this.responseText = JSON.stringify(mockEventSpec);
+        this.responseText = JSON.stringify(mockEventSpecResponseWire);
         if (this.onload) this.onload();
       }
     }, 10);
   }
 }
 
-const mockEventSpec: EventSpec = {
-  baseEvent: {
-    name: "user_login",
-    id: "evt_123",
-    props: {
-      login_method: {
-        t: "string",
-        r: true,
-        v: ["email", "google", "facebook"]
-      },
-      user_email: {
-        t: "string",
-        r: true,
-        rx: "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$"
-      }
-    }
-  },
-  variants: [
+// Mock wire format response (short field names)
+const mockEventSpecResponseWire: EventSpecResponseWire = {
+  events: [
     {
-      variantId: "enterprise",
-      nameSuffix: "Enterprise",
-      eventId: "evt_123.enterprise",
-      props: {
+      b: "main", // branchId
+      id: "evt_123", // baseEventId
+      vids: ["evt_123.v1", "evt_123.v2"], // variantIds
+      p: {
+        // props
         login_method: {
-          t: "string",
-          r: true,
-          v: ["saml", "ldap"]
+          t: "string", // type
+          r: true, // required
+          p: {
+            // pinned values
+            email: ["evt_123"],
+            google: ["evt_123.v1"],
+            facebook: ["evt_123.v2"]
+          }
         },
-        company_domain: {
+        user_email: {
           t: "string",
           r: true,
-          rx: "^[a-z0-9-]+\\.com$"
+          rx: {
+            // regex patterns
+            "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$": [
+              "evt_123",
+              "evt_123.v1",
+              "evt_123.v2"
+            ]
+          }
         }
       }
     }
-  ]
+  ],
+  metadata: {
+    schemaId: "schema_123",
+    branchId: "main",
+    latestActionId: "action_456",
+    sourceId: "source_789"
+  }
 };
 
 describe("EventSpecFetcher", () => {
@@ -117,10 +121,10 @@ describe("EventSpecFetcher", () => {
         eventName: "success"
       });
 
-      // expect(result).not.toBeNull();
-      // expect(result?.baseEvent.name).toBe("user_login");
-      // expect(result?.baseEvent.id).toBe("evt_123");
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      // Parsed result should have long field names
+      expect(result?.events[0].baseEventId).toBe("evt_123");
+      expect(result?.events[0].branchId).toBe("main");
     });
 
     test("should use provided parameters in URL", async () => {
@@ -130,14 +134,12 @@ describe("EventSpecFetcher", () => {
         eventName: "success"
       });
 
-      // expect(result).not.toBeNull();
-      // expect(result?.baseEvent.name).toBe("user_login");
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
 
       // Verify all required parameters are included in the URL query
-      // expect(MockXMLHttpRequest.lastCalledUrl).toContain("apiKey=apiKey1");
-      // expect(MockXMLHttpRequest.lastCalledUrl).toContain("streamId=stream1");
-      // expect(MockXMLHttpRequest.lastCalledUrl).toContain("eventName=success");
+      expect(MockXMLHttpRequest.lastCalledUrl).toContain("apiKey=apiKey1");
+      expect(MockXMLHttpRequest.lastCalledUrl).toContain("streamId=stream1");
+      expect(MockXMLHttpRequest.lastCalledUrl).toContain("eventName=success");
     });
 
     test("should parse event spec with variants", async () => {
@@ -147,10 +149,54 @@ describe("EventSpecFetcher", () => {
         eventName: "success"
       });
 
-      // expect(result?.variants).toBeDefined();
-      // expect(result?.variants?.length).toBe(1);
-      // expect(result?.variants?.[0].variantId).toBe("enterprise");
-      expect(result).toBeNull();
+      expect(result?.events[0].variantIds).toBeDefined();
+      expect(result?.events[0].variantIds.length).toBe(2);
+      expect(result?.events[0].variantIds).toContain("evt_123.v1");
+      expect(result?.events[0].variantIds).toContain("evt_123.v2");
+    });
+
+    test("should parse metadata correctly", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      expect(result?.metadata).toBeDefined();
+      expect(result?.metadata.schemaId).toBe("schema_123");
+      expect(result?.metadata.branchId).toBe("main");
+      expect(result?.metadata.latestActionId).toBe("action_456");
+      expect(result?.metadata.sourceId).toBe("source_789");
+    });
+
+    test("should parse property constraints with long names", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      const loginMethod = result?.events[0].props.login_method;
+      expect(loginMethod).toBeDefined();
+      expect(loginMethod?.type).toBe("string");
+      expect(loginMethod?.required).toBe(true);
+      expect(loginMethod?.pinnedValues).toBeDefined();
+      expect(loginMethod?.pinnedValues?.email).toContain("evt_123");
+    });
+
+    test("should parse regex patterns with long names", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      const userEmail = result?.events[0].props.user_email;
+      expect(userEmail).toBeDefined();
+      expect(userEmail?.regexPatterns).toBeDefined();
+      expect(
+        Object.keys(userEmail?.regexPatterns || {}).length
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -194,6 +240,17 @@ describe("EventSpecFetcher", () => {
 
       expect(result).toBeNull();
     });
+
+    test("should return null in production environment", async () => {
+      const prodFetcher = new AvoEventSpecFetcher(2000, false, "prod");
+      const result = await prodFetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      expect(result).toBeNull();
+    });
   });
 
   describe("In-flight Request Deduplication", () => {
@@ -213,8 +270,7 @@ describe("EventSpecFetcher", () => {
       const [result1, result2] = await Promise.all([promise1, promise2]);
 
       expect(result1).toEqual(result2);
-      // expect(result1).not.toBeNull();
-      expect(result1).toBeNull();
+      expect(result1).not.toBeNull();
     });
 
     test("should not deduplicate requests for different events", async () => {
@@ -233,79 +289,68 @@ describe("EventSpecFetcher", () => {
       const [result1, result2] = await Promise.all([promise1, promise2]);
 
       // Both should succeed independently
-      // expect(result1).not.toBeNull();
-      expect(result1).toBeNull();
-      // expect(result2).not.toBeNull();
-      expect(result2).toBeNull();
+      expect(result1).not.toBeNull();
+      expect(result2).not.toBeNull();
     });
   });
 
   describe("Response Validation", () => {
-    test("should validate baseEvent structure", async () => {
-      // This test uses the mock which returns valid structure
+    test("should validate events array structure", async () => {
       const result = await fetcher.fetch({
         apiKey: "apiKey1",
         streamId: "stream1",
         eventName: "success"
       });
 
-      // expect(result?.baseEvent).toBeDefined();
-      // expect(result?.baseEvent.name).toBeDefined();
-      // expect(result?.baseEvent.id).toBeDefined();
-      // expect(result?.baseEvent.props).toBeDefined();
-      expect(result).toBeNull();
+      expect(result?.events).toBeDefined();
+      expect(Array.isArray(result?.events)).toBe(true);
+      expect(result?.events[0].baseEventId).toBeDefined();
+      expect(result?.events[0].branchId).toBeDefined();
+      expect(result?.events[0].props).toBeDefined();
     });
 
-    test("should validate property specs", async () => {
+    test("should validate property specs structure", async () => {
       const result = await fetcher.fetch({
         apiKey: "apiKey1",
         streamId: "stream1",
         eventName: "success"
       });
 
-      // const loginMethod = result?.baseEvent.props.login_method;
-      // expect(loginMethod).toBeDefined();
-      // expect(loginMethod?.t).toBe("string");
-      // expect(loginMethod?.r).toBe(true);
-      // expect(loginMethod?.v).toEqual(["email", "google", "facebook"]);
-      expect(result).toBeNull();
+      const loginMethod = result?.events[0].props.login_method;
+      expect(loginMethod).toBeDefined();
+      expect(loginMethod?.type).toBe("string");
+      expect(loginMethod?.required).toBe(true);
     });
 
-    test("should validate variant structure when present", async () => {
+    test("should validate metadata structure", async () => {
       const result = await fetcher.fetch({
         apiKey: "apiKey1",
         streamId: "stream1",
         eventName: "success"
       });
 
-      // const variant = result?.variants?.[0];
-      // expect(variant).toBeDefined();
-      // expect(variant?.variantId).toBe("enterprise");
-      // expect(variant?.nameSuffix).toBe("Enterprise");
-      // expect(variant?.eventId).toBe("evt_123.enterprise");
-      // expect(variant?.props).toBeDefined();
-      expect(result).toBeNull();
+      expect(result?.metadata).toBeDefined();
+      expect(result?.metadata.schemaId).toBeDefined();
+      expect(result?.metadata.branchId).toBeDefined();
+      expect(result?.metadata.latestActionId).toBeDefined();
     });
   });
 
   describe("URL Building", () => {
     test("should build correct URL with all parameters", async () => {
-      // We can't directly test URL building, but we can verify the fetch succeeds
-      // which means the URL was built correctly
       const result = await fetcher.fetch({
         apiKey: "apiKey1",
         streamId: "stream1",
         eventName: "success"
       });
 
-      //expect(result).not.toBeNull();
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
     });
   });
 
   describe("Logging", () => {
     test("should not log when shouldLog is false", async () => {
-      const consoleSpy = jest.spyOn(console, "log");
+      (console.log as jest.Mock).mockClear();
 
       await fetcher.fetch({
         apiKey: "apiKey1",
@@ -313,12 +358,11 @@ describe("EventSpecFetcher", () => {
         eventName: "success"
       });
 
-      expect(consoleSpy).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(console.log).not.toHaveBeenCalled();
     });
 
     test("should log when shouldLog is true", async () => {
-      const consoleSpy = jest.spyOn(console, "log");
+      (console.log as jest.Mock).mockClear();
       const logFetcher = new AvoEventSpecFetcher(2000, true, "dev");
 
       await logFetcher.fetch({
@@ -327,8 +371,7 @@ describe("EventSpecFetcher", () => {
         eventName: "success"
       });
 
-      //expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(console.log).toHaveBeenCalled();
     });
   });
 
@@ -348,7 +391,41 @@ describe("EventSpecFetcher", () => {
       });
 
       // Should still work with custom base URL
-      //expect(result).not.toBeNull();
+      expect(result).not.toBeNull();
+    });
+  });
+
+  describe("Environment Restrictions", () => {
+    test("should work in dev environment", async () => {
+      const devFetcher = new AvoEventSpecFetcher(2000, false, "dev");
+      const result = await devFetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      expect(result).not.toBeNull();
+    });
+
+    test("should work in staging environment", async () => {
+      const stagingFetcher = new AvoEventSpecFetcher(2000, false, "staging");
+      const result = await stagingFetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      expect(result).not.toBeNull();
+    });
+
+    test("should return null in production environment", async () => {
+      const prodFetcher = new AvoEventSpecFetcher(2000, false, "prod");
+      const result = await prodFetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
       expect(result).toBeNull();
     });
   });

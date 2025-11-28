@@ -1,6 +1,7 @@
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
 import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
+import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 
 import { defaultOptions } from "./constants";
 
@@ -8,6 +9,7 @@ const inspectorVersion = process.env.npm_package_version || "";
 
 jest.mock("../AvoBatcher");
 jest.mock("../AvoStorage");
+jest.mock("../eventSpec/AvoEventSpecFetcher");
 
 describe("Batcher", () => {
   let inspector: AvoInspector;
@@ -22,6 +24,12 @@ describe("Batcher", () => {
   );
 
   beforeAll(() => {
+    // Mock eventSpecFetcher to return null (no spec available)
+    // so the batched flow is used
+    (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+      fetch: jest.fn().mockResolvedValue(null)
+    }));
+
     inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
   });
@@ -37,7 +45,7 @@ describe("Batcher", () => {
     expect(AvoBatcher).toHaveBeenCalledWith(networkHandler);
   });
 
-  test("handleTrackSchema is called on trackSchema", () => {
+  test("handleTrackSchema is called on trackSchema", async () => {
     const eventName = "event name";
     const schema = [
       {
@@ -50,7 +58,7 @@ describe("Batcher", () => {
       }
     ];
 
-    inspector.trackSchema(eventName, schema);
+    await inspector.trackSchema(eventName, schema);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
@@ -61,7 +69,7 @@ describe("Batcher", () => {
     );
   });
 
-  test("handleTrackSchema is called on trackSchemaFromEvent", () => {
+  test("handleTrackSchema is called on trackSchemaFromEvent when no spec available", async () => {
     const eventName = "event name";
     const properties = {
       prop0: "",
@@ -72,7 +80,7 @@ describe("Batcher", () => {
 
     const schema = inspector.extractSchema(properties);
 
-    inspector.trackSchemaFromEvent(eventName, properties);
+    await inspector.trackSchemaFromEvent(eventName, properties);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
@@ -83,7 +91,7 @@ describe("Batcher", () => {
     );
   });
 
-  test("handleTrackSchema is called on _avoFunctionTrackSchemaFromEvent", () => {
+  test("handleTrackSchema is called on _avoFunctionTrackSchemaFromEvent when no spec available", async () => {
     const eventName = "event name";
     const properties = {
       prop0: "",
@@ -97,7 +105,7 @@ describe("Batcher", () => {
     const schema = inspector.extractSchema(properties);
 
     // @ts-expect-error
-    inspector._avoFunctionTrackSchemaFromEvent(eventName, properties, eventId, eventHash);
+    await inspector._avoFunctionTrackSchemaFromEvent(eventName, properties, eventId, eventHash);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(

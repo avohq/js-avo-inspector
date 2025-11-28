@@ -1,11 +1,21 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 import { generateKeyPair, decryptValue } from "./helpers/encryptionHelpers";
 import { type } from "./constants";
+
+// Mock eventSpecFetcher to return null so batched flow is used
+jest.mock("../eventSpec/AvoEventSpecFetcher");
 
 describe("Encrypted Property Tracking", () => {
   // Generate a test ECC key pair
   const { publicKey: testPublicKey, privateKey: testPrivateKey } = generateKeyPair();
+
+  beforeAll(() => {
+    (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+      fetch: jest.fn().mockResolvedValue(null)
+    }));
+  });
 
   describe("with encryption enabled in dev environment", () => {
     const inspector = new AvoInspector({
@@ -65,7 +75,7 @@ describe("Encrypted Property Tracking", () => {
       expect(decrypted2).toBe(false);
     });
 
-    test("should encrypt nested object properties", () => {
+    test("should encrypt nested object children but not the parent object", () => {
       const eventProperties = {
         nestedObject: {
           innerProp: "inner value",
@@ -79,20 +89,27 @@ describe("Encrypted Property Tracking", () => {
 
       expect(schema[0].propertyName).toBe("nestedObject");
       expect(schema[0].propertyType).toBe(type.OBJECT);
-      expect(schema[0].encryptedPropertyValue).toBeDefined();
+      // Object properties should NOT have encrypted value (children are encrypted individually)
+      expect(schema[0].encryptedPropertyValue).toBeUndefined();
 
-      // Decrypt the top-level object
-      const decryptedObject = decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
-      expect(decryptedObject).toEqual(eventProperties.nestedObject);
-
-      // Check children also have encrypted values
+      // Check children have encrypted values
       expect(schema[0].children).toBeDefined();
       expect(schema[0].children.length).toBe(2);
+      
+      // innerProp is a primitive - should be encrypted
       expect(schema[0].children[0].encryptedPropertyValue).toBeDefined();
-      expect(schema[0].children[1].encryptedPropertyValue).toBeDefined();
+      const decryptedInner = decryptValue(schema[0].children[0].encryptedPropertyValue!, testPrivateKey);
+      expect(decryptedInner).toBe("inner value");
+      
+      // deepNested is an object - should NOT be encrypted, but its children should be
+      expect(schema[0].children[1].encryptedPropertyValue).toBeUndefined();
+      expect(schema[0].children[1].children).toBeDefined();
+      expect(schema[0].children[1].children[0].encryptedPropertyValue).toBeDefined();
+      const decryptedDeep = decryptValue(schema[0].children[1].children[0].encryptedPropertyValue!, testPrivateKey);
+      expect(decryptedDeep).toBe(456);
     });
 
-    test("should encrypt array properties", () => {
+    test("should not encrypt array properties (children are type strings)", () => {
       const eventProperties = {
         arrayProp: [1, 2, 3, "four"]
       };
@@ -101,10 +118,11 @@ describe("Encrypted Property Tracking", () => {
 
       expect(schema[0].propertyName).toBe("arrayProp");
       expect(schema[0].propertyType).toBe(type.LIST);
-      expect(schema[0].encryptedPropertyValue).toBeDefined();
-
-      const decryptedArray = decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
-      expect(decryptedArray).toEqual([1, 2, 3, "four"]);
+      // Array properties should NOT have encrypted value
+      expect(schema[0].encryptedPropertyValue).toBeUndefined();
+      
+      // Children of arrays with primitives are type strings (deduplicated)
+      expect(schema[0].children).toEqual(["int", "string"]);
     });
   });
 
@@ -213,14 +231,14 @@ describe("Encrypted Property Tracking", () => {
       inspector.enableLogging(false);
     });
 
-    test("should return schema with encrypted values from trackSchemaFromEvent", () => {
+    test("should return schema with encrypted values from trackSchemaFromEvent", async () => {
       const eventName = "Test Event";
       const eventProperties = {
         prop1: "value1",
         prop2: 42
       };
 
-      const schema = inspector.trackSchemaFromEvent(eventName, eventProperties);
+      const schema = await inspector.trackSchemaFromEvent(eventName, eventProperties);
 
       expect(schema.length).toBe(2);
       expect(schema[0].encryptedPropertyValue).toBeDefined();

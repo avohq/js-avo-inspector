@@ -2,6 +2,7 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "jsdom",
   setupFiles: ["<rootDir>/src/__tests__/jest.setup.js"],
+  setupFilesAfterEnv: ["<rootDir>/src/__tests__/jest.setupAfterEnv.js"],
   moduleNameMapper: {
     "^react-native$": "<rootDir>/src/__tests__/jest.setup.js",
   },
@@ -16,6 +17,10 @@ module.exports = {
     "/dist/",
     "/examples/",
     "/constants/",
+  ],
+  modulePathIgnorePatterns: [
+    "<rootDir>/dist/",
+    "<rootDir>/dist-native/",
   ],
   transform: {
     "^.+\\.(ts|tsx)$": "ts-jest",

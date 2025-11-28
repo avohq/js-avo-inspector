@@ -1,23 +1,22 @@
 import {
   type SessionStartedBody,
   type EventSchemaBody,
-  type AvoNetworkCallsHandler
+  type AvoNetworkCallsHandler,
+  type EventProperty
 } from "./AvoNetworkCallsHandler";
 import { AvoInspector } from "./AvoInspector";
+import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
 
 export interface AvoBatcherType {
-  handleSessionStarted: () => void
+  handleSessionStarted: () => void;
 
   handleTrackSchema: (
     eventName: string,
-    schema: Array<{
-      propertyName: string
-      propertyType: string
-      children?: any
-    }>,
+    schema: EventProperty[],
     eventId: string | null,
-    eventHash: string | null
-  ) => void
+    eventHash: string | null,
+    eventSpecMetadata?: EventSpecMetadata
+  ) => void;
 }
 
 export class AvoBatcher implements AvoBatcherType {
@@ -27,15 +26,15 @@ export class AvoBatcher implements AvoBatcherType {
 
   private readonly networkCallsHandler: AvoNetworkCallsHandler;
 
-  constructor (networkCallsHandler: AvoNetworkCallsHandler) {
+  constructor(networkCallsHandler: AvoNetworkCallsHandler) {
     this.networkCallsHandler = networkCallsHandler;
 
     this.batchFlushAttemptTimestamp = Date.now();
 
     AvoInspector.avoStorage
       .getItemAsync<Array<SessionStartedBody | EventSchemaBody | null> | null>(
-      AvoBatcher.cacheKey
-    )
+        AvoBatcher.cacheKey
+      )
       .then((savedEvents) => {
         if (savedEvents !== null) {
           const nonNullSavedEvents = savedEvents.filter(
@@ -46,34 +45,33 @@ export class AvoBatcher implements AvoBatcherType {
           );
           this.checkIfBatchNeedsToBeSent();
         }
-      }).catch((error) => {
+      })
+      .catch((error) => {
         console.error("Avo Inspector: error getting events from cache", error);
       });
   }
 
-  handleSessionStarted (): void {
+  handleSessionStarted(): void {
     this.events.push(this.networkCallsHandler.bodyForSessionStartedCall());
     this.saveEvents();
 
     this.checkIfBatchNeedsToBeSent();
   }
 
-  handleTrackSchema (
+  handleTrackSchema(
     eventName: string,
-    schema: Array<{
-      propertyName: string
-      propertyType: string
-      children?: any
-    }>,
+    schema: EventProperty[],
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    eventSpecMetadata?: EventSpecMetadata
   ): void {
     this.events.push(
       this.networkCallsHandler.bodyForEventSchemaCall(
         eventName,
         schema,
         eventId,
-        eventHash
+        eventHash,
+        eventSpecMetadata
       )
     );
     this.saveEvents();
@@ -90,7 +88,7 @@ export class AvoBatcher implements AvoBatcherType {
     this.checkIfBatchNeedsToBeSent();
   }
 
-  private checkIfBatchNeedsToBeSent () {
+  private checkIfBatchNeedsToBeSent() {
     const batchSize = this.events.length;
     const now = Date.now();
     const timeSinceLastFlushAttempt = now - this.batchFlushAttemptTimestamp;
@@ -129,7 +127,7 @@ export class AvoBatcher implements AvoBatcherType {
     }
   }
 
-  private saveEvents (): void {
+  private saveEvents(): void {
     if (this.events.length > 1000) {
       const extraElements = this.events.length - 1000;
       this.events.splice(0, extraElements);
@@ -138,7 +136,7 @@ export class AvoBatcher implements AvoBatcherType {
     AvoInspector.avoStorage.setItem(AvoBatcher.cacheKey, this.events);
   }
 
-  static get cacheKey (): string {
+  static get cacheKey(): string {
     return "AvoInspectorEvents";
   }
 }
