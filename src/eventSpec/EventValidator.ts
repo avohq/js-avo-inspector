@@ -342,7 +342,13 @@ function convertValueToString(value: RuntimePropertyValue): string {
     return String(value);
   }
   if (Array.isArray(value) || typeof value === "object") {
-    return JSON.stringify(value);
+    try {
+      return JSON.stringify(value);
+    } catch (e) {
+      // Circular reference or other serialization error
+      console.warn(`[Avo Inspector] Failed to stringify value: ${e}`);
+      return String(value);
+    }
   }
   return String(value);
 }
