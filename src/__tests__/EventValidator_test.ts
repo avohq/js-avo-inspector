@@ -959,14 +959,14 @@ describe("Empty Constraint Objects", () => {
 });
 
 describe("Array and Object Value Stringification", () => {
-  test("should stringify array values for pinned value comparison", () => {
+  test("should JSON stringify array values for pinned value comparison", () => {
     const specResponse = createEventSpecResponse([
       createEventSpecEntry({
         baseEventId: "evt_1",
         variantIds: [],
         props: {
           tags: createPinnedValueProperty({
-            "a,b,c": ["evt_1"] // Array.toString() produces "a,b,c"
+            '["a","b","c"]': ["evt_1"] // JSON.stringify(["a","b","c"])
           })
         }
       })
@@ -974,18 +974,18 @@ describe("Array and Object Value Stringification", () => {
 
     const result = validateEvent({ tags: ["a", "b", "c"] }, specResponse);
 
-    // Array ["a","b","c"].toString() = "a,b,c", which matches
+    // JSON.stringify(["a","b","c"]) matches
     expect(result.propertyResults["tags"].failedEventIds).toBeUndefined();
   });
 
-  test("should stringify object values as [object Object]", () => {
+  test("should JSON stringify object values for comparison", () => {
     const specResponse = createEventSpecResponse([
       createEventSpecEntry({
         baseEventId: "evt_1",
         variantIds: [],
         props: {
           data: createPinnedValueProperty({
-            "[object Object]": ["evt_1"]
+            '{"key":"value"}': ["evt_1"]
           })
         }
       })
@@ -993,11 +993,11 @@ describe("Array and Object Value Stringification", () => {
 
     const result = validateEvent({ data: { key: "value" } }, specResponse);
 
-    // Object.toString() = "[object Object]"
+    // JSON.stringify({key:"value"}) matches
     expect(result.propertyResults["data"].failedEventIds).toBeUndefined();
   });
 
-  test("should fail object when expecting specific string", () => {
+  test("should fail object when expecting specific string (that isn't JSON)", () => {
     const specResponse = createEventSpecResponse([
       createEventSpecEntry({
         baseEventId: "evt_1",
@@ -1012,18 +1012,18 @@ describe("Array and Object Value Stringification", () => {
 
     const result = validateEvent({ value: { nested: "object" } }, specResponse);
 
-    // "[object Object]" !== "expected_string"
+    // '{"nested":"object"}' !== "expected_string"
     expect(result.propertyResults["value"].failedEventIds).toContain("evt_1");
   });
 
-  test("should handle nested array stringification", () => {
+  test("should handle nested array stringification with JSON", () => {
     const specResponse = createEventSpecResponse([
       createEventSpecEntry({
         baseEventId: "evt_1",
         variantIds: [],
         props: {
           matrix: createPinnedValueProperty({
-            "1,2,3,4": ["evt_1"] // Nested arrays flatten when stringified
+            "[[1,2],[3,4]]": ["evt_1"] // JSON representation
           })
         }
       })
@@ -1031,7 +1031,7 @@ describe("Array and Object Value Stringification", () => {
 
     const result = validateEvent({ matrix: [[1, 2], [3, 4]] }, specResponse);
 
-    // [[1,2],[3,4]].toString() = "1,2,3,4"
+    // JSON.stringify([[1,2],[3,4]]) matches
     expect(result.propertyResults["matrix"].failedEventIds).toBeUndefined();
   });
 });

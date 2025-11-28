@@ -41,6 +41,33 @@ export type RuntimePropertyValue =
 export type RuntimeProperties = Record<string, RuntimePropertyValue>;
 
 // =============================================================================
+// CACHES
+// =============================================================================
+
+/**
+ * Cache for compiled regex objects to avoid recompilation on every event.
+ * Patterns are expected to be stable per session.
+ */
+const regexCache = new Map<string, RegExp>();
+
+/**
+ * Gets a compiled regex from cache or compiles and caches it.
+ * @throws Error if pattern is invalid
+ */
+function getOrCompileRegex(pattern: string): RegExp {
+  let regex = regexCache.get(pattern);
+  if (!regex) {
+    // SECURITY: We trust regex patterns from the Avo backend (EventSpecResponse).
+    // While a malicious pattern could cause ReDoS, we assume the backend is secure
+    // and only delivers valid, non-malicious regexes derived from the Tracking Plan.
+    // A complete fix would require a safe-regex validator or timeout-based execution.
+    regex = new RegExp(pattern);
+    regexCache.set(pattern, regex);
+  }
+  return regex;
+}
+
+// =============================================================================
 // MAIN VALIDATION FUNCTION
 // =============================================================================
 
@@ -286,6 +313,27 @@ function addIdsToSet(ids: string[], set: Set<string>): void {
 }
 
 /**
+ * Converts runtime value to string for comparison.
+ * - Primitives (null, undefined, boolean, number, string) -> String(value)
+ * - Objects/Arrays -> JSON.stringify(value)
+ */
+function convertValueToString(value: RuntimePropertyValue): string {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "boolean" ||
+    typeof value === "number" ||
+    typeof value === "string"
+  ) {
+    return String(value);
+  }
+  if (Array.isArray(value) || typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/**
  * Checks pinned values constraint.
  * For each pinnedValue -> eventIds entry, if runtime value !== pinnedValue, those eventIds FAIL.
  */
@@ -294,7 +342,7 @@ function checkPinnedValues(
   pinnedValues: Record<string, string[]>,
   failedIds: Set<string>
 ): void {
-  const stringValue = String(value);
+  const stringValue = convertValueToString(value);
 
   for (const [pinnedValue, eventIds] of Object.entries(pinnedValues)) {
     if (stringValue !== pinnedValue) {
@@ -313,7 +361,7 @@ function checkAllowedValues(
   allowedValues: Record<string, string[]>,
   failedIds: Set<string>
 ): void {
-  const stringValue = String(value);
+  const stringValue = convertValueToString(value);
 
   for (const [allowedArrayJson, eventIds] of Object.entries(allowedValues)) {
     try {
@@ -351,7 +399,7 @@ function checkRegexPatterns(
 
   for (const [pattern, eventIds] of Object.entries(regexPatterns)) {
     try {
-      const regex = new RegExp(pattern);
+      const regex = getOrCompileRegex(pattern);
       if (!regex.test(value)) {
         // Value doesn't match pattern, so these eventIds fail
         addIdsToSet(eventIds, failedIds);
