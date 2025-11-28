@@ -126,7 +126,9 @@ function collectAllEventIds(events: EventSpecEntry[]): string[] {
   const ids: string[] = [];
   for (const event of events) {
     ids.push(event.baseEventId);
-    ids.push(...event.variantIds);
+    for (let j = 0; j < event.variantIds.length; j++) {
+      ids.push(event.variantIds[j]);
+    }
   }
   return ids;
 }
@@ -189,7 +191,10 @@ function collectConstraintsByPropertyName(
           for (const key of Object.keys(constraints.pinnedValues)) {
             if (existing.pinnedValues[key]) {
               // Merge and deduplicate eventIds
-              const merged = new Set([...existing.pinnedValues[key], ...constraints.pinnedValues[key]]);
+              const merged = new Set(existing.pinnedValues[key]);
+              for (const id of constraints.pinnedValues[key]) {
+                merged.add(id);
+              }
               existing.pinnedValues[key] = Array.from(merged);
             } else {
               existing.pinnedValues[key] = constraints.pinnedValues[key];
@@ -203,7 +208,10 @@ function collectConstraintsByPropertyName(
           for (const key of Object.keys(constraints.allowedValues)) {
             if (existing.allowedValues[key]) {
               // Merge and deduplicate eventIds
-              const merged = new Set([...existing.allowedValues[key], ...constraints.allowedValues[key]]);
+              const merged = new Set(existing.allowedValues[key]);
+              for (const id of constraints.allowedValues[key]) {
+                merged.add(id);
+              }
               existing.allowedValues[key] = Array.from(merged);
             } else {
               existing.allowedValues[key] = constraints.allowedValues[key];
@@ -217,7 +225,10 @@ function collectConstraintsByPropertyName(
           for (const key of Object.keys(constraints.regexPatterns)) {
             if (existing.regexPatterns[key]) {
               // Merge and deduplicate eventIds
-              const merged = new Set([...existing.regexPatterns[key], ...constraints.regexPatterns[key]]);
+              const merged = new Set(existing.regexPatterns[key]);
+              for (const id of constraints.regexPatterns[key]) {
+                merged.add(id);
+              }
               existing.regexPatterns[key] = Array.from(merged);
             } else {
               existing.regexPatterns[key] = constraints.regexPatterns[key];
@@ -231,7 +242,10 @@ function collectConstraintsByPropertyName(
           for (const key of Object.keys(constraints.minMaxRanges)) {
             if (existing.minMaxRanges[key]) {
               // Merge and deduplicate eventIds
-              const merged = new Set([...existing.minMaxRanges[key], ...constraints.minMaxRanges[key]]);
+              const merged = new Set(existing.minMaxRanges[key]);
+              for (const id of constraints.minMaxRanges[key]) {
+                merged.add(id);
+              }
               existing.minMaxRanges[key] = Array.from(merged);
             } else {
               existing.minMaxRanges[key] = constraints.minMaxRanges[key];
