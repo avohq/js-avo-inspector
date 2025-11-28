@@ -160,7 +160,13 @@ function collectConstraintsByPropertyName(
             existing.pinnedValues = {};
           }
           for (const key of Object.keys(constraints.pinnedValues)) {
-            existing.pinnedValues[key] = constraints.pinnedValues[key];
+            if (existing.pinnedValues[key]) {
+              // Merge and deduplicate eventIds
+              const merged = new Set([...existing.pinnedValues[key], ...constraints.pinnedValues[key]]);
+              existing.pinnedValues[key] = Array.from(merged);
+            } else {
+              existing.pinnedValues[key] = constraints.pinnedValues[key];
+            }
           }
         }
         if (constraints.allowedValues) {
@@ -168,7 +174,13 @@ function collectConstraintsByPropertyName(
             existing.allowedValues = {};
           }
           for (const key of Object.keys(constraints.allowedValues)) {
-            existing.allowedValues[key] = constraints.allowedValues[key];
+            if (existing.allowedValues[key]) {
+              // Merge and deduplicate eventIds
+              const merged = new Set([...existing.allowedValues[key], ...constraints.allowedValues[key]]);
+              existing.allowedValues[key] = Array.from(merged);
+            } else {
+              existing.allowedValues[key] = constraints.allowedValues[key];
+            }
           }
         }
         if (constraints.regexPatterns) {
@@ -176,7 +188,13 @@ function collectConstraintsByPropertyName(
             existing.regexPatterns = {};
           }
           for (const key of Object.keys(constraints.regexPatterns)) {
-            existing.regexPatterns[key] = constraints.regexPatterns[key];
+            if (existing.regexPatterns[key]) {
+              // Merge and deduplicate eventIds
+              const merged = new Set([...existing.regexPatterns[key], ...constraints.regexPatterns[key]]);
+              existing.regexPatterns[key] = Array.from(merged);
+            } else {
+              existing.regexPatterns[key] = constraints.regexPatterns[key];
+            }
           }
         }
         if (constraints.minMaxRanges) {
@@ -184,7 +202,13 @@ function collectConstraintsByPropertyName(
             existing.minMaxRanges = {};
           }
           for (const key of Object.keys(constraints.minMaxRanges)) {
-            existing.minMaxRanges[key] = constraints.minMaxRanges[key];
+            if (existing.minMaxRanges[key]) {
+              // Merge and deduplicate eventIds
+              const merged = new Set([...existing.minMaxRanges[key], ...constraints.minMaxRanges[key]]);
+              existing.minMaxRanges[key] = Array.from(merged);
+            } else {
+              existing.minMaxRanges[key] = constraints.minMaxRanges[key];
+            }
           }
         }
       }

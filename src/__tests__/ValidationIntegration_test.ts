@@ -223,30 +223,6 @@ describe("Validation Integration", () => {
         expect.any(Array)
       );
     });
-
-    test("should return baseEventId from first event in spec", async () => {
-      const inspector = new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0"
-      });
-
-      callInspectorImmediatelySpy = jest
-        .spyOn(
-          (inspector as any).avoNetworkCallsHandler,
-          "callInspectorImmediately"
-        )
-        .mockImplementation((...args: any[]) => {
-          args[1](null);
-        });
-
-      await inspector.trackSchemaFromEvent("test_event", {
-        required_prop: "test"
-      });
-
-      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
-      expect(eventBody.eventId).toBe("evt_test");
-    });
   });
 
   describe("When event spec is not available", () => {

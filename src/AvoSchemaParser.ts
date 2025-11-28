@@ -62,19 +62,19 @@ export class AvoSchemaParser {
               propertyType: this.getPropValueType(val)
             };
 
-            // Only set encryptedPropertyValue if we can encrypt. Never send unencrypted values.
-            const encryptedValue = this.getEncryptedPropertyValueIfEnabled(
-              val,
-              canSendEncryptedValues,
-              publicEncryptionKey
-            );
-            if (encryptedValue !== undefined) {
-              mappedEntry.encryptedPropertyValue = encryptedValue;
-            }
-
             if (typeof val === "object" && val != null) {
-              // When val is object/array, mapping returns SchemaChild[] (EventProperty[] or array of children)
+              // Object/array properties: children are encrypted individually, no need to encrypt parent
               mappedEntry.children = mapping(val) as SchemaChild[];
+            } else {
+              // Primitive properties: encrypt the value if encryption is enabled
+              const encryptedValue = this.getEncryptedPropertyValueIfEnabled(
+                val,
+                canSendEncryptedValues,
+                publicEncryptionKey
+              );
+              if (encryptedValue !== undefined) {
+                mappedEntry.encryptedPropertyValue = encryptedValue;
+              }
             }
 
             mappedResult.push(mappedEntry);
