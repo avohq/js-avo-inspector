@@ -25,6 +25,8 @@ export interface PropertyConstraintsWire {
   rx?: Record<string, string[]>;
   /** Min/max ranges: "min,max" -> eventIds that require value in this range */
   minmax?: Record<string, string[]>;
+  /** Nested property constraints for object properties */
+  children?: Record<string, PropertyConstraintsWire>;
 }
 
 /**
@@ -75,6 +77,8 @@ export interface PropertyConstraints {
   regexPatterns?: Record<string, string[]>;
   /** Min/max ranges: "min,max" -> eventIds that require value in this range */
   minMaxRanges?: Record<string, string[]>;
+  /** Nested property constraints for object properties */
+  children?: Record<string, PropertyConstraints>;
 }
 
 /**
@@ -154,6 +158,8 @@ export interface PropertyValidationResult {
   failedEventIds?: string[];
   /** Event/variant IDs that PASSED validation (present if smaller than failed) */
   passedEventIds?: string[];
+  /** Nested validation results for child properties of object properties */
+  children?: Record<string, PropertyValidationResult>;
 }
 
 /**

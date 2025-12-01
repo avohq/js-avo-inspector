@@ -6,7 +6,8 @@ import {
   createRegexProperty,
   createMinMaxProperty,
   createEventSpecEntry,
-  createEventSpecResponse
+  createEventSpecResponse,
+  createNestedProperty
 } from "./helpers/mockFactories";
 
 // =============================================================================
@@ -1103,5 +1104,441 @@ describe("Negative Number Ranges", () => {
     // Boundaries should pass (inclusive)
     expect(resultAtMin.propertyResults["depth"].failedEventIds).toBeUndefined();
     expect(resultAtMax.propertyResults["depth"].failedEventIds).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// NESTED PROPERTY VALIDATION TESTS
+// =============================================================================
+
+describe("Nested Property Validation", () => {
+  describe("Basic Nested Properties", () => {
+    test("should validate child property with pinned value constraint", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            user: createNestedProperty({
+              status: createPinnedValueProperty({
+                active: ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const resultPass = validateEvent(
+        { user: { status: "active" } },
+        specResponse
+      );
+      const resultFail = validateEvent(
+        { user: { status: "inactive" } },
+        specResponse
+      );
+
+      // Pass: child value matches
+      expect(resultPass.propertyResults["user"].children?.["status"].failedEventIds).toBeUndefined();
+      // Fail: child value doesn't match
+      expect(resultFail.propertyResults["user"].children?.["status"].failedEventIds).toContain("evt_1");
+    });
+
+    test("should validate child property with allowed values constraint", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            config: createNestedProperty({
+              theme: createAllowedValuesProperty({
+                '["light","dark","system"]': ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const resultPass = validateEvent(
+        { config: { theme: "dark" } },
+        specResponse
+      );
+      const resultFail = validateEvent(
+        { config: { theme: "custom" } },
+        specResponse
+      );
+
+      expect(resultPass.propertyResults["config"].children?.["theme"].failedEventIds).toBeUndefined();
+      expect(resultFail.propertyResults["config"].children?.["theme"].failedEventIds).toContain("evt_1");
+    });
+
+    test("should validate child property with min/max constraint", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            item: createNestedProperty({
+              quantity: createMinMaxProperty({
+                "1,100": ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const resultPass = validateEvent(
+        { item: { quantity: 50 } },
+        specResponse
+      );
+      const resultFail = validateEvent(
+        { item: { quantity: 150 } },
+        specResponse
+      );
+
+      expect(resultPass.propertyResults["item"].children?.["quantity"].failedEventIds).toBeUndefined();
+      expect(resultFail.propertyResults["item"].children?.["quantity"].failedEventIds).toContain("evt_1");
+    });
+  });
+
+  describe("Deeply Nested Properties", () => {
+    test("should validate properties at multiple nesting levels", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            order: createNestedProperty({
+              shipping: createNestedProperty({
+                address: createNestedProperty({
+                  country: createPinnedValueProperty({
+                    US: ["evt_1"]
+                  })
+                })
+              })
+            })
+          }
+        })
+      ]);
+
+      const resultPass = validateEvent(
+        { order: { shipping: { address: { country: "US" } } } },
+        specResponse
+      );
+      const resultFail = validateEvent(
+        { order: { shipping: { address: { country: "CA" } } } },
+        specResponse
+      );
+
+      // Navigate through nested children
+      expect(
+        resultPass.propertyResults["order"]
+          .children?.["shipping"]
+          .children?.["address"]
+          .children?.["country"].failedEventIds
+      ).toBeUndefined();
+
+      expect(
+        resultFail.propertyResults["order"]
+          .children?.["shipping"]
+          .children?.["address"]
+          .children?.["country"].failedEventIds
+      ).toContain("evt_1");
+    });
+  });
+
+  describe("Mixed Flat and Nested Properties", () => {
+    test("should validate both flat and nested properties in same event", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            // Flat property
+            event_type: createPinnedValueProperty({
+              purchase: ["evt_1"]
+            }),
+            // Nested property
+            payment: createNestedProperty({
+              method: createAllowedValuesProperty({
+                '["card","paypal","bank"]': ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        {
+          event_type: "purchase",
+          payment: { method: "card" }
+        },
+        specResponse
+      );
+
+      // Both should pass
+      expect(result.propertyResults["event_type"].failedEventIds).toBeUndefined();
+      expect(result.propertyResults["payment"].children?.["method"].failedEventIds).toBeUndefined();
+    });
+
+    test("should handle partial failures with mixed properties", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            status: createPinnedValueProperty({
+              success: ["evt_1"]
+            }),
+            details: createNestedProperty({
+              code: createMinMaxProperty({
+                "200,299": ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        {
+          status: "success",    // passes
+          details: { code: 404 } // fails (not in 200-299)
+        },
+        specResponse
+      );
+
+      expect(result.propertyResults["status"].failedEventIds).toBeUndefined();
+      expect(result.propertyResults["details"].children?.["code"].failedEventIds).toContain("evt_1");
+    });
+  });
+
+  describe("Nested Properties with Multiple Children", () => {
+    test("should validate all children independently", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            product: createNestedProperty({
+              name: createRegexProperty({
+                "^[A-Z]": ["evt_1"] // Must start with uppercase
+              }),
+              price: createMinMaxProperty({
+                "0.01,10000": ["evt_1"]
+              }),
+              category: createAllowedValuesProperty({
+                '["electronics","clothing","food"]': ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const resultAllPass = validateEvent(
+        {
+          product: {
+            name: "Laptop Pro",
+            price: 999.99,
+            category: "electronics"
+          }
+        },
+        specResponse
+      );
+
+      const resultPartialFail = validateEvent(
+        {
+          product: {
+            name: "laptop pro", // fails - lowercase start
+            price: 999.99,      // passes
+            category: "toys"    // fails - not in allowed list
+          }
+        },
+        specResponse
+      );
+
+      // All pass
+      expect(resultAllPass.propertyResults["product"].children?.["name"].failedEventIds).toBeUndefined();
+      expect(resultAllPass.propertyResults["product"].children?.["price"].failedEventIds).toBeUndefined();
+      expect(resultAllPass.propertyResults["product"].children?.["category"].failedEventIds).toBeUndefined();
+
+      // Partial failures
+      expect(resultPartialFail.propertyResults["product"].children?.["name"].failedEventIds).toContain("evt_1");
+      // price passes - it may not be included in children at all (only non-empty results included)
+      const priceResult = resultPartialFail.propertyResults["product"].children?.["price"];
+      expect(priceResult?.failedEventIds).toBeUndefined();
+      expect(resultPartialFail.propertyResults["product"].children?.["category"].failedEventIds).toContain("evt_1");
+    });
+  });
+
+  describe("Edge Cases for Nested Properties", () => {
+    test("should handle missing nested object in runtime value", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            config: createNestedProperty({
+              setting: createPinnedValueProperty({
+                enabled: ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      // Runtime value is not an object
+      const result = validateEvent(
+        { config: "not an object" },
+        specResponse
+      );
+
+      // Child validation should still occur, but with undefined value
+      // undefined !== "enabled", so it should fail
+      expect(result.propertyResults["config"].children?.["setting"].failedEventIds).toContain("evt_1");
+    });
+
+    test("should handle null nested object in runtime value", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            user: createNestedProperty({
+              id: createMinMaxProperty({
+                "1,1000000": ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        { user: null },
+        specResponse
+      );
+
+      // null is not an object, so child value is undefined
+      // Non-numeric value fails min/max
+      expect(result.propertyResults["user"].children?.["id"].failedEventIds).toContain("evt_1");
+    });
+
+    test("should handle array as nested value (not treated as object)", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            data: createNestedProperty({
+              value: createPinnedValueProperty({
+                expected: ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        { data: ["array", "not", "object"] },
+        specResponse
+      );
+
+      // Array is not treated as object, so child value is undefined
+      expect(result.propertyResults["data"].children?.["value"].failedEventIds).toContain("evt_1");
+    });
+
+    test("should return empty result for nested property with no children constraints", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            metadata: createNestedProperty({}) // No children defined
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        { metadata: { any: "value" } },
+        specResponse
+      );
+
+      // No children constraints means no validation failures
+      expect(result.propertyResults["metadata"].children).toBeUndefined();
+      expect(result.propertyResults["metadata"].failedEventIds).toBeUndefined();
+    });
+
+    test("should handle extra runtime properties not in spec", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            settings: createNestedProperty({
+              visible: createPinnedValueProperty({
+                true: ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        {
+          settings: {
+            visible: true,
+            extra_prop: "not in spec" // Extra property
+          }
+        },
+        specResponse
+      );
+
+      // Only visible is validated
+      expect(result.propertyResults["settings"].children?.["visible"].failedEventIds).toBeUndefined();
+      // extra_prop is not validated (not in spec)
+      expect(result.propertyResults["settings"].children?.["extra_prop"]).toBeUndefined();
+    });
+  });
+
+  describe("Nested Properties with Multiple Events", () => {
+    test("should validate nested properties against all events", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            shipping: createNestedProperty({
+              type: createPinnedValueProperty({
+                standard: ["evt_1"]
+              })
+            })
+          }
+        }),
+        createEventSpecEntry({
+          baseEventId: "evt_2",
+          variantIds: [],
+          props: {
+            shipping: createNestedProperty({
+              type: createPinnedValueProperty({
+                express: ["evt_2"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        { shipping: { type: "standard" } },
+        specResponse
+      );
+
+      // evt_1 passes (standard), evt_2 fails (express !== standard)
+      const typeValidation = result.propertyResults["shipping"].children?.["type"];
+      if (typeValidation?.failedEventIds) {
+        expect(typeValidation.failedEventIds).toContain("evt_2");
+        expect(typeValidation.failedEventIds).not.toContain("evt_1");
+      } else if (typeValidation?.passedEventIds) {
+        expect(typeValidation.passedEventIds).toContain("evt_1");
+        expect(typeValidation.passedEventIds).not.toContain("evt_2");
+      }
+    });
   });
 });

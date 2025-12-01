@@ -66,6 +66,12 @@ function parsePropertyConstraints(wire: PropertyConstraintsWire): PropertyConstr
   if (wire.minmax) {
     result.minMaxRanges = wire.minmax;
   }
+  if (wire.children) {
+    result.children = {};
+    for (const [propName, childWire] of Object.entries(wire.children)) {
+      result.children[propName] = parsePropertyConstraints(childWire);
+    }
+  }
 
   return result;
 }

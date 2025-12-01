@@ -2,7 +2,7 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
-import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
+import type { EventSpecResponse, EventSpecResponseWire } from "../eventSpec/AvoEventSpecFetchTypes";
 
 // Mock dependencies
 jest.mock("../AvoStorage", () => ({
@@ -553,6 +553,339 @@ describe("Validation Integration", () => {
       // Should send immediately, not batch
       expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
       expect(batcherHandleTrackSchemaSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Nested Property Validation", () => {
+    // Mock spec response with nested properties (internal format - as parsed from wire)
+    const nestedEventSpecResponse: EventSpecResponse = {
+      events: [{
+        branchId: "main",
+        baseEventId: "evt_purchase",
+        variantIds: ["evt_purchase.v1", "evt_purchase.v2"],
+        props: {
+          amount: {
+            type: "float",
+            required: true,
+            minMaxRanges: { "0.01,10000": ["evt_purchase", "evt_purchase.v1", "evt_purchase.v2"] }
+          },
+          payment_method: {
+            type: "string",
+            required: true,
+            pinnedValues: { "credit_card": ["evt_purchase.v1"], "paypal": ["evt_purchase.v2"] }
+          },
+          category: {
+            type: "string",
+            required: true,
+            allowedValues: {
+              "[\"clothing\",\"electronics\",\"home\"]": ["evt_purchase", "evt_purchase.v1"],
+              "[\"electronics\",\"home\"]": ["evt_purchase.v2"]
+            }
+          },
+          user: {
+            type: "object",
+            required: true,
+            children: {
+              id: {
+                type: "string",
+                required: true,
+                regexPatterns: { "^usr_[a-z0-9]{8}$": ["evt_purchase", "evt_purchase.v1", "evt_purchase.v2"] }
+              },
+              tier: {
+                type: "string",
+                required: false,
+                allowedValues: {
+                  "[\"enterprise\",\"free\",\"premium\"]": ["evt_purchase", "evt_purchase.v1"],
+                  "[\"enterprise\",\"premium\"]": ["evt_purchase.v2"]
+                }
+              }
+            }
+          },
+          shipping: {
+            type: "object",
+            required: false,
+            children: {
+              method: {
+                type: "string",
+                required: true,
+                allowedValues: { "[\"express\",\"standard\"]": ["evt_purchase", "evt_purchase.v1", "evt_purchase.v2"] }
+              },
+              address: {
+                type: "object",
+                required: true,
+                children: {
+                  country: {
+                    type: "string",
+                    required: true,
+                    allowedValues: { "[\"CA\",\"UK\",\"US\"]": ["evt_purchase", "evt_purchase.v1", "evt_purchase.v2"] }
+                  },
+                  zip: {
+                    type: "string",
+                    required: false,
+                    regexPatterns: { "^[0-9]{5}$": ["evt_purchase", "evt_purchase.v1", "evt_purchase.v2"] }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }],
+      metadata: {
+        schemaId: "schema_abc123",
+        branchId: "main",
+        latestActionId: "action_xyz789",
+        sourceId: "source_web"
+      }
+    };
+
+    beforeEach(() => {
+      (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(nestedEventSpecResponse),
+        set: jest.fn()
+      }));
+
+      (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(nestedEventSpecResponse)
+      }));
+    });
+
+    test("should validate nested properties and include validation results in children", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Track event with nested properties - some valid, some invalid
+      await inspector.trackSchemaFromEvent("Purchase Completed", {
+        amount: 99.99,                    // valid (in range)
+        payment_method: "credit_card",    // valid for v1, fails v2 (paypal) and base (no pinned)
+        category: "clothing",             // valid for base+v1, fails v2 (not in its list)
+        user: {
+          id: "usr_abc12345",             // valid (matches regex)
+          tier: "free"                    // valid for base+v1, fails v2 (free not allowed)
+        },
+        shipping: {
+          method: "express",              // valid (in allowed list)
+          address: {
+            country: "US",                // valid (in allowed list)
+            zip: "12345"                  // valid (matches regex)
+          }
+        }
+      });
+
+      expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Verify metadata is present
+      expect(eventBody.eventSpecMetadata).toEqual({
+        schemaId: "schema_abc123",
+        branchId: "main",
+        latestActionId: "action_xyz789",
+        sourceId: "source_web"
+      });
+
+      // Find the user property
+      const userProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "user"
+      );
+      expect(userProp).toBeDefined();
+      expect(userProp.propertyType).toBe("object");
+      expect(userProp.children).toBeDefined();
+      expect(Array.isArray(userProp.children)).toBe(true);
+
+      // Find user.tier in children - should have validation results
+      const tierChild = userProp.children.find(
+        (c: any) => c.propertyName === "tier"
+      );
+      expect(tierChild).toBeDefined();
+      // "free" is valid for base+v1, fails for v2
+      expect(tierChild.failedEventIds || tierChild.passedEventIds).toBeDefined();
+
+      // Find the shipping property
+      const shippingProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "shipping"
+      );
+      expect(shippingProp).toBeDefined();
+      expect(shippingProp.children).toBeDefined();
+
+      // Find shipping.address (nested object)
+      const addressChild = shippingProp.children.find(
+        (c: any) => c.propertyName === "address"
+      );
+      expect(addressChild).toBeDefined();
+      expect(addressChild.propertyType).toBe("object");
+      expect(addressChild.children).toBeDefined();
+
+      // Find shipping.address.zip (deeply nested)
+      const zipChild = addressChild.children.find(
+        (c: any) => c.propertyName === "zip"
+      );
+      expect(zipChild).toBeDefined();
+      // "12345" matches the regex, so no failures expected
+    });
+
+    test("should include failedEventIds on nested children when validation fails", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Track event with invalid nested values
+      await inspector.trackSchemaFromEvent("Purchase Completed", {
+        amount: 500,
+        payment_method: "bitcoin",        // invalid - not pinned for any variant
+        category: "electronics",
+        user: {
+          id: "invalid_id",               // invalid - doesn't match regex
+          tier: "basic"                   // invalid - not in any allowed list
+        },
+        shipping: {
+          method: "drone",                // invalid - not in allowed list
+          address: {
+            country: "FR",                // invalid - not in allowed list
+            zip: "ABCDE"                  // invalid - doesn't match regex
+          }
+        }
+      });
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Check user.id has failures (invalid regex)
+      const userProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "user"
+      );
+      const idChild = userProp.children.find(
+        (c: any) => c.propertyName === "id"
+      );
+      expect(idChild.failedEventIds).toBeDefined();
+      expect(idChild.failedEventIds).toContain("evt_purchase");
+      expect(idChild.failedEventIds).toContain("evt_purchase.v1");
+      expect(idChild.failedEventIds).toContain("evt_purchase.v2");
+
+      // Check user.tier has failures (not in any allowed list)
+      const tierChild = userProp.children.find(
+        (c: any) => c.propertyName === "tier"
+      );
+      expect(tierChild.failedEventIds).toBeDefined();
+
+      // Check shipping.address.zip has failures (invalid regex)
+      const shippingProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "shipping"
+      );
+      const addressChild = shippingProp.children.find(
+        (c: any) => c.propertyName === "address"
+      );
+      const zipChild = addressChild.children.find(
+        (c: any) => c.propertyName === "zip"
+      );
+      expect(zipChild.failedEventIds).toBeDefined();
+      expect(zipChild.failedEventIds).toContain("evt_purchase");
+    });
+
+    test("should produce correct inspector request structure for nested properties", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      await inspector.trackSchemaFromEvent("Purchase Completed", {
+        amount: 150.00,
+        payment_method: "credit_card",
+        category: "electronics",
+        user: {
+          id: "usr_abcd1234",
+          tier: "premium"
+        },
+        shipping: {
+          method: "standard",
+          address: {
+            country: "US",
+            zip: "90210"
+          }
+        }
+      });
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Verify overall structure
+      expect(eventBody.type).toBe("event");
+      expect(eventBody.eventName).toBe("Purchase Completed");
+      expect(eventBody.eventProperties).toBeDefined();
+      expect(Array.isArray(eventBody.eventProperties)).toBe(true);
+
+      // Verify nested structure matches expected format:
+      // {
+      //   propertyName: "user",
+      //   propertyType: "object",
+      //   children: [
+      //     { propertyName: "id", propertyType: "string", failedEventIds?: [...] },
+      //     { propertyName: "tier", propertyType: "string", passedEventIds?: [...] }
+      //   ]
+      // }
+
+      const userProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "user"
+      );
+
+      // User should be an object with children array
+      expect(userProp.propertyType).toBe("object");
+      expect(Array.isArray(userProp.children)).toBe(true);
+      expect(userProp.children.length).toBe(2);
+
+      // Each child should have propertyName and propertyType
+      for (const child of userProp.children) {
+        expect(child.propertyName).toBeDefined();
+        expect(child.propertyType).toBeDefined();
+      }
+
+      // Verify deeply nested structure (shipping.address.country)
+      const shippingProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "shipping"
+      );
+      expect(shippingProp.propertyType).toBe("object");
+
+      const addressChild = shippingProp.children.find(
+        (c: any) => c.propertyName === "address"
+      );
+      expect(addressChild.propertyType).toBe("object");
+      expect(Array.isArray(addressChild.children)).toBe(true);
+
+      const countryChild = addressChild.children.find(
+        (c: any) => c.propertyName === "country"
+      );
+      expect(countryChild.propertyName).toBe("country");
+      expect(countryChild.propertyType).toBe("string");
     });
   });
 });

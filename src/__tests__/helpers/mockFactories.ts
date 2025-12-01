@@ -198,3 +198,18 @@ export function createMultiEventSpecResponse(): EventSpecResponse {
     })
   ]);
 }
+
+/**
+ * Creates a property with nested children constraints.
+ * children maps each child property name to its PropertyConstraints.
+ */
+export function createNestedProperty(
+  children: Record<string, PropertyConstraints>,
+  extraOverrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
+  return createPropertyConstraints({
+    type: "object",
+    children,
+    ...extraOverrides
+  });
+}

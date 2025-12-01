@@ -20,6 +20,159 @@ import type {
 } from "./AvoEventSpecFetchTypes";
 
 // =============================================================================
+// HELPER FUNCTIONS FOR NESTED PROPERTIES
+// =============================================================================
+
+/**
+ * Deep copies children constraints recursively.
+ */
+function deepCopyChildren(
+  children: Record<string, PropertyConstraints>
+): Record<string, PropertyConstraints> {
+  const result: Record<string, PropertyConstraints> = {};
+  for (const [propName, constraints] of Object.entries(children)) {
+    result[propName] = {
+      type: constraints.type,
+      required: constraints.required,
+      pinnedValues: constraints.pinnedValues
+        ? { ...constraints.pinnedValues }
+        : undefined,
+      allowedValues: constraints.allowedValues
+        ? { ...constraints.allowedValues }
+        : undefined,
+      regexPatterns: constraints.regexPatterns
+        ? { ...constraints.regexPatterns }
+        : undefined,
+      minMaxRanges: constraints.minMaxRanges
+        ? { ...constraints.minMaxRanges }
+        : undefined,
+      children: constraints.children
+        ? deepCopyChildren(constraints.children)
+        : undefined
+    };
+  }
+  return result;
+}
+
+/**
+ * Merges children constraints from source into target recursively.
+ */
+function mergeChildren(
+  target: Record<string, PropertyConstraints>,
+  source: Record<string, PropertyConstraints>
+): void {
+  for (const [propName, sourceConstraints] of Object.entries(source)) {
+    if (!target[propName]) {
+      // New child property - deep copy it
+      target[propName] = {
+        type: sourceConstraints.type,
+        required: sourceConstraints.required,
+        pinnedValues: sourceConstraints.pinnedValues
+          ? { ...sourceConstraints.pinnedValues }
+          : undefined,
+        allowedValues: sourceConstraints.allowedValues
+          ? { ...sourceConstraints.allowedValues }
+          : undefined,
+        regexPatterns: sourceConstraints.regexPatterns
+          ? { ...sourceConstraints.regexPatterns }
+          : undefined,
+        minMaxRanges: sourceConstraints.minMaxRanges
+          ? { ...sourceConstraints.minMaxRanges }
+          : undefined,
+        children: sourceConstraints.children
+          ? deepCopyChildren(sourceConstraints.children)
+          : undefined
+      };
+    } else {
+      // Merge into existing child property
+      const targetConstraints = target[propName];
+      mergeConstraintMappings(targetConstraints, sourceConstraints);
+      // Recursively merge nested children
+      if (sourceConstraints.children) {
+        if (!targetConstraints.children) {
+          targetConstraints.children = deepCopyChildren(sourceConstraints.children);
+        } else {
+          mergeChildren(targetConstraints.children, sourceConstraints.children);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Merges constraint mappings (pinnedValues, allowedValues, etc.) from source into target.
+ */
+function mergeConstraintMappings(
+  target: PropertyConstraints,
+  source: PropertyConstraints
+): void {
+  if (source.pinnedValues) {
+    if (!target.pinnedValues) {
+      target.pinnedValues = {};
+    }
+    for (const key of Object.keys(source.pinnedValues)) {
+      if (target.pinnedValues[key]) {
+        const merged = new Set(target.pinnedValues[key]);
+        for (const id of source.pinnedValues[key]) {
+          merged.add(id);
+        }
+        target.pinnedValues[key] = Array.from(merged);
+      } else {
+        target.pinnedValues[key] = source.pinnedValues[key];
+      }
+    }
+  }
+  if (source.allowedValues) {
+    if (!target.allowedValues) {
+      target.allowedValues = {};
+    }
+    for (const key of Object.keys(source.allowedValues)) {
+      if (target.allowedValues[key]) {
+        const merged = new Set(target.allowedValues[key]);
+        for (const id of source.allowedValues[key]) {
+          merged.add(id);
+        }
+        target.allowedValues[key] = Array.from(merged);
+      } else {
+        target.allowedValues[key] = source.allowedValues[key];
+      }
+    }
+  }
+  if (source.regexPatterns) {
+    if (!target.regexPatterns) {
+      target.regexPatterns = {};
+    }
+    for (const key of Object.keys(source.regexPatterns)) {
+      if (target.regexPatterns[key]) {
+        const merged = new Set(target.regexPatterns[key]);
+        for (const id of source.regexPatterns[key]) {
+          merged.add(id);
+        }
+        target.regexPatterns[key] = Array.from(merged);
+      } else {
+        target.regexPatterns[key] = source.regexPatterns[key];
+      }
+    }
+  }
+  if (source.minMaxRanges) {
+    if (!target.minMaxRanges) {
+      target.minMaxRanges = {};
+    }
+    for (const key of Object.keys(source.minMaxRanges)) {
+      if (target.minMaxRanges[key]) {
+        const merged = new Set(target.minMaxRanges[key]);
+        for (const id of source.minMaxRanges[key]) {
+          merged.add(id);
+        }
+        target.minMaxRanges[key] = Array.from(merged);
+      } else {
+        target.minMaxRanges[key] = source.minMaxRanges[key];
+      }
+    }
+  }
+}
+
+// =============================================================================
 // TYPES
 // =============================================================================
 
@@ -179,77 +332,21 @@ function collectConstraintsByPropertyName(
             : undefined,
           minMaxRanges: constraints.minMaxRanges
             ? { ...constraints.minMaxRanges }
+            : undefined,
+          children: constraints.children
+            ? deepCopyChildren(constraints.children)
             : undefined
         };
       } else {
         // Aggregate constraint mappings from additional events
         const existing = result[propName];
-        if (constraints.pinnedValues) {
-          if (!existing.pinnedValues) {
-            existing.pinnedValues = {};
-          }
-          for (const key of Object.keys(constraints.pinnedValues)) {
-            if (existing.pinnedValues[key]) {
-              // Merge and deduplicate eventIds
-              const merged = new Set(existing.pinnedValues[key]);
-              for (const id of constraints.pinnedValues[key]) {
-                merged.add(id);
-              }
-              existing.pinnedValues[key] = Array.from(merged);
-            } else {
-              existing.pinnedValues[key] = constraints.pinnedValues[key];
-            }
-          }
-        }
-        if (constraints.allowedValues) {
-          if (!existing.allowedValues) {
-            existing.allowedValues = {};
-          }
-          for (const key of Object.keys(constraints.allowedValues)) {
-            if (existing.allowedValues[key]) {
-              // Merge and deduplicate eventIds
-              const merged = new Set(existing.allowedValues[key]);
-              for (const id of constraints.allowedValues[key]) {
-                merged.add(id);
-              }
-              existing.allowedValues[key] = Array.from(merged);
-            } else {
-              existing.allowedValues[key] = constraints.allowedValues[key];
-            }
-          }
-        }
-        if (constraints.regexPatterns) {
-          if (!existing.regexPatterns) {
-            existing.regexPatterns = {};
-          }
-          for (const key of Object.keys(constraints.regexPatterns)) {
-            if (existing.regexPatterns[key]) {
-              // Merge and deduplicate eventIds
-              const merged = new Set(existing.regexPatterns[key]);
-              for (const id of constraints.regexPatterns[key]) {
-                merged.add(id);
-              }
-              existing.regexPatterns[key] = Array.from(merged);
-            } else {
-              existing.regexPatterns[key] = constraints.regexPatterns[key];
-            }
-          }
-        }
-        if (constraints.minMaxRanges) {
-          if (!existing.minMaxRanges) {
-            existing.minMaxRanges = {};
-          }
-          for (const key of Object.keys(constraints.minMaxRanges)) {
-            if (existing.minMaxRanges[key]) {
-              // Merge and deduplicate eventIds
-              const merged = new Set(existing.minMaxRanges[key]);
-              for (const id of constraints.minMaxRanges[key]) {
-                merged.add(id);
-              }
-              existing.minMaxRanges[key] = Array.from(merged);
-            } else {
-              existing.minMaxRanges[key] = constraints.minMaxRanges[key];
-            }
+        mergeConstraintMappings(existing, constraints);
+        // Recursively merge nested children
+        if (constraints.children) {
+          if (!existing.children) {
+            existing.children = deepCopyChildren(constraints.children);
+          } else {
+            mergeChildren(existing.children, constraints.children);
           }
         }
       }
@@ -263,12 +360,44 @@ function collectConstraintsByPropertyName(
  * Validates a property value against its constraints.
  * Returns the validation result with either failedEventIds or passedEventIds
  * (whichever is smaller for bandwidth optimization).
+ *
+ * For object properties with children:
+ * - Skip value-level validation (pinned/allowed/regex/minmax)
+ * - Recursively validate child properties
  */
 function validatePropertyConstraints(
   value: RuntimePropertyValue,
   constraints: PropertyConstraints,
   allEventIds: string[]
 ): PropertyValidationResult {
+  const result: PropertyValidationResult = {};
+
+  // Handle nested object properties with children
+  if (constraints.children) {
+    // For object properties, recursively validate children
+    // Object properties themselves have no value constraints to validate
+    const childrenResults: Record<string, PropertyValidationResult> = {};
+    const valueObj = (typeof value === "object" && value !== null && !Array.isArray(value))
+      ? (value as Record<string, RuntimePropertyValue>)
+      : {};
+
+    for (const [childName, childConstraints] of Object.entries(constraints.children)) {
+      const childValue = valueObj[childName];
+      const childResult = validatePropertyConstraints(childValue, childConstraints, allEventIds);
+      // Only include non-empty results
+      if (childResult.failedEventIds || childResult.passedEventIds || childResult.children) {
+        childrenResults[childName] = childResult;
+      }
+    }
+
+    if (Object.keys(childrenResults).length > 0) {
+      result.children = childrenResults;
+    }
+
+    return result;
+  }
+
+  // Validate value constraints for non-object properties
   const failedIds = new Set<string>();
 
   // Check pinned values
