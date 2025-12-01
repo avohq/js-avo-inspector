@@ -32,7 +32,7 @@ class MockXMLHttpRequest {
         this.responseText = responseBody;
         this.response = responseBody;
         if (this.onload) this.onload();
-      } else if (this.url.includes("/getEventSpec")) {
+      } else if (this.url.includes("/trackingPlan/eventSpec")) {
         // Mock event spec endpoint response (wire format)
         this.status = 200;
         const mockSpec: EventSpecResponseWire = {

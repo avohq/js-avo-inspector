@@ -83,8 +83,8 @@ function parsePropertyConstraints(wire: PropertyConstraintsWire): PropertyConstr
 /**
  * EventSpecFetcher handles fetching event specifications from the Avo API.
  *
- * Endpoint: GET /getEventSpec
- * Base URL: https://us-central1-avo-web-app.cloudfunctions.net
+ * Endpoint: GET /trackingPlan/eventSpec
+ * Base URL: https://api.avo.app
  */
 export class AvoEventSpecFetcher {
   /** Base URL for the event spec API */
@@ -102,7 +102,7 @@ export class AvoEventSpecFetcher {
     timeout: number = 2000,
     shouldLog: boolean = false,
     env: string,
-    baseUrl: string = "https://us-central1-avo-web-app.cloudfunctions.net"
+    baseUrl: string = "https://api.avo.app"
   ) {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
@@ -214,7 +214,7 @@ export class AvoEventSpecFetcher {
       streamId: params.streamId,
       eventName: params.eventName
     });
-    return `${this.baseUrl}/getEventSpec?${queryParams.toString()}`;
+    return `${this.baseUrl}/trackingPlan/eventSpec?${queryParams.toString()}`;
   }
 
   /**
