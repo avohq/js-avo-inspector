@@ -24,6 +24,20 @@ import type {
 // =============================================================================
 
 /**
+ * Deep copies a constraint mapping (pinnedValues, allowedValues, etc.),
+ * including the arrays inside to avoid shared references.
+ */
+function deepCopyConstraintMapping(
+  mapping: Record<string, string[]>
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  for (const [key, arr] of Object.entries(mapping)) {
+    result[key] = [...arr];
+  }
+  return result;
+}
+
+/**
  * Deep copies children constraints recursively.
  */
 function deepCopyChildren(
@@ -35,16 +49,16 @@ function deepCopyChildren(
       type: constraints.type,
       required: constraints.required,
       pinnedValues: constraints.pinnedValues
-        ? { ...constraints.pinnedValues }
+        ? deepCopyConstraintMapping(constraints.pinnedValues)
         : undefined,
       allowedValues: constraints.allowedValues
-        ? { ...constraints.allowedValues }
+        ? deepCopyConstraintMapping(constraints.allowedValues)
         : undefined,
       regexPatterns: constraints.regexPatterns
-        ? { ...constraints.regexPatterns }
+        ? deepCopyConstraintMapping(constraints.regexPatterns)
         : undefined,
       minMaxRanges: constraints.minMaxRanges
-        ? { ...constraints.minMaxRanges }
+        ? deepCopyConstraintMapping(constraints.minMaxRanges)
         : undefined,
       children: constraints.children
         ? deepCopyChildren(constraints.children)
@@ -68,16 +82,16 @@ function mergeChildren(
         type: sourceConstraints.type,
         required: sourceConstraints.required,
         pinnedValues: sourceConstraints.pinnedValues
-          ? { ...sourceConstraints.pinnedValues }
+          ? deepCopyConstraintMapping(sourceConstraints.pinnedValues)
           : undefined,
         allowedValues: sourceConstraints.allowedValues
-          ? { ...sourceConstraints.allowedValues }
+          ? deepCopyConstraintMapping(sourceConstraints.allowedValues)
           : undefined,
         regexPatterns: sourceConstraints.regexPatterns
-          ? { ...sourceConstraints.regexPatterns }
+          ? deepCopyConstraintMapping(sourceConstraints.regexPatterns)
           : undefined,
         minMaxRanges: sourceConstraints.minMaxRanges
-          ? { ...sourceConstraints.minMaxRanges }
+          ? deepCopyConstraintMapping(sourceConstraints.minMaxRanges)
           : undefined,
         children: sourceConstraints.children
           ? deepCopyChildren(sourceConstraints.children)
@@ -118,7 +132,7 @@ function mergeConstraintMappings(
         }
         target.pinnedValues[key] = Array.from(merged);
       } else {
-        target.pinnedValues[key] = source.pinnedValues[key];
+        target.pinnedValues[key] = [...source.pinnedValues[key]];
       }
     }
   }
@@ -134,7 +148,7 @@ function mergeConstraintMappings(
         }
         target.allowedValues[key] = Array.from(merged);
       } else {
-        target.allowedValues[key] = source.allowedValues[key];
+        target.allowedValues[key] = [...source.allowedValues[key]];
       }
     }
   }
@@ -150,7 +164,7 @@ function mergeConstraintMappings(
         }
         target.regexPatterns[key] = Array.from(merged);
       } else {
-        target.regexPatterns[key] = source.regexPatterns[key];
+        target.regexPatterns[key] = [...source.regexPatterns[key]];
       }
     }
   }
@@ -166,7 +180,7 @@ function mergeConstraintMappings(
         }
         target.minMaxRanges[key] = Array.from(merged);
       } else {
-        target.minMaxRanges[key] = source.minMaxRanges[key];
+        target.minMaxRanges[key] = [...source.minMaxRanges[key]];
       }
     }
   }
@@ -356,6 +370,9 @@ function collectConstraintsByPropertyName(
   return result;
 }
 
+/** Maximum nesting depth for recursive validation to prevent stack overflow */
+const MAX_VALIDATION_DEPTH = 100;
+
 /**
  * Validates a property value against its constraints.
  * Returns the validation result with either failedEventIds or passedEventIds
@@ -364,13 +381,22 @@ function collectConstraintsByPropertyName(
  * For object properties with children:
  * - Skip value-level validation (pinned/allowed/regex/minmax)
  * - Recursively validate child properties
+ *
+ * @param depth - Current recursion depth (internal use)
  */
 function validatePropertyConstraints(
   value: RuntimePropertyValue,
   constraints: PropertyConstraints,
-  allEventIds: string[]
+  allEventIds: string[],
+  depth: number = 0
 ): PropertyValidationResult {
   const result: PropertyValidationResult = {};
+
+  // Guard against excessive nesting (potential malformed spec or DoS)
+  if (depth > MAX_VALIDATION_DEPTH) {
+    console.warn(`[Avo Inspector] Max validation depth (${MAX_VALIDATION_DEPTH}) exceeded, stopping recursive validation`);
+    return result;
+  }
 
   // Handle nested object properties with children
   if (constraints.children) {
@@ -383,7 +409,7 @@ function validatePropertyConstraints(
 
     for (const [childName, childConstraints] of Object.entries(constraints.children)) {
       const childValue = valueObj[childName];
-      const childResult = validatePropertyConstraints(childValue, childConstraints, allEventIds);
+      const childResult = validatePropertyConstraints(childValue, childConstraints, allEventIds, depth + 1);
       // Only include non-empty results
       if (childResult.failedEventIds || childResult.passedEventIds || childResult.children) {
         childrenResults[childName] = childResult;
