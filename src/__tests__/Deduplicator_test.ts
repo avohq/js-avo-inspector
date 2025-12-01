@@ -19,9 +19,9 @@ describe("Deduplicator", () => {
   };
 
   beforeAll(() => {
-    (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+    jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
       fetch: jest.fn().mockResolvedValue(null)
-    }));
+    }) as any);
   });
 
   test("AvoDeduplicator.deepEqual tests", () => {
