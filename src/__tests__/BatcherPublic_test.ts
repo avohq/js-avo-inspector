@@ -26,9 +26,9 @@ describe("Batcher", () => {
   beforeAll(() => {
     // Mock eventSpecFetcher to return null (no spec available)
     // so the batched flow is used
-    (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+    jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
       fetch: jest.fn().mockResolvedValue(null)
-    }));
+    }) as any);
 
     inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
