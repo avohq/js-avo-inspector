@@ -129,8 +129,10 @@ export interface EventSpecMetadata {
 export interface EventSpecCacheEntry {
   /** The cached event specification response (internal format) */
   spec: EventSpecResponse;
-  /** Timestamp when this entry was cached */
+  /** Timestamp when this entry was cached (used for TTL expiration) */
   timestamp: number;
+  /** Timestamp when this entry was last accessed (used for LRU eviction) */
+  lastAccessed: number;
   /** Number of cache hits since this entry was cached */
   eventCount: number;
 }
