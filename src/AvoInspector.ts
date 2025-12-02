@@ -624,7 +624,8 @@ export class AvoInspector {
       eventSchema,
       eventId,
       eventHash,
-      validationResult.metadata ?? undefined
+      validationResult.metadata ?? undefined,
+      validationResult.metadata?.branchId
     );
 
     // Send immediately (bypass batching)

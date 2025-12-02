@@ -60,6 +60,9 @@ export interface EventSchemaBody extends BaseBody {
   // Legacy fields
   avoFunction: boolean;
   eventHash: string | null;
+
+  /** Branch ID from getEventSpec response when value validation was performed */
+  validatedBranchId?: string;
 }
 
 export class AvoNetworkCallsHandler {
@@ -175,7 +178,8 @@ export class AvoNetworkCallsHandler {
     eventProperties: EventProperty[],
     eventId: string | null,
     eventHash: string | null,
-    eventSpecMetadata?: EventSpecMetadata
+    eventSpecMetadata?: EventSpecMetadata,
+    validatedBranchId?: string
   ): EventSchemaBody {
     const eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
@@ -195,6 +199,11 @@ export class AvoNetworkCallsHandler {
     // Set metadata on base body if provided
     if (eventSpecMetadata) {
       eventSchemaBody.eventSpecMetadata = eventSpecMetadata;
+    }
+
+    // Set validated branch ID if value validation was performed
+    if (validatedBranchId) {
+      eventSchemaBody.validatedBranchId = validatedBranchId;
     }
 
     return eventSchemaBody;
