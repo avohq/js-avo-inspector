@@ -6,7 +6,7 @@ import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
 import { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
 import { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
-import { AvoAnonymousId } from "./AvoAnonymousId";
+import { AvoStreamId } from "./AvoStreamId";
 import { validateEvent } from "./eventSpec/EventValidator";
 
 import { isValueEmpty } from "./utils";
@@ -133,7 +133,7 @@ export class AvoInspector {
     this.avoDeduplicator = new AvoDeduplicator();
 
     this.publicEncryptionKey = options.publicEncryptionKey;
-    this.streamId = AvoAnonymousId.anonymousId;
+    this.streamId = AvoStreamId.streamId;
 
     // Enable event spec fetching if streamId is present (and not "unknown")
     if (this.streamId) {
