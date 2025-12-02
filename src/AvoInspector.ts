@@ -6,11 +6,11 @@ import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
 import { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
 import { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
-import { AvoAnonymousId } from "./AvoAnonymousId";
+import { AvoStreamId } from "./AvoStreamId";
 import { validateEvent } from "./eventSpec/EventValidator";
 
 import { isValueEmpty } from "./utils";
-import type { EventSpecResponse, ValidationResult } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { EventSpecResponse, ValidationResult, PropertyValidationResult } from "./eventSpec/AvoEventSpecFetchTypes";
 
 const libVersion = require("../package.json").version;
 
@@ -133,7 +133,7 @@ export class AvoInspector {
     this.avoDeduplicator = new AvoDeduplicator();
 
     this.publicEncryptionKey = options.publicEncryptionKey;
-    this.streamId = AvoAnonymousId.anonymousId;
+    this.streamId = AvoStreamId.streamId;
 
     // Enable event spec fetching if streamId is present (and not "unknown")
     if (this.streamId) {
@@ -522,6 +522,7 @@ export class AvoInspector {
   /**
    * Merges validation results into the event schema.
    * Adds failedEventIds or passedEventIds to each property based on validation.
+   * Recursively merges validation results for nested children.
    */
   private mergeValidationResults(
     eventSchema: Array<{
@@ -533,32 +534,59 @@ export class AvoInspector {
     validationResult: ValidationResult
   ): EventProperty[] {
     return eventSchema.map((prop) => {
-      const result: EventProperty = {
-        propertyName: prop.propertyName,
-        propertyType: prop.propertyType
-      };
-
-      if (prop.encryptedPropertyValue) {
-        result.encryptedPropertyValue = prop.encryptedPropertyValue;
-      }
-
-      if (prop.children) {
-        result.children = prop.children;
-      }
-
-      // Add validation result for this property
       const propValidation = validationResult.propertyResults[prop.propertyName];
-      if (propValidation) {
-        if (propValidation.failedEventIds) {
-          result.failedEventIds = propValidation.failedEventIds;
-        }
-        if (propValidation.passedEventIds) {
-          result.passedEventIds = propValidation.passedEventIds;
-        }
-      }
-
-      return result;
+      return this.mergePropertyValidation(prop, propValidation);
     });
+  }
+
+  /**
+   * Merges validation result into a single property, recursively handling children.
+   */
+  private mergePropertyValidation(
+    prop: {
+      propertyName: string;
+      propertyType: string;
+      encryptedPropertyValue?: string;
+      children?: any;
+    },
+    propValidation?: PropertyValidationResult
+  ): EventProperty {
+    const result: EventProperty = {
+      propertyName: prop.propertyName,
+      propertyType: prop.propertyType
+    };
+
+    if (prop.encryptedPropertyValue) {
+      result.encryptedPropertyValue = prop.encryptedPropertyValue;
+    }
+
+    // Recursively merge validation results into children
+    if (prop.children && Array.isArray(prop.children)) {
+      result.children = prop.children.map((child: any) => {
+        // Children can be strings (for array types) or objects (for nested properties)
+        if (typeof child === 'string') {
+          return child;
+        }
+        if (child && typeof child === 'object' && child.propertyName) {
+          // Get nested validation result for this child
+          const childValidation = propValidation?.children?.[child.propertyName];
+          return this.mergePropertyValidation(child, childValidation);
+        }
+        return child;
+      });
+    }
+
+    // Add validation result for this property
+    if (propValidation) {
+      if (propValidation.failedEventIds) {
+        result.failedEventIds = propValidation.failedEventIds;
+      }
+      if (propValidation.passedEventIds) {
+        result.passedEventIds = propValidation.passedEventIds;
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -596,7 +624,8 @@ export class AvoInspector {
       eventSchema,
       eventId,
       eventHash,
-      validationResult.metadata ?? undefined
+      validationResult.metadata ?? undefined,
+      validationResult.metadata?.branchId
     );
 
     // Send immediately (bypass batching)

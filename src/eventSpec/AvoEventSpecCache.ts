@@ -79,6 +79,9 @@ export class EventSpecCache {
       console.log(`[EventSpecCache] Cache hit for key: ${key}`);
     }
 
+    // Update lastAccessed for LRU (Least Recently Used) eviction
+    entry.lastAccessed = Date.now();
+
     // Increment hit count for this entry
     entry.eventCount++;
     this.globalEventCount++;
@@ -103,9 +106,11 @@ export class EventSpecCache {
   ): void {
     const key = this.generateKey(apiKey, streamId, eventName);
 
+    const now = Date.now();
     const entry: EventSpecCacheEntry = {
       spec,
-      timestamp: Date.now(),
+      timestamp: now,
+      lastAccessed: now,
       eventCount: 0
     };
 
@@ -131,7 +136,7 @@ export class EventSpecCache {
   }
 
   /**
-   * Evicts the oldest cache entry based on timestamp.
+   * Evicts the least recently used cache entry based on lastAccessed timestamp.
    * This implements the LRU (Least Recently Used) eviction policy.
    */
   private evictOldest(): void {
@@ -139,22 +144,22 @@ export class EventSpecCache {
       return;
     }
 
-    let oldestKey: string | null = null;
-    let oldestTimestamp = Infinity;
+    let lruKey: string | null = null;
+    let oldestAccessTime = Infinity;
 
-    // Find the entry with the oldest timestamp
+    // Find the entry with the oldest lastAccessed time (least recently used)
     this.cache.forEach((entry, key) => {
-      if (entry.timestamp < oldestTimestamp) {
-        oldestTimestamp = entry.timestamp;
-        oldestKey = key;
+      if (entry.lastAccessed < oldestAccessTime) {
+        oldestAccessTime = entry.lastAccessed;
+        lruKey = key;
       }
     });
 
-    // Remove the oldest entry
-    if (oldestKey !== null) {
-      this.cache.delete(oldestKey);
+    // Remove the least recently used entry
+    if (lruKey !== null) {
+      this.cache.delete(lruKey);
       if (this.shouldLog) {
-        console.log(`[EventSpecCache] Evicted oldest entry: ${oldestKey}`);
+        console.log(`[EventSpecCache] Evicted LRU entry: ${lruKey}`);
       }
     }
   }
@@ -183,15 +188,16 @@ export class EventSpecCache {
   getStats(): {
     size: number;
     globalEventCount: number;
-    entries: Array<{ key: string; age: number; eventCount: number }>;
+    entries: Array<{ key: string; age: number; lastAccessedAgo: number; eventCount: number }>;
   } {
-    const entries: Array<{ key: string; age: number; eventCount: number }> = [];
+    const entries: Array<{ key: string; age: number; lastAccessedAgo: number; eventCount: number }> = [];
     const now = Date.now();
 
     this.cache.forEach((entry, key) => {
       entries.push({
         key,
         age: now - entry.timestamp,
+        lastAccessedAgo: now - entry.lastAccessed,
         eventCount: entry.eventCount
       });
     });

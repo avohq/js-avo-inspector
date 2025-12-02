@@ -21,6 +21,8 @@ export interface PropertyConstraintsWire {
   rx?: Record<string, Array<string>>;
   /** Min/max ranges: "min,max" -> eventIds that require value in this range */
   minmax?: Record<string, Array<string>>;
+  /** Nested property constraints for object properties */
+  children?: Record<string, PropertyConstraintsWire>;
 }
 
 /**
@@ -67,6 +69,8 @@ export interface PropertyConstraints {
   regexPatterns?: Record<string, Array<string>>;
   /** Min/max ranges: "min,max" -> eventIds that require value in this range */
   minMaxRanges?: Record<string, Array<string>>;
+  /** Nested property constraints for object properties */
+  children?: Record<string, PropertyConstraints>;
 }
 
 /**
@@ -111,8 +115,10 @@ export interface EventSpecMetadata {
 export interface EventSpecCacheEntry {
   /** The cached event specification response (internal format) */
   spec: EventSpecResponse;
-  /** Timestamp when this entry was cached */
+  /** Timestamp when this entry was cached (used for TTL expiration) */
   timestamp: number;
+  /** Timestamp when this entry was last accessed (used for LRU eviction) */
+  lastAccessed: number;
   /** Number of cache hits since this entry was cached */
   eventCount: number;
 }
@@ -136,6 +142,8 @@ export interface PropertyValidationResult {
   failedEventIds?: Array<string>;
   /** Event/variant IDs that PASSED validation (present if smaller than failed) */
   passedEventIds?: Array<string>;
+  /** Nested validation results for child properties of object properties */
+  children?: Record<string, PropertyValidationResult>;
 }
 
 /**

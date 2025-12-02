@@ -1,6 +1,6 @@
 import AvoGuid from "./AvoGuid";
 import { AvoInspector } from "./AvoInspector";
-import { AvoAnonymousId } from "./AvoAnonymousId";
+import { AvoStreamId } from "./AvoStreamId";
 import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
 
 /**
@@ -35,7 +35,7 @@ export interface BaseBody {
   trackingId: string;
   createdAt: string;
   sessionId: string;
-  anonymousId: string;
+  streamId: string;
   samplingRate: number;
   /** Event spec metadata from EventSpecResponse (moved from EventSchemaBody) */
   eventSpecMetadata?: EventSpecMetadata;
@@ -60,6 +60,9 @@ export interface EventSchemaBody extends BaseBody {
   // Legacy fields
   avoFunction: boolean;
   eventHash: string | null;
+
+  /** Branch ID from getEventSpec response when value validation was performed */
+  validatedBranchId?: string;
 }
 
 export class AvoNetworkCallsHandler {
@@ -102,7 +105,7 @@ export class AvoNetworkCallsHandler {
     }
 
     const events = inEvents.filter((x) => x != null);
-    this.fixAnonymousIds(events);
+    this.fixStreamIds(events);
 
     if (events.length === 0) {
       return;
@@ -140,25 +143,25 @@ export class AvoNetworkCallsHandler {
     });
   }
 
-  private fixAnonymousIds(
+  private fixStreamIds(
     events: Array<SessionStartedBody | EventSchemaBody>
   ): void {
-    let knownAnonymousId: string | null = null;
+    let knownStreamId: string | null = null;
     events.forEach(function (event) {
       if (
-        event.anonymousId !== null &&
-        event.anonymousId !== undefined &&
-        event.anonymousId !== "unknown"
+        event.streamId !== null &&
+        event.streamId !== undefined &&
+        event.streamId !== "unknown"
       ) {
-        knownAnonymousId = event.anonymousId;
+        knownStreamId = event.streamId;
       }
     });
     events.forEach(function (event) {
-      if (event.anonymousId === "unknown") {
-        if (knownAnonymousId != null) {
-          event.anonymousId = knownAnonymousId;
+      if (event.streamId === "unknown") {
+        if (knownStreamId != null) {
+          event.streamId = knownStreamId;
         } else {
-          event.anonymousId = AvoAnonymousId.anonymousId;
+          event.streamId = AvoStreamId.streamId;
         }
       }
     });
@@ -175,7 +178,8 @@ export class AvoNetworkCallsHandler {
     eventProperties: EventProperty[],
     eventId: string | null,
     eventHash: string | null,
-    eventSpecMetadata?: EventSpecMetadata
+    eventSpecMetadata?: EventSpecMetadata,
+    validatedBranchId?: string
   ): EventSchemaBody {
     const eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
@@ -197,6 +201,11 @@ export class AvoNetworkCallsHandler {
       eventSchemaBody.eventSpecMetadata = eventSpecMetadata;
     }
 
+    // Set validated branch ID if value validation was performed
+    if (validatedBranchId) {
+      eventSchemaBody.validatedBranchId = validatedBranchId;
+    }
+
     return eventSchemaBody;
   }
 
@@ -212,7 +221,7 @@ export class AvoNetworkCallsHandler {
       trackingId: "",
       createdAt: new Date().toISOString(),
       sessionId: "",
-      anonymousId: AvoAnonymousId.anonymousId,
+      streamId: AvoStreamId.streamId,
       samplingRate: this.samplingRate
     };
   }
@@ -226,9 +235,9 @@ export class AvoNetworkCallsHandler {
     eventBody: EventSchemaBody,
     onCompleted: (error: Error | null) => any
   ): void {
-    // Fix anonymous ID if needed
-    if (eventBody.anonymousId === "unknown") {
-      eventBody.anonymousId = AvoAnonymousId.anonymousId;
+    // Fix stream ID if needed
+    if (eventBody.streamId === "unknown") {
+      eventBody.streamId = AvoStreamId.streamId;
     }
 
     if (AvoInspector.shouldLog) {

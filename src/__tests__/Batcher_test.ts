@@ -2,6 +2,7 @@ import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
 import { AvoNetworkCallsHandler, type EventSchemaBody, type SessionStartedBody } from "../AvoNetworkCallsHandler";
 import { AvoStorage } from "../AvoStorage";
+import { AvoStreamId } from "../AvoStreamId";
 
 import { defaultOptions, networkCallType } from "./constants";
 
@@ -218,6 +219,11 @@ describe("Batcher", () => {
   });
 
   test("Batch is not sent if batchFlushSeconds not exceeded", () => {
+    // Mock streamId to avoid side effects from Date.now() mock
+    const streamIdSpy = jest
+      .spyOn(AvoStreamId as any, "streamId", "get")
+      .mockReturnValue("mock-stream-id");
+
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
 
@@ -236,9 +242,15 @@ describe("Batcher", () => {
     expect(inspectorCallSpy).not.toHaveBeenCalled();
 
     dateNowSpy.mockRestore();
+    streamIdSpy.mockRestore();
   });
 
   test("Batch is sent if batchFlushSeconds exceeded", async () => {
+    // Mock streamId to avoid side effects from Date.now() mock
+    const streamIdSpy = jest
+      .spyOn(AvoStreamId as any, "streamId", "get")
+      .mockReturnValue("mock-stream-id");
+
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
 
@@ -260,9 +272,15 @@ describe("Batcher", () => {
     expect(inspectorCallSpy).toHaveBeenCalledWith(events, expect.any(Function));
 
     dateNowSpy.mockRestore();
+    streamIdSpy.mockRestore();
   });
 
   test("Only latest 1000 events are stored in the storage", (done) => {
+    // Mock streamId to avoid extra storage writes from streamId activity tracking
+    const streamIdSpy = jest
+      .spyOn(AvoStreamId as any, "streamId", "get")
+      .mockReturnValue("mock-stream-id");
+
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
     const eventLimit = 1000;
@@ -301,6 +319,7 @@ describe("Batcher", () => {
       expect(setItemsSpy).toHaveBeenCalledTimes(1);
       expect(setItemsSpy).toHaveBeenCalledWith(AvoBatcher.cacheKey, events);
 
+      streamIdSpy.mockRestore();
       done();
     }, 1000);
   });

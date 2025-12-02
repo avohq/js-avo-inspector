@@ -1,6 +1,6 @@
 import AvoGuid from "../AvoGuid";
 import { AvoNetworkCallsHandler, type BaseBody } from "../AvoNetworkCallsHandler";
-import { AvoAnonymousId } from "../AvoAnonymousId";
+import { AvoStreamId } from "../AvoStreamId";
 
 import xhrMock from "../__mocks__/xhr";
 
@@ -31,7 +31,7 @@ describe("NetworkCallsHandler", () => {
       .mockImplementation(() => mockedReturns.GUID);
 
     jest
-      .spyOn(AvoAnonymousId as any, "anonymousId", "get")
+      .spyOn(AvoStreamId as any, "streamId", "get")
       .mockImplementation(() => mockedReturns.INSTALLATION_ID);
 
     networkHandler = new AvoNetworkCallsHandler(
@@ -53,7 +53,7 @@ describe("NetworkCallsHandler", () => {
       trackingId: "",
       createdAt: new Date().toISOString(),
       sessionId: "",
-      anonymousId: mockedReturns.INSTALLATION_ID,
+      streamId: mockedReturns.INSTALLATION_ID,
       samplingRate: 1.0
     };
   });
