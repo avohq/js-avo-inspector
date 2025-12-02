@@ -11,74 +11,8 @@ import type {
   EventSpecEntryWire,
   PropertyConstraints,
   PropertyConstraintsWire,
-  FetchEventSpecParams
+  FetchEventSpecParams,
 } from "./AvoEventSpecFetchTypes";
-
-// =============================================================================
-// PARSING FUNCTIONS (wire format -> internal format)
-// =============================================================================
-
-/**
- * Parses the wire format response into internal format with meaningful field names.
- */
-function parseEventSpecResponse(wire: EventSpecResponseWire): EventSpecResponse {
-  return {
-    events: wire.events.map(parseEventSpecEntry),
-    metadata: wire.metadata
-  };
-}
-
-/**
- * Parses a single event spec entry from wire format.
- */
-function parseEventSpecEntry(wire: EventSpecEntryWire): EventSpecEntry {
-  const props: Record<string, PropertyConstraints> = {};
-  for (const [propName, propWire] of Object.entries(wire.p)) {
-    props[propName] = parsePropertyConstraints(propWire);
-  }
-
-  return {
-    branchId: wire.b,
-    baseEventId: wire.id,
-    variantIds: wire.vids,
-    props
-  };
-}
-
-/**
- * Parses property constraints from wire format.
- */
-function parsePropertyConstraints(wire: PropertyConstraintsWire): PropertyConstraints {
-  const result: PropertyConstraints = {
-    type: wire.t,
-    required: wire.r
-  };
-
-  if (wire.p) {
-    result.pinnedValues = wire.p;
-  }
-  if (wire.v) {
-    result.allowedValues = wire.v;
-  }
-  if (wire.rx) {
-    result.regexPatterns = wire.rx;
-  }
-  if (wire.minmax) {
-    result.minMaxRanges = wire.minmax;
-  }
-  if (wire.children) {
-    result.children = {};
-    for (const [propName, childWire] of Object.entries(wire.children)) {
-      result.children[propName] = parsePropertyConstraints(childWire);
-    }
-  }
-
-  return result;
-}
-
-// =============================================================================
-// EVENT SPEC FETCHER
-// =============================================================================
 
 /**
  * EventSpecFetcher handles fetching event specifications from the Avo API.
@@ -126,7 +60,7 @@ export class AvoEventSpecFetcher {
    * - The request times out
    *
    * This method gracefully degrades - failures do not throw errors.
-   * When null is returned, validation should be skipped for that event.
+   * When null is returned, Phase 2 should skip validation for that event.
    */
   async fetch(params: FetchEventSpecParams): Promise<EventSpecResponse | null> {
     const requestKey: string = this.generateRequestKey(params);
@@ -169,8 +103,9 @@ export class AvoEventSpecFetcher {
       console.log(`[EventSpecFetcher] Using base URL: ${this.baseUrl}`);
     }
     try {
-      const wireResponse: EventSpecResponseWire | null =
-        await this.makeRequest(url);
+      const wireResponse: EventSpecResponseWire | null = await this.makeRequest(
+        url
+      );
       if (!wireResponse) {
         if (this.shouldLog) {
           console.warn(
@@ -189,7 +124,8 @@ export class AvoEventSpecFetcher {
         return null;
       }
       // Parse wire format to internal format
-      const response = parseEventSpecResponse(wireResponse);
+      const response: EventSpecResponse =
+        AvoEventSpecFetcher.parseEventSpecResponse(wireResponse);
       if (this.shouldLog) {
         console.log(
           `[EventSpecFetcher] Successfully fetched event spec for: ${params.eventName}`
@@ -212,7 +148,7 @@ export class AvoEventSpecFetcher {
     const queryParams: URLSearchParams = new URLSearchParams({
       apiKey: params.apiKey,
       streamId: params.streamId,
-      eventName: params.eventName
+      eventName: params.eventName,
     });
     return `${this.baseUrl}/trackingPlan/eventSpec?${queryParams.toString()}`;
   }
@@ -222,54 +158,53 @@ export class AvoEventSpecFetcher {
    * Returns the parsed JSON response or null on failure.
    */
   private makeRequest(url: string): Promise<EventSpecResponseWire | null> {
-    return new Promise((resolve: (value: EventSpecResponseWire | null) => void) => {
-      const xhr: XMLHttpRequest = new XMLHttpRequest();
-      xhr.open("GET", url, true);
-      xhr.timeout = this.timeout;
-      // Note: Don't set Content-Type for GET requests - it triggers CORS preflight
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          try {
-            const response: EventSpecResponseWire = JSON.parse(xhr.responseText);
-            resolve(response);
-          } catch (error) {
+    return new Promise(
+      (resolve: (value: EventSpecResponseWire | null) => void) => {
+        const xhr: XMLHttpRequest = new XMLHttpRequest();
+        xhr.open("GET", url, true);
+        xhr.timeout = this.timeout;
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            try {
+              const response: EventSpecResponseWire = JSON.parse(
+                xhr.responseText
+              );
+              resolve(response);
+            } catch (error) {
+              if (this.shouldLog) {
+                console.error(
+                  "[EventSpecFetcher] Failed to parse response:",
+                  error
+                );
+              }
+              resolve(null);
+            }
+          } else {
             if (this.shouldLog) {
-              console.error(
-                "[EventSpecFetcher] Failed to parse response:",
-                error
+              console.warn(
+                `[EventSpecFetcher] Request failed with status: ${xhr.status}`
               );
             }
             resolve(null);
           }
-        } else {
+        };
+        xhr.onerror = () => {
           if (this.shouldLog) {
-            console.warn(
-              `[EventSpecFetcher] Request failed with status: ${xhr.status}`
+            console.error("[EventSpecFetcher] Network error occurred");
+          }
+          resolve(null);
+        };
+        xhr.ontimeout = () => {
+          if (this.shouldLog) {
+            console.error(
+              `[EventSpecFetcher] Request timed out after ${this.timeout}ms`
             );
           }
           resolve(null);
-        }
-      };
-
-      xhr.onerror = () => {
-        if (this.shouldLog) {
-          console.error("[EventSpecFetcher] Network error occurred");
-        }
-        resolve(null);
-      };
-
-      xhr.ontimeout = () => {
-        if (this.shouldLog) {
-          console.error(
-            `[EventSpecFetcher] Request timed out after ${this.timeout}ms`
-          );
-        }
-        resolve(null);
-      };
-
-      xhr.send();
-    });
+        };
+        xhr.send();
+      }
+    );
   }
 
   /**
@@ -287,5 +222,62 @@ export class AvoEventSpecFetcher {
       typeof response.metadata.branchId === "string" &&
       typeof response.metadata.latestActionId === "string"
     );
+  }
+
+  /** Parses the wire format response into internal format with meaningful field names. */
+  private static parseEventSpecResponse(
+    wire: EventSpecResponseWire
+  ): EventSpecResponse {
+    return {
+      events: wire.events.map(AvoEventSpecFetcher.parseEventSpecEntry),
+      metadata: wire.metadata,
+    };
+  }
+
+  /** Parses a single event spec entry from wire format. */
+  private static parseEventSpecEntry(wire: EventSpecEntryWire): EventSpecEntry {
+    const props: Record<string, PropertyConstraints> = {};
+    for (const entry of Object.entries(wire.p)) {
+      const propName: string = Reflect.get(entry, "0");
+      const propWire: PropertyConstraintsWire = Reflect.get(entry, "1");
+      Reflect.set(
+        props,
+        propName,
+        AvoEventSpecFetcher.parsePropertyConstraints(propWire)
+      );
+    }
+    return {
+      branchId: wire.b,
+      baseEventId: wire.id,
+      variantIds: wire.vids,
+      props: props,
+    };
+  }
+
+  /** Parses property constraints from wire format. */
+  private static parsePropertyConstraints(
+    wire: PropertyConstraintsWire
+  ): PropertyConstraints {
+    const result: PropertyConstraints = { type: wire.t, required: wire.r };
+    if (wire.p) {
+      result.pinnedValues = wire.p;
+    }
+    if (wire.v) {
+      result.allowedValues = wire.v;
+    }
+    if (wire.rx) {
+      result.regexPatterns = wire.rx;
+    }
+    if (wire.minmax) {
+      result.minMaxRanges = wire.minmax;
+    }
+    if (wire.children) {
+      result.children = {};
+      for (const [propName, childWire] of Object.entries(wire.children)) {
+        result.children[propName] =
+          AvoEventSpecFetcher.parsePropertyConstraints(childWire);
+      }
+    }
+    return result;
   }
 }

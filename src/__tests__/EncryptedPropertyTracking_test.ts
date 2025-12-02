@@ -12,9 +12,9 @@ describe("Encrypted Property Tracking", () => {
   const { publicKey: testPublicKey, privateKey: testPrivateKey } = generateKeyPair();
 
   beforeAll(() => {
-    (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+    jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
       fetch: jest.fn().mockResolvedValue(null)
-    }));
+    }) as any);
   });
 
   describe("with encryption enabled in dev environment", () => {

@@ -72,9 +72,9 @@ describe("Validation Integration", () => {
       }));
 
       // Mock fetcher (shouldn't be called when cache hit)
-      (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+      jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
         fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse)
-      }));
+      }) as any);
     });
 
     test("should validate event and send immediately", async () => {
@@ -234,9 +234,9 @@ describe("Validation Integration", () => {
       }));
 
       // Mock fetcher to return null (spec not found)
-      (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+      jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
         fetch: jest.fn().mockResolvedValue(null)
-      }));
+      }) as any);
     });
 
     test("should fall back to batched flow", async () => {
@@ -639,12 +639,12 @@ describe("Validation Integration", () => {
     };
 
     beforeEach(() => {
-      (EventSpecCache as jest.Mock).mockImplementation(() => ({
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
         get: jest.fn().mockReturnValue(nestedEventSpecResponse),
         set: jest.fn()
       }));
 
-      (AvoEventSpecFetcher as jest.Mock).mockImplementation(() => ({
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
         fetch: jest.fn().mockResolvedValue(nestedEventSpecResponse)
       }));
     });
