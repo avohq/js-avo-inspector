@@ -888,4 +888,283 @@ describe("Validation Integration", () => {
       expect(countryChild.propertyType).toBe("string");
     });
   });
+
+  describe("Array of Objects (list of nested objects)", () => {
+    // Mock spec response for event with array of objects
+    // This simulates the "Cmd Palette Results Received" event structure
+    const arrayOfObjectsEventSpecResponse: EventSpecResponse = {
+      events: [{
+        branchId: "main",
+        baseEventId: "evt_cmd_palette",
+        variantIds: [],
+        props: {
+          "Schema Id": {
+            type: "string",
+            required: true
+          },
+          "Visible Smart Results": {
+            type: "list",
+            required: false,
+            // Note: For array of objects, we may have constraints on the array items
+            children: {
+              itemName: {
+                type: "string",
+                required: true
+              },
+              itemType: {
+                type: "string",
+                required: false,
+                allowedValues: {
+                  "[\"Event\",\"Property\",\"Branch\"]": ["evt_cmd_palette"]
+                }
+              },
+              searchResultPosition: {
+                type: "int",
+                required: true,
+                minMaxRanges: { "1,100": ["evt_cmd_palette"] }
+              },
+              searchResultRanking: {
+                type: "float",
+                required: false,
+                minMaxRanges: { "0,1": ["evt_cmd_palette"] }
+              },
+              searchTerm: {
+                type: "string",
+                required: true
+              }
+            }
+          },
+          "Visible Fuzzy Matches": {
+            type: "list",
+            required: false,
+            children: {
+              itemName: {
+                type: "string",
+                required: true
+              },
+              itemType: {
+                type: "string",
+                required: false
+              }
+            }
+          }
+        }
+      }],
+      metadata: {
+        schemaId: "schema_cmd",
+        branchId: "main",
+        latestActionId: "action_latest",
+        sourceId: "source_web"
+      }
+    };
+
+    beforeEach(() => {
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(arrayOfObjectsEventSpecResponse),
+        set: jest.fn()
+      }));
+
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(arrayOfObjectsEventSpecResponse)
+      }));
+    });
+
+    test("should preserve array of objects structure in eventProperties", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Track event with array of objects (like Cmd Palette Results)
+      await inspector.trackSchemaFromEvent("Cmd Palette Results Received", {
+        "Schema Id": "schema-123",
+        "Visible Smart Results": [
+          {
+            itemName: "User Signed Up",
+            itemType: "Event",
+            searchResultPosition: 1,
+            searchResultRanking: 0.95,
+            searchTerm: "sign"
+          },
+          {
+            itemName: "User ID",
+            itemType: "Property",
+            searchResultPosition: 2,
+            searchResultRanking: 0.87,
+            searchTerm: "sign"
+          }
+        ],
+        "Visible Fuzzy Matches": [
+          {
+            itemName: "Signup Flow",
+            itemType: "Event"
+          }
+        ]
+      });
+
+      expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Verify eventProperties is NOT empty
+      expect(eventBody.eventProperties).toBeDefined();
+      expect(eventBody.eventProperties.length).toBeGreaterThan(0);
+
+      // Find the Visible Smart Results property
+      const smartResultsProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "Visible Smart Results"
+      );
+
+      expect(smartResultsProp).toBeDefined();
+      expect(smartResultsProp.propertyType).toBe("list");
+
+      // CRITICAL: children should NOT be empty!
+      expect(smartResultsProp.children).toBeDefined();
+      expect(smartResultsProp.children.length).toBeGreaterThan(0);
+
+      // For array of objects, children should contain arrays of property objects
+      // Each item in the source array becomes an array of EventProperty objects
+      const firstItemProps = smartResultsProp.children[0];
+      expect(Array.isArray(firstItemProps)).toBe(true);
+      expect(firstItemProps.length).toBe(5); // itemName, itemType, searchResultPosition, searchResultRanking, searchTerm
+
+      // Verify nested property structure is preserved
+      const itemNameProp = firstItemProps.find((p: any) => p.propertyName === "itemName");
+      expect(itemNameProp).toBeDefined();
+      expect(itemNameProp.propertyType).toBe("string");
+
+      const positionProp = firstItemProps.find((p: any) => p.propertyName === "searchResultPosition");
+      expect(positionProp).toBeDefined();
+      expect(positionProp.propertyType).toBe("int");
+    });
+
+    test("should include all properties even when validation is performed on array of objects", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Track the exact event structure from the bug report
+      await inspector.trackSchemaFromEvent("Cmd Palette Results Received", {
+        "Schema Id": "schema-123",
+        "Schema Name": "My Schema",
+        "Schema Billing Status": "Team",
+        "Branch Id": "branch-456",
+        "Branch Name": "main",
+        "Visible Fuzzy Match Count": 5,
+        "Visible Smart Result Count": 3,
+        "Visible Fuzzy Match Names": ["Event A", "Event B"],
+        "Visible Smart Result Names": ["Result 1", "Result 2"],
+        "Visible Smart Results": [
+          {
+            itemName: "User Signed Up",
+            itemType: "Event",
+            searchResultPosition: 1,
+            searchResultRanking: 0.95,
+            searchTerm: "sign"
+          }
+        ],
+        "Visible Fuzzy Matches": [
+          {
+            itemName: "Signup Flow",
+            itemType: "Event",
+            searchResultPosition: 1,
+            searchResultRanking: 0.75,
+            searchTerm: "sign"
+          }
+        ],
+        "Cmd Palette Results Type": "Tracking plan items",
+        "Client": "web",
+        "Version": "2.0.0"
+      });
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Verify we have ALL properties (not empty!)
+      expect(eventBody.eventProperties.length).toBe(14);
+
+      // Verify each expected property is present
+      const propertyNames = eventBody.eventProperties.map((p: any) => p.propertyName);
+      expect(propertyNames).toContain("Schema Id");
+      expect(propertyNames).toContain("Schema Name");
+      expect(propertyNames).toContain("Visible Smart Results");
+      expect(propertyNames).toContain("Visible Fuzzy Matches");
+      expect(propertyNames).toContain("Visible Fuzzy Match Names");
+      expect(propertyNames).toContain("Client");
+      expect(propertyNames).toContain("Version");
+
+      // Verify the nested structures are preserved
+      const smartResults = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "Visible Smart Results"
+      );
+      expect(smartResults.children).toBeDefined();
+      expect(smartResults.children.length).toBe(1); // One object in the array
+
+      const fuzzyMatches = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "Visible Fuzzy Matches"
+      );
+      expect(fuzzyMatches.children).toBeDefined();
+      expect(fuzzyMatches.children.length).toBe(1); // One object in the array
+    });
+
+    test("JSON serialization of eventProperties should preserve nested array structure", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      await inspector.trackSchemaFromEvent("Cmd Palette Results Received", {
+        "Schema Id": "schema-123",
+        "Visible Smart Results": [
+          { itemName: "Test", itemType: "Event", searchResultPosition: 1, searchResultRanking: 0.5, searchTerm: "test" }
+        ]
+      });
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Serialize and parse to verify structure survives JSON round-trip
+      const json = JSON.stringify(eventBody);
+      const parsed = JSON.parse(json);
+
+      // eventProperties should not be empty after JSON round-trip
+      expect(parsed.eventProperties.length).toBe(2);
+
+      const smartResults = parsed.eventProperties.find(
+        (p: any) => p.propertyName === "Visible Smart Results"
+      );
+      expect(smartResults.children).toBeDefined();
+      expect(smartResults.children.length).toBe(1);
+      expect(smartResults.children[0].length).toBe(5);
+    });
+  });
 });
