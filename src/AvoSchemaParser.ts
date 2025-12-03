@@ -31,7 +31,16 @@ export class AvoSchemaParser {
     if (!canEncrypt || !publicEncryptionKey) {
       return undefined; // No encryption key: do not send any property values
     }
-    return encryptValue(propertyValue, publicEncryptionKey); // Only send encrypted values
+    try {
+      return encryptValue(propertyValue, publicEncryptionKey); // Only send encrypted values
+    } catch (error) {
+      // If encryption fails, log the error but don't fail the entire schema extraction
+      console.error(
+        "[Avo Inspector] Failed to encrypt property value:",
+        error instanceof Error ? error.message : String(error)
+      );
+      return undefined;
+    }
   }
 
   static extractSchema (
@@ -65,8 +74,9 @@ export class AvoSchemaParser {
             if (typeof val === "object" && val != null) {
               // Object/array properties: children are encrypted individually, no need to encrypt parent
               mappedEntry.children = mapping(val) as SchemaChild[];
-            } else {
+            } else if (val !== undefined) {
               // Primitive properties: encrypt the value if encryption is enabled
+              // Skip undefined values - they can't be encrypted and shouldn't be sent
               const encryptedValue = this.getEncryptedPropertyValueIfEnabled(
                 val,
                 canSendEncryptedValues,
