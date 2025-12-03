@@ -10,6 +10,7 @@ type options = {
   apiKey: string,
   env: env,
   version: string,
+  publicEncryptionKey?: string,
 }
 
 @new @module("avo-inspector")
