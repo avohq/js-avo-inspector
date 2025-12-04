@@ -34,6 +34,10 @@ class MockXMLHttpRequest {
         this.status = 200;
         this.responseText = JSON.stringify(mockEventSpecResponseWire);
         if (this.onload) this.onload();
+      } else if (this.url.includes("nested")) {
+        this.status = 200;
+        this.responseText = JSON.stringify(mockNestedEventSpecResponseWire);
+        if (this.onload) this.onload();
       } else if (this.url.includes("invalid")) {
         this.status = 200;
         this.responseText = JSON.stringify({ invalid: "response" });
@@ -54,46 +58,150 @@ class MockXMLHttpRequest {
   }
 }
 
-// Mock wire format response (short field names)
+// Mock wire format response matching the real API format
 const mockEventSpecResponseWire: EventSpecResponseWire = {
-  events: [
+  branchId: "main",
+  baseEvent: {
+    name: "User Login",
+    id: "evt_123",
+    props: {
+      login_method: {
+        t: "string",
+        r: true,
+        v: ["email", "google", "facebook"]
+      },
+      user_email: {
+        t: "string",
+        r: true
+      },
+      attempt_count: {
+        t: "int",
+        r: false,
+        min: 1,
+        max: 10
+      }
+    }
+  },
+  variants: [
     {
-      b: "main", // branchId
-      id: "evt_123", // baseEventId
-      vids: ["evt_123.v1", "evt_123.v2"], // variantIds
-      p: {
-        // props
+      variantId: "v1",
+      nameSuffix: "with social",
+      eventId: "evt_123.v1",
+      props: {
         login_method: {
-          t: "string", // type
-          r: true, // required
-          p: {
-            // pinned values
-            email: ["evt_123"],
-            google: ["evt_123.v1"],
-            facebook: ["evt_123.v2"]
-          }
+          t: "string",
+          r: true,
+          v: ["google", "facebook"]
         },
         user_email: {
           t: "string",
+          r: true
+        },
+        attempt_count: {
+          t: "int",
+          r: false,
+          min: 1,
+          max: 5
+        }
+      }
+    },
+    {
+      variantId: "v2",
+      nameSuffix: "with email",
+      eventId: "evt_123.v2",
+      props: {
+        login_method: {
+          t: "string",
           r: true,
-          rx: {
-            // regex patterns
-            "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$": [
-              "evt_123",
-              "evt_123.v1",
-              "evt_123.v2"
-            ]
-          }
+          v: ["email"]
+        },
+        user_email: {
+          t: "string",
+          r: true
+        },
+        attempt_count: {
+          t: "int",
+          r: false,
+          min: 1,
+          max: 3
         }
       }
     }
-  ],
-  metadata: {
-    schemaId: "schema_123",
-    branchId: "main",
-    latestActionId: "action_456",
-    sourceId: "source_789"
-  }
+  ]
+};
+
+// Mock wire format response with nested object arrays (like Cmd Palette Results Received)
+const mockNestedEventSpecResponseWire: EventSpecResponseWire = {
+  branchId: "main",
+  baseEvent: {
+    name: "Cmd Palette Results Received",
+    id: "m2MFSPe9KC",
+    props: {
+      "Schema Id": {
+        t: "string",
+        r: true
+      },
+      "Visible Smart Results": {
+        t: {
+          "Item Name": { t: "string", r: false },
+          "Item Type": {
+            t: "string",
+            r: false,
+            v: ["Property", "Event", "Branch"]
+          },
+          "Search Result Position": { t: "int", r: true, min: 1 },
+          "Search Result Ranking": { t: "float", r: true, min: 0, max: 1 },
+          "Search Term": { t: "string", r: true }
+        },
+        r: true,
+        l: true
+      },
+      "Visible Fuzzy Matches": {
+        t: {
+          "Item Name": { t: "string", r: false },
+          "Item Type": { t: "string", r: false }
+        },
+        r: true,
+        l: true
+      }
+    }
+  },
+  variants: [
+    {
+      variantId: "uBcwgjbg-",
+      nameSuffix: "tracking plan item search",
+      eventId: "m2MFSPe9KC.uBcwgjbg-",
+      props: {
+        "Schema Id": {
+          t: "string",
+          r: true
+        },
+        "Visible Smart Results": {
+          t: {
+            "Item Name": { t: "string", r: false },
+            "Item Type": {
+              t: "string",
+              r: false,
+              v: ["Property", "Event", "Branch"]
+            },
+            "Search Result Position": { t: "int", r: true, min: 1 },
+            "Search Result Ranking": { t: "float", r: true, min: 0, max: 1 },
+            "Search Term": { t: "string", r: true }
+          },
+          r: true,
+          l: true
+        },
+        "Visible Fuzzy Matches": {
+          t: {
+            "Item Name": { t: "string", r: false },
+            "Item Type": { t: "string", r: false }
+          },
+          r: true,
+          l: true
+        }
+      }
+    }
+  ]
 };
 
 describe("EventSpecFetcher", () => {
@@ -163,13 +271,11 @@ describe("EventSpecFetcher", () => {
       });
 
       expect(result?.metadata).toBeDefined();
-      expect(result?.metadata.schemaId).toBe("schema_123");
+      // Note: schemaId and latestActionId are not in the new API format
       expect(result?.metadata.branchId).toBe("main");
-      expect(result?.metadata.latestActionId).toBe("action_456");
-      expect(result?.metadata.sourceId).toBe("source_789");
     });
 
-    test("should parse property constraints with long names", async () => {
+    test("should parse property constraints with allowed values", async () => {
       const result = await fetcher.fetch({
         apiKey: "apiKey1",
         streamId: "stream1",
@@ -180,23 +286,23 @@ describe("EventSpecFetcher", () => {
       expect(loginMethod).toBeDefined();
       expect(loginMethod?.type).toBe("string");
       expect(loginMethod?.required).toBe(true);
-      expect(loginMethod?.pinnedValues).toBeDefined();
-      expect(loginMethod?.pinnedValues?.email).toContain("evt_123");
+      // Allowed values should be converted to Record<JSON string, eventIds>
+      expect(loginMethod?.allowedValues).toBeDefined();
     });
 
-    test("should parse regex patterns with long names", async () => {
+    test("should parse min/max ranges correctly", async () => {
       const result = await fetcher.fetch({
         apiKey: "apiKey1",
         streamId: "stream1",
         eventName: "success"
       });
 
-      const userEmail = result?.events[0].props.user_email;
-      expect(userEmail).toBeDefined();
-      expect(userEmail?.regexPatterns).toBeDefined();
-      expect(
-        Object.keys(userEmail?.regexPatterns || {}).length
-      ).toBeGreaterThan(0);
+      const attemptCount = result?.events[0].props.attempt_count;
+      expect(attemptCount).toBeDefined();
+      expect(attemptCount?.type).toBe("int");
+      expect(attemptCount?.minMaxRanges).toBeDefined();
+      // Should have entries for each event's min/max
+      expect(Object.keys(attemptCount?.minMaxRanges || {}).length).toBeGreaterThan(0);
     });
   });
 
@@ -427,6 +533,113 @@ describe("EventSpecFetcher", () => {
       });
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("Nested Object Arrays (List of Objects)", () => {
+    test("should parse list of objects with nested schema", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "nested"
+      });
+
+      expect(result).not.toBeNull();
+      expect(result?.events[0].baseEventId).toBe("m2MFSPe9KC");
+      expect(result?.events[0].branchId).toBe("main");
+    });
+
+    test("should identify list type correctly for nested objects", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "nested"
+      });
+
+      const visibleSmartResults = result?.events[0].props["Visible Smart Results"];
+      expect(visibleSmartResults).toBeDefined();
+      expect(visibleSmartResults?.type).toBe("list");
+      expect(visibleSmartResults?.required).toBe(true);
+    });
+
+    test("should parse children for nested object arrays", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "nested"
+      });
+
+      const visibleSmartResults = result?.events[0].props["Visible Smart Results"];
+      expect(visibleSmartResults?.children).toBeDefined();
+
+      // Should have all child properties
+      expect(visibleSmartResults?.children?.["Item Name"]).toBeDefined();
+      expect(visibleSmartResults?.children?.["Item Type"]).toBeDefined();
+      expect(visibleSmartResults?.children?.["Search Result Position"]).toBeDefined();
+      expect(visibleSmartResults?.children?.["Search Result Ranking"]).toBeDefined();
+      expect(visibleSmartResults?.children?.["Search Term"]).toBeDefined();
+    });
+
+    test("should parse child property types correctly", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "nested"
+      });
+
+      const visibleSmartResults = result?.events[0].props["Visible Smart Results"];
+
+      expect(visibleSmartResults?.children?.["Item Name"]?.type).toBe("string");
+      expect(visibleSmartResults?.children?.["Item Type"]?.type).toBe("string");
+      expect(visibleSmartResults?.children?.["Search Result Position"]?.type).toBe("int");
+      expect(visibleSmartResults?.children?.["Search Result Ranking"]?.type).toBe("float");
+      expect(visibleSmartResults?.children?.["Search Term"]?.type).toBe("string");
+    });
+
+    test("should parse child property constraints correctly", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "nested"
+      });
+
+      const visibleSmartResults = result?.events[0].props["Visible Smart Results"];
+
+      // Item Type should have allowed values
+      expect(visibleSmartResults?.children?.["Item Type"]?.allowedValues).toBeDefined();
+
+      // Search Result Position should have min/max
+      expect(visibleSmartResults?.children?.["Search Result Position"]?.minMaxRanges).toBeDefined();
+
+      // Search Result Ranking should have min/max
+      expect(visibleSmartResults?.children?.["Search Result Ranking"]?.minMaxRanges).toBeDefined();
+    });
+
+    test("should parse child required flags correctly", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "nested"
+      });
+
+      const visibleSmartResults = result?.events[0].props["Visible Smart Results"];
+
+      expect(visibleSmartResults?.children?.["Item Name"]?.required).toBe(false);
+      expect(visibleSmartResults?.children?.["Item Type"]?.required).toBe(false);
+      expect(visibleSmartResults?.children?.["Search Result Position"]?.required).toBe(true);
+      expect(visibleSmartResults?.children?.["Search Result Ranking"]?.required).toBe(true);
+      expect(visibleSmartResults?.children?.["Search Term"]?.required).toBe(true);
+    });
+
+    test("should include variant event IDs", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "nested"
+      });
+
+      expect(result?.events[0].variantIds).toBeDefined();
+      expect(result?.events[0].variantIds).toContain("m2MFSPe9KC.uBcwgjbg-");
     });
   });
 });

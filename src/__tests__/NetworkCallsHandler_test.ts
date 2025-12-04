@@ -209,4 +209,108 @@ describe("NetworkCallsHandler", () => {
     expect(customCallback).toHaveBeenCalledTimes(1);
     expect(customCallback).toHaveBeenCalledWith(new Error(requestMsg.TIMEOUT));
   });
+
+  test("bodyForEventSchemaCall correctly includes nested object array properties", () => {
+    // This test verifies that nested object arrays (like visibleSmartResults)
+    // are correctly included in the eventProperties payload
+    const eventName = "Cmd Palette Results Received";
+    const eventProperties = [
+      { propertyName: "Schema Id", propertyType: "string" },
+      { propertyName: "Branch Id", propertyType: "string" },
+      // Nested object array property
+      {
+        propertyName: "Visible Smart Results",
+        propertyType: "list",
+        children: [
+          [
+            { propertyName: "itemName", propertyType: "string" },
+            { propertyName: "itemType", propertyType: "string" },
+            { propertyName: "searchResultPosition", propertyType: "int" },
+            { propertyName: "searchResultRanking", propertyType: "float" },
+            { propertyName: "searchTerm", propertyType: "string" }
+          ]
+        ]
+      }
+    ];
+
+    const body = networkHandler.bodyForEventSchemaCall(
+      eventName,
+      eventProperties,
+      null,
+      null
+    );
+
+    // Verify the eventProperties are included in the body
+    expect(body.eventProperties).toEqual(eventProperties);
+    expect(body.eventProperties.length).toBe(3);
+
+    // Verify the nested property structure is preserved
+    const nestedProp = body.eventProperties.find(
+      (p) => p.propertyName === "Visible Smart Results"
+    );
+    expect(nestedProp).toBeDefined();
+    expect(nestedProp!.propertyType).toBe("list");
+    expect(nestedProp!.children).toBeDefined();
+    expect(nestedProp!.children!.length).toBe(1);
+    expect(Array.isArray(nestedProp!.children![0])).toBe(true);
+
+    // Verify JSON serialization preserves the structure
+    const jsonPayload = JSON.stringify([body]);
+    const parsed = JSON.parse(jsonPayload);
+
+    expect(parsed[0].eventProperties.length).toBe(3);
+
+    const parsedNestedProp = parsed[0].eventProperties.find(
+      (p: any) => p.propertyName === "Visible Smart Results"
+    );
+    expect(parsedNestedProp.children.length).toBe(1);
+    expect(parsedNestedProp.children[0].length).toBe(5);
+    expect(parsedNestedProp.children[0][0].propertyName).toBe("itemName");
+  });
+
+  test("JSON serialization of nested object arrays is correct for API", () => {
+    // This test verifies that the JSON.stringify of nested object arrays
+    // produces the correct structure that would be sent to the API
+    const eventName = "Cmd Palette Results Received";
+    const eventProperties = [
+      { propertyName: "Schema Id", propertyType: "string" },
+      {
+        propertyName: "Visible Smart Results",
+        propertyType: "list",
+        children: [
+          [
+            { propertyName: "itemName", propertyType: "string" },
+            { propertyName: "itemType", propertyType: "string" }
+          ]
+        ]
+      }
+    ];
+
+    const eventBody = networkHandler.bodyForEventSchemaCall(
+      eventName,
+      eventProperties,
+      null,
+      null
+    );
+
+    const events = [eventBody];
+
+    // Verify the JSON structure that would be sent to the API
+    const jsonPayload = JSON.stringify(events);
+    const parsedPayload = JSON.parse(jsonPayload);
+
+    // Verify the nested structure is preserved in the JSON
+    expect(parsedPayload[0].eventProperties.length).toBe(2);
+
+    const parsedNestedProp = parsedPayload[0].eventProperties.find(
+      (p: any) => p.propertyName === "Visible Smart Results"
+    );
+    expect(parsedNestedProp).toBeDefined();
+    expect(parsedNestedProp.propertyType).toBe("list");
+    expect(parsedNestedProp.children).toBeDefined();
+    expect(parsedNestedProp.children.length).toBe(1);
+    expect(parsedNestedProp.children[0].length).toBe(2);
+    expect(parsedNestedProp.children[0][0].propertyName).toBe("itemName");
+    expect(parsedNestedProp.children[0][1].propertyName).toBe("itemType");
+  });
 });

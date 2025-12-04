@@ -186,6 +186,7 @@ export class AvoInspector {
             eventSchema,
             validationResult
           );
+
           this.sendEventWithValidation(
             eventName,
             schemaWithValidation,
@@ -381,7 +382,7 @@ export class AvoInspector {
       );
     } catch (e) {
       console.error(
-        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        "Avo Inspector: something went wrong in extractSchema. Please report to support@avo.app.",
         e
       );
       return [];

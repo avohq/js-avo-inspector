@@ -888,4 +888,607 @@ describe("Validation Integration", () => {
       expect(countryChild.propertyType).toBe("string");
     });
   });
+
+  describe("End-to-end eventProperties flow", () => {
+    // This test traces through the EXACT flow that caused the bug:
+    // extractSchema -> fetchAndValidateEvent -> mergeValidationResults -> bodyForEventSchemaCall
+    // The issue: eventProperties was empty even though validation returned data
+
+    test("should NOT produce empty eventProperties when tracking with validation", async () => {
+      // Mock spec response for this test
+      const testSpec: EventSpecResponse = {
+        events: [{
+          branchId: "main",
+          baseEventId: "test_evt",
+          variantIds: [],
+          props: {
+            "simple_prop": { type: "string", required: true },
+            "nested_list": {
+              type: "list",
+              required: true,
+              children: {
+                "child_name": { type: "string", required: false },
+                "child_value": { type: "int", required: true }
+              }
+            }
+          }
+        }],
+        metadata: { schemaId: "test", branchId: "main", latestActionId: "act" }
+      };
+
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(testSpec),
+        set: jest.fn()
+      }));
+
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      let capturedEventBody: any = null;
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((eventBody: any, callback: any) => {
+          capturedEventBody = eventBody;
+          callback(null);
+        });
+
+      // Track with nested array of objects
+      await inspector.trackSchemaFromEvent("test_event", {
+        simple_prop: "hello",
+        nested_list: [
+          { child_name: "Item 1", child_value: 10 },
+          { child_name: "Item 2", child_value: 20 }
+        ]
+      });
+
+      // CRITICAL ASSERTION: eventProperties must NOT be empty!
+      expect(capturedEventBody).not.toBeNull();
+      expect(capturedEventBody.eventProperties).toBeDefined();
+      expect(capturedEventBody.eventProperties.length).toBeGreaterThan(0);
+
+      // Should have 2 properties: simple_prop and nested_list
+      expect(capturedEventBody.eventProperties.length).toBe(2);
+
+      // Find the properties
+      const simpleProp = capturedEventBody.eventProperties.find(
+        (p: any) => p.propertyName === "simple_prop"
+      );
+      const nestedList = capturedEventBody.eventProperties.find(
+        (p: any) => p.propertyName === "nested_list"
+      );
+
+      expect(simpleProp).toBeDefined();
+      expect(simpleProp.propertyType).toBe("string");
+
+      expect(nestedList).toBeDefined();
+      expect(nestedList.propertyType).toBe("list");
+      expect(nestedList.children).toBeDefined();
+      expect(nestedList.children.length).toBe(2); // Two objects in the array
+
+      // Verify the nested structure
+      const firstItem = nestedList.children[0];
+      expect(Array.isArray(firstItem)).toBe(true);
+      expect(firstItem.length).toBe(2); // child_name, child_value
+
+      callInspectorImmediatelySpy.mockRestore();
+    });
+
+    test("debug: trace extractSchema output for nested list of objects", () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      // This is the exact structure from the bug report
+      const eventProperties = {
+        "Schema Id": "schema-123",
+        "Visible Smart Results": [
+          {
+            itemName: "User Signed Up",
+            itemType: "Event",
+            searchResultPosition: 1,
+            searchResultRanking: 0.95,
+            searchTerm: "sign"
+          }
+        ]
+      };
+
+      const schema = inspector.extractSchema(eventProperties);
+
+      // The schema should NOT be empty
+      expect(schema.length).toBe(2);
+
+      // Find Visible Smart Results
+      const smartResults = schema.find(p => p.propertyName === "Visible Smart Results");
+      expect(smartResults).toBeDefined();
+      expect(smartResults!.propertyType).toBe("list");
+      expect(smartResults!.children).toBeDefined();
+      expect(smartResults!.children!.length).toBe(1);
+
+      // The child should be an array of properties
+      const firstChild = smartResults!.children![0];
+      expect(Array.isArray(firstChild)).toBe(true);
+      expect((firstChild as any[]).length).toBe(5);
+    });
+
+    test("debug: verify extractSchema is called on every unique event", async () => {
+      // This test verifies that extractSchema is always called for events that aren't deduplicated
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      // Spy on extractSchema
+      const extractSchemaSpy = jest.spyOn(inspector, "extractSchema");
+
+      // Track two different events
+      const result1 = await inspector.trackSchemaFromEvent("event_1", {
+        prop: "value1"
+      });
+
+      const result2 = await inspector.trackSchemaFromEvent("event_2", {
+        prop: "value2"
+      });
+
+      // Both calls should have schema
+      expect(result1.length).toBe(1);
+      expect(result1[0].propertyName).toBe("prop");
+
+      expect(result2.length).toBe(1);
+      expect(result2[0].propertyName).toBe("prop");
+
+      // extractSchema should have been called twice (once per event)
+      expect(extractSchemaSpy).toHaveBeenCalledTimes(2);
+
+      extractSchemaSpy.mockRestore();
+    });
+
+    test("CRITICAL: if extractSchema fails, validation still runs but eventProperties is empty", async () => {
+      // This test demonstrates the bug scenario:
+      // 1. extractSchema fails (returns [])
+      // 2. validation still runs against original eventProperties
+      // 3. mergeValidationResults receives [] for eventSchema
+      // 4. Final eventProperties is []
+
+      const testSpec: EventSpecResponse = {
+        events: [{
+          branchId: "main",
+          baseEventId: "test_evt",
+          variantIds: [],
+          props: {
+            "prop": { type: "string", required: true }
+          }
+        }],
+        metadata: { schemaId: "test", branchId: "main", latestActionId: "act" }
+      };
+
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(testSpec),
+        set: jest.fn()
+      }));
+
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      // Mock extractSchema to return empty (simulating error)
+      const originalExtractSchema = inspector.extractSchema.bind(inspector);
+      jest.spyOn(inspector, "extractSchema").mockReturnValue([]);
+
+      let capturedEventBody: any = null;
+      jest.spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      ).mockImplementation((eventBody: any, callback: any) => {
+        capturedEventBody = eventBody;
+        callback(null);
+      });
+
+      // Track an event - extractSchema will return [], but validation may still run
+      await inspector.trackSchemaFromEvent("test_event", {
+        prop: "value"
+      });
+
+      // The event body has EMPTY eventProperties - this is the bug!
+      expect(capturedEventBody).not.toBeNull();
+      expect(capturedEventBody.eventProperties).toEqual([]);
+
+      // But validation result would have had data...
+      // This shows the disconnect between schema extraction and validation
+    });
+
+    test("verify the returned schema from trackSchemaFromEvent matches extractSchema output", async () => {
+      // This test verifies that trackSchemaFromEvent returns the same schema as extractSchema
+      // even when validation is performed
+
+      const testSpec: EventSpecResponse = {
+        events: [{
+          branchId: "main",
+          baseEventId: "test_evt",
+          variantIds: [],
+          props: {
+            "items": {
+              type: "list",
+              required: true,
+              children: {
+                "name": { type: "string", required: true }
+              }
+            }
+          }
+        }],
+        metadata: { schemaId: "test", branchId: "main", latestActionId: "act" }
+      };
+
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(testSpec),
+        set: jest.fn()
+      }));
+
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      let capturedEventBody: any = null;
+      jest.spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      ).mockImplementation((eventBody: any, callback: any) => {
+        capturedEventBody = eventBody;
+        callback(null);
+      });
+
+      const eventProps = {
+        items: [{ name: "Item 1" }, { name: "Item 2" }]
+      };
+
+      // Get the schema via extractSchema
+      const expectedSchema = inspector.extractSchema(eventProps);
+
+      // Track the event
+      const returnedSchema = await inspector.trackSchemaFromEvent("return_test", eventProps);
+
+      // The returned schema should match extractSchema output
+      // (not empty, and has the same structure)
+      expect(returnedSchema.length).toBe(expectedSchema.length);
+      expect(returnedSchema[0].propertyName).toBe(expectedSchema[0].propertyName);
+      expect(returnedSchema[0].propertyType).toBe(expectedSchema[0].propertyType);
+
+      // And the event body should also have eventProperties
+      expect(capturedEventBody.eventProperties.length).toBe(1);
+      expect(capturedEventBody.eventProperties[0].propertyName).toBe("items");
+    });
+  });
+
+  describe("Array of Objects (list of nested objects)", () => {
+    // Mock spec response for testing list of nested objects with optional properties
+    // Key scenario: nested objects may be missing optional properties (like "Item Category")
+    const arrayOfObjectsEventSpecResponse: EventSpecResponse = {
+      events: [{
+        branchId: "main",
+        baseEventId: "evt_search_results",
+        variantIds: ["evt_search_results.variant1"],
+        props: {
+          "Workspace Id": {
+            type: "string",
+            required: true
+          },
+          "Workspace Name": {
+            type: "string",
+            required: false
+          },
+          "Account Status": {
+            type: "string",
+            required: true,
+            allowedValues: {
+              '["Active","Trial","Expired"]': ["evt_search_results", "evt_search_results.variant1"]
+            }
+          },
+          "Result Count": {
+            type: "int",
+            required: true
+          },
+          // Key property: list of nested objects with OPTIONAL "Item Category" property
+          // This tests the scenario where actual data may not include optional nested properties
+          "Search Results": {
+            type: "list",
+            required: true,
+            children: {
+              "Item Name": {
+                type: "string",
+                required: false
+              },
+              "Item Category": {
+                type: "string",
+                required: false,  // OPTIONAL - data may not include this
+                allowedValues: {
+                  '["TypeA","TypeB","TypeC"]': ["evt_search_results", "evt_search_results.variant1"]
+                }
+              },
+              "Position": {
+                type: "int",
+                required: true,
+                minMaxRanges: {
+                  "1,100": ["evt_search_results", "evt_search_results.variant1"]
+                }
+              },
+              "Score": {
+                type: "float",
+                required: true,
+                minMaxRanges: {
+                  "0,1": ["evt_search_results", "evt_search_results.variant1"]
+                }
+              },
+              "Query": {
+                type: "string",
+                required: true
+              }
+            }
+          },
+          "Fuzzy Results": {
+            type: "list",
+            required: true,
+            children: {
+              "Item Name": {
+                type: "string",
+                required: false
+              },
+              "Item Category": {
+                type: "string",
+                required: false
+              },
+              "Position": {
+                type: "int",
+                required: true
+              },
+              "Score": {
+                type: "float",
+                required: true
+              },
+              "Query": {
+                type: "string",
+                required: true
+              }
+            }
+          },
+          "Search Type": {
+            type: "string",
+            required: true
+          },
+          "Client": {
+            type: "string",
+            required: true,
+            allowedValues: {
+              '["Web","Mobile","API"]': ["evt_search_results", "evt_search_results.variant1"]
+            }
+          },
+          "App Version": {
+            type: "string",
+            required: true
+          }
+        }
+      }],
+      metadata: {
+        schemaId: "test_schema",
+        branchId: "main",
+        latestActionId: "action_123"
+      }
+    };
+
+    beforeEach(() => {
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(arrayOfObjectsEventSpecResponse),
+        set: jest.fn()
+      }));
+
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(arrayOfObjectsEventSpecResponse)
+      }));
+    });
+
+    test("should preserve array of objects structure in eventProperties", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Track event with array of objects - note that "Item Category" is OPTIONAL and not included
+      await inspector.trackSchemaFromEvent("Search Results Received", {
+        "Workspace Id": "workspace-123",
+        "Search Results": [
+          {
+            "Item Name": "First Result",
+            // "Item Category" intentionally omitted - it's optional
+            "Position": 1,
+            "Score": 0.95,
+            "Query": "test"
+          },
+          {
+            "Item Name": "Second Result",
+            "Item Category": "TypeA",  // included here
+            "Position": 2,
+            "Score": 0.87,
+            "Query": "test"
+          }
+        ],
+        "Fuzzy Results": [
+          {
+            "Item Name": "Fuzzy Match",
+            "Position": 1,
+            "Score": 0.75,
+            "Query": "test"
+          }
+        ]
+      });
+
+      expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Verify eventProperties is NOT empty
+      expect(eventBody.eventProperties).toBeDefined();
+      expect(eventBody.eventProperties.length).toBeGreaterThan(0);
+
+      // Find the Search Results property
+      const searchResultsProp = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "Search Results"
+      );
+
+      expect(searchResultsProp).toBeDefined();
+      expect(searchResultsProp.propertyType).toBe("list");
+
+      // CRITICAL: children should NOT be empty!
+      expect(searchResultsProp.children).toBeDefined();
+      expect(searchResultsProp.children.length).toBeGreaterThan(0);
+
+      // For array of objects, children should contain arrays of property objects
+      // Each item in the source array becomes an array of EventProperty objects
+      const firstItemProps = searchResultsProp.children[0];
+      expect(Array.isArray(firstItemProps)).toBe(true);
+      expect(firstItemProps.length).toBe(4); // Item Name, Position, Score, Query (no Item Category)
+
+      // Verify nested property structure is preserved
+      const itemNameProp = firstItemProps.find((p: any) => p.propertyName === "Item Name");
+      expect(itemNameProp).toBeDefined();
+      expect(itemNameProp.propertyType).toBe("string");
+
+      const positionProp = firstItemProps.find((p: any) => p.propertyName === "Position");
+      expect(positionProp).toBeDefined();
+      expect(positionProp.propertyType).toBe("int");
+    });
+
+    test("should include all properties even when validation is performed on array of objects", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Track event with all properties matching the spec
+      await inspector.trackSchemaFromEvent("Search Results Received", {
+        "Workspace Id": "workspace-123",
+        "Workspace Name": "Test Workspace",
+        "Account Status": "Active",
+        "Result Count": 5,
+        "Search Results": [
+          {
+            "Item Name": "First Result",
+            "Item Category": "TypeA",
+            "Position": 1,
+            "Score": 0.95,
+            "Query": "test"
+          }
+        ],
+        "Fuzzy Results": [
+          {
+            "Item Name": "Fuzzy Match",
+            "Item Category": "TypeB",
+            "Position": 1,
+            "Score": 0.75,
+            "Query": "test"
+          }
+        ],
+        "Search Type": "full",
+        "Client": "Web",
+        "App Version": "2.0.0"
+      });
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Verify we have ALL properties (not empty!)
+      expect(eventBody.eventProperties.length).toBe(9);
+
+      // Verify each expected property is present
+      const propertyNames = eventBody.eventProperties.map((p: any) => p.propertyName);
+      expect(propertyNames).toContain("Workspace Id");
+      expect(propertyNames).toContain("Workspace Name");
+      expect(propertyNames).toContain("Search Results");
+      expect(propertyNames).toContain("Fuzzy Results");
+      expect(propertyNames).toContain("Client");
+      expect(propertyNames).toContain("App Version");
+
+      // Verify the nested structures are preserved
+      const searchResults = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "Search Results"
+      );
+      expect(searchResults.children).toBeDefined();
+      expect(searchResults.children.length).toBe(1); // One object in the array
+
+      const fuzzyResults = eventBody.eventProperties.find(
+        (p: any) => p.propertyName === "Fuzzy Results"
+      );
+      expect(fuzzyResults.children).toBeDefined();
+      expect(fuzzyResults.children.length).toBe(1); // One object in the array
+    });
+
+    test("JSON serialization of eventProperties should preserve nested array structure", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      await inspector.trackSchemaFromEvent("Search Results Received", {
+        "Workspace Id": "workspace-123",
+        "Search Results": [
+          { "Item Name": "Test", "Item Category": "TypeA", "Position": 1, "Score": 0.5, "Query": "test" }
+        ]
+      });
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+
+      // Serialize and parse to verify structure survives JSON round-trip
+      const json = JSON.stringify(eventBody);
+      const parsed = JSON.parse(json);
+
+      // eventProperties should not be empty after JSON round-trip
+      expect(parsed.eventProperties.length).toBe(2);
+
+      const searchResults = parsed.eventProperties.find(
+        (p: any) => p.propertyName === "Search Results"
+      );
+      expect(searchResults.children).toBeDefined();
+      expect(searchResults.children.length).toBe(1);
+      expect(searchResults.children[0].length).toBe(5);
+    });
+  });
 });

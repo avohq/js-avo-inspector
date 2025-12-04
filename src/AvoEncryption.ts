@@ -36,7 +36,12 @@ export function generateKeyPair(): { privateKey: string; publicKey: string } {
 export function encryptValue(value: any, publicKey: string): string {
   try {
     // Convert the value to a JSON string to support all types
-    const stringValue = JSON.stringify(value);
+    // Note: JSON.stringify(undefined) returns undefined (not a string), so handle it explicitly
+    const stringValue = value === undefined ? "null" : JSON.stringify(value);
+
+    if (stringValue === undefined) {
+      throw new Error("Cannot encrypt undefined value");
+    }
 
     // eciesjs encrypt expects a hex string for the public key and a Uint8Array for data
     // Ensure publicKey is a string

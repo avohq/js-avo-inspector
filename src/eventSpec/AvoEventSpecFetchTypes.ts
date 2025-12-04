@@ -1,55 +1,70 @@
 /**
- * This file is generated. Internal development changes should be made in the generator
- * and the file should be re-generated. External contributions are welcome to submit
- * changes directly to this file, and we'll apply them to the generator internally.
- */
-
-/**
- * Wire format - Property constraints with short field names.
- * At most one constraint type will be present per property.
+ * Wire format - Property constraints from the API.
+ *
+ * The API returns constraints in a compact format:
+ * - `t`: Type - either a string ("string", "int", "float", "boolean") or an object (for nested object types)
+ * - `r`: Required flag
+ * - `l`: List flag - true if this is an array/list of the type
+ * - `v`: Allowed values - array of allowed string values
+ * - `min`/`max`: Numeric range constraints
+ *
+ * For list of objects, `t` is an object containing child property schemas and `l` is true.
  */
 export interface PropertyConstraintsWire {
-  /** Type name (for reference only, not validated) */
-  t: string;
-  /** Required flag (for reference only, not validated) */
+  /**
+   * Type - either a string type name ("string", "int", "float", "boolean")
+   * or an object containing nested property schemas (for object/list of objects)
+   */
+  t: string | Record<string, PropertyConstraintsWire>;
+  /** Required flag */
   r: boolean;
-  /** Pinned values: pinnedValue -> eventIds that require this exact value */
-  p?: Record<string, Array<string>>;
-  /** Allowed values: JSON array string -> eventIds that accept these values */
-  v?: Record<string, Array<string>>;
-  /** Regex patterns: pattern -> eventIds that require matching this regex */
-  rx?: Record<string, Array<string>>;
-  /** Min/max ranges: "min,max" -> eventIds that require value in this range */
-  minmax?: Record<string, Array<string>>;
-  /** Nested property constraints for object properties */
-  children?: Record<string, PropertyConstraintsWire>;
+  /** List flag - true if this is an array/list of the type */
+  l?: boolean;
+  /** Allowed values - array of allowed string values */
+  v?: Array<string>;
+  /** Minimum value for numeric types */
+  min?: number;
+  /** Maximum value for numeric types */
+  max?: number;
 }
 
 /**
- * Wire format - Event spec entry with short field names.
- * A single event entry (base event + its variants).
- * Multiple events can match the same name request due to name mapping.
+ * Wire format - Base event from the API.
  */
-export interface EventSpecEntryWire {
-  /** Branch identifier */
-  b: string;
-  /** Base event ID */
+export interface BaseEventWire {
+  /** Event name */
+  name: string;
+  /** Event ID */
   id: string;
-  /** Variant IDs (baseEventId + variantIds = complete set) */
-  vids: Array<string>;
   /** Property constraints keyed by property name */
-  p: Record<string, PropertyConstraintsWire>;
+  props: Record<string, PropertyConstraintsWire>;
+}
+
+/**
+ * Wire format - Event variant from the API.
+ */
+export interface EventVariantWire {
+  /** Variant ID */
+  variantId: string;
+  /** Name suffix for this variant */
+  nameSuffix: string;
+  /** Full event ID (baseEventId.variantId) */
+  eventId: string;
+  /** Property constraints for this variant */
+  props: Record<string, PropertyConstraintsWire>;
 }
 
 /**
  * Wire format - Response from getEventSpec endpoint.
- * Contains array of events that match the requested name (due to name mapping).
+ * Contains the base event and its variants.
  */
 export interface EventSpecResponseWire {
-  /** Array of events matching the requested name */
-  events: Array<EventSpecEntryWire>;
-  /** Schema metadata (keeps long names - small, one per response) */
-  metadata: EventSpecMetadata;
+  /** Branch identifier */
+  branchId: string;
+  /** Base event definition */
+  baseEvent: BaseEventWire;
+  /** Event variants */
+  variants: Array<EventVariantWire>;
 }
 
 /**
