@@ -36,11 +36,12 @@
   },
   "homepage": "https://github.com/avohq/web-avo-inspector#readme",
   "dependencies": {
-    "eciesjs": "^0.4.11"
+    "elliptic": "^6.6.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
+    "@types/elliptic": "^6.4.18",
     "@types/jest": "^29.5.12",
     "@types/node": "^22.3.0",
     "@typescript-eslint/eslint-plugin": "^8.1.0",

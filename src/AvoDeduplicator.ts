@@ -103,30 +103,30 @@ export class AvoDeduplicator {
     return false;
   }
 
-  shouldRegisterSchemaFromManually (
+  async shouldRegisterSchemaFromManually (
     eventName: string,
     eventSchema: Array<{
       propertyName: string
       propertyType: string
       children?: any
     }>
-  ): boolean {
+  ): Promise<boolean> {
     this.clearOldEvents();
 
-    return !this.hasSameShapeInAvoFunctionsAs(eventName, eventSchema);
+    return !(await this.hasSameShapeInAvoFunctionsAs(eventName, eventSchema));
   }
 
-  private hasSameShapeInAvoFunctionsAs (
+  private async hasSameShapeInAvoFunctionsAs (
     eventName: string,
     eventSchema: Array<{
       propertyName: string
       propertyType: string
       children?: any
     }>
-  ): boolean {
+  ): Promise<boolean> {
     let result = false;
 
-    if (this.lookForEventSchemaIn(eventName, eventSchema, this.avoFunctionsEventsParams)) {
+    if (await this.lookForEventSchemaIn(eventName, eventSchema, this.avoFunctionsEventsParams)) {
       result = true;
     }
 
@@ -137,18 +137,18 @@ export class AvoDeduplicator {
     return result;
   }
 
-  private lookForEventSchemaIn (
+  private async lookForEventSchemaIn (
     eventName: string,
     eventSchema: Array<{
       propertyName: string
       propertyType: string
       children?: any
     }>,
-    eventsStorage: Record<string, Record<string, any>>): boolean {
+    eventsStorage: Record<string, Record<string, any>>): Promise<boolean> {
     for (const otherEventName in eventsStorage) {
       if (eventsStorage.hasOwnProperty(otherEventName)) {
         if (otherEventName === eventName) {
-          const otherSchema = AvoSchemaParser.extractSchema(
+          const otherSchema = await AvoSchemaParser.extractSchema(
             eventsStorage[eventName]
           );
           if (otherSchema && deepEquals(eventSchema, otherSchema)) {

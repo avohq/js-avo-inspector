@@ -23,16 +23,16 @@ export class AvoSchemaParser {
    * Returns the encrypted property value if encryption is enabled, otherwise undefined.
    * Never returns unencrypted values - only encrypted or nothing.
    */
-  private static getEncryptedPropertyValueIfEnabled(
+  private static async getEncryptedPropertyValueIfEnabled(
     propertyValue: any,
     canEncrypt: boolean,
     publicEncryptionKey: string | undefined
-  ): string | undefined {
+  ): Promise<string | undefined> {
     if (!canEncrypt || !publicEncryptionKey) {
       return undefined; // No encryption key: do not send any property values
     }
     try {
-      return encryptValue(propertyValue, publicEncryptionKey); // Only send encrypted values
+      return await encryptValue(propertyValue, publicEncryptionKey); // Only send encrypted values
     } catch (error) {
       // If encryption fails, log the error but don't fail the entire schema extraction
       console.error(
@@ -43,22 +43,22 @@ export class AvoSchemaParser {
     }
   }
 
-  static extractSchema (
+  static async extractSchema (
     eventProperties: Record<string, any>,
     publicEncryptionKey?: string,
     env?: string
-  ): EventProperty[] {
+  ): Promise<EventProperty[]> {
     if (eventProperties === null || eventProperties === undefined) {
       return [];
     }
 
     const canSendEncryptedValues = this.canSendEncryptedValues(publicEncryptionKey, env);
 
-    const mapping = (object: any): SchemaChild => {
+    const mapping = async (object: any): Promise<SchemaChild> => {
       if (isArray(object)) {
-        const list = object.map((x: any) => {
-          return mapping(x);
-        });
+        const list = await Promise.all(object.map(async (x: any) => {
+          return await mapping(x);
+        }));
         return this.removeDuplicates(list);
       } else if (typeof object === "object") {
         const mappedResult: EventProperty[] = [];
@@ -73,11 +73,11 @@ export class AvoSchemaParser {
 
             if (typeof val === "object" && val != null) {
               // Object/array properties: children are encrypted individually, no need to encrypt parent
-              mappedEntry.children = mapping(val) as SchemaChild[];
+              mappedEntry.children = (await mapping(val)) as SchemaChild[];
             } else if (val !== undefined) {
               // Primitive properties: encrypt the value if encryption is enabled
               // Skip undefined values - they can't be encrypted and shouldn't be sent
-              const encryptedValue = this.getEncryptedPropertyValueIfEnabled(
+              const encryptedValue = await this.getEncryptedPropertyValueIfEnabled(
                 val,
                 canSendEncryptedValues,
                 publicEncryptionKey
@@ -98,7 +98,7 @@ export class AvoSchemaParser {
     };
 
     // eventProperties is always an object (Record), so mapping returns EventProperty[]
-    const mappedEventProps = mapping(eventProperties) as EventProperty[];
+    const mappedEventProps = (await mapping(eventProperties)) as EventProperty[];
 
     return mappedEventProps;
   }

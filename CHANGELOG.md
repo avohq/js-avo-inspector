@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **ECC Property Value Encryption**: Optional `publicEncryptionKey` parameter on SDK initialization enables zero-knowledge encryption of property values in dev/staging environments using ECIES (Elliptic Curve Integrated Encryption Scheme). Avo never has access to the private key, ensuring complete data privacy.
-  - Uses secp256k1 curve with AES-256-GCM for hybrid encryption
+  - Uses prime256v1 (NIST P-256) curve with AES-256-GCM for hybrid encryption (standard for Web Crypto API)
   - Only encrypts in dev/staging environments (production sends schema only)
   - Adds optional `encryptedPropertyValue` field to event schema
   - CLI tool for key generation: `npx avo-inspector generate-keys`
@@ -26,10 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Production environment now optimized: no property values, no encryption, no EventSpec API calls
 - Dev/Staging environments now support rich debugging with encrypted values and event specs
-
-### Dependencies
-
-- Added `eciesjs` ^0.4.11 for ECC/ECIES encryption
 
 ## 2.2.0
 

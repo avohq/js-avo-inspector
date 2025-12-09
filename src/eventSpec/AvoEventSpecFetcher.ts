@@ -294,7 +294,6 @@ export class AvoEventSpecFetcher {
       }));
 
       result[propName] = AvoEventSpecFetcher.mergePropertyConstraints(
-        propName,
         baseProp,
         baseEventId,
         variantProps,
@@ -309,7 +308,6 @@ export class AvoEventSpecFetcher {
    * Merges property constraints from base event and variants into a single PropertyConstraints.
    */
   private static mergePropertyConstraints(
-    propName: string,
     baseProp: PropertyConstraintsWire | undefined,
     baseEventId: string,
     variantProps: Array<{ eventId: string; prop: PropertyConstraintsWire | undefined }>,
@@ -386,7 +384,6 @@ export class AvoEventSpecFetcher {
         }));
 
         result.children[childName] = AvoEventSpecFetcher.mergePropertyConstraints(
-          childName,
           childWire,
           baseEventId,
           variantChildProps,

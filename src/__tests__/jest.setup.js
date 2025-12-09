@@ -1,4 +1,4 @@
-// Polyfill TextEncoder and TextDecoder for eciesjs and other crypto libraries
+// Polyfill TextEncoder and TextDecoder for crypto libraries
 const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;

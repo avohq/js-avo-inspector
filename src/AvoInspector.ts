@@ -172,7 +172,7 @@ export class AvoInspector {
           );
         }
 
-        const eventSchema = this.extractSchema(eventProperties, false);
+        const eventSchema = await this.extractSchema(eventProperties, false);
 
         // Fetch and validate event spec (sync blocking)
         const validationResult = await this.fetchAndValidateEvent(
@@ -234,7 +234,7 @@ export class AvoInspector {
           );
         }
 
-        const eventSchema = this.extractSchema(eventProperties, false);
+        const eventSchema = await this.extractSchema(eventProperties, false);
 
         // Fetch and validate event spec (sync blocking)
         const validationResult = await this.fetchAndValidateEvent(
@@ -287,7 +287,7 @@ export class AvoInspector {
   ): Promise<void> {
     try {
       if (
-        this.avoDeduplicator.shouldRegisterSchemaFromManually(
+        await this.avoDeduplicator.shouldRegisterSchemaFromManually(
           eventName,
           eventSchema
         )
@@ -348,15 +348,15 @@ export class AvoInspector {
     AvoInspector._shouldLog = enable;
   }
 
-  extractSchema(
+  async extractSchema(
     eventProperties: Record<string, any>,
     shouldLogIfEnabled = true
-  ): Array<{
+  ): Promise<Array<{
     propertyName: string;
     propertyType: string;
     encryptedPropertyValue?: string;
     children?: any;
-  }> {
+  }>> {
     try {
       if (this.avoDeduplicator.hasSeenEventParams(eventProperties, true)) {
         if (shouldLogIfEnabled && AvoInspector.shouldLog) {
@@ -375,7 +375,7 @@ export class AvoInspector {
         );
       }
 
-      return AvoSchemaParser.extractSchema(
+      return await AvoSchemaParser.extractSchema(
         eventProperties,
         this.publicEncryptionKey,
         this.environment

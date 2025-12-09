@@ -1,20 +1,18 @@
 #!/usr/bin/env node
 
-// Use eciesjs directly for ECC key generation
-const { PrivateKey } = require('eciesjs');
+// Use Node.js crypto for ECC key generation (prime256v1 / NIST P-256)
+const { createECDH } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 function generateKeyPair() {
-  // Generate a new random private key (32 bytes / 256 bits)
-  const privateKey = new PrivateKey();
-
-  // Derive the public key from the private key
-  const publicKey = privateKey.publicKey;
+  // Generate a new random private key (32 bytes) via ECDH on prime256v1
+  const ecdh = createECDH('prime256v1');
+  ecdh.generateKeys();
 
   return {
-    publicKey: publicKey.toHex(),
-    privateKey: privateKey.toHex()
+    publicKey: ecdh.getPublicKey('hex'),
+    privateKey: ecdh.getPrivateKey('hex')
   };
 }
 
@@ -48,7 +46,7 @@ Examples:
 function generateKeys(writeToFiles = false) {
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║           Generating ECC Key Pair (secp256k1)...             ║
+║      Generating ECC Key Pair (prime256v1 / NIST P-256)...     ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 
