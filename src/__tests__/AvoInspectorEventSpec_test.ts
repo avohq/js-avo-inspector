@@ -33,21 +33,27 @@ class MockXMLHttpRequest {
         this.response = responseBody;
         if (this.onload) this.onload();
       } else if (this.url.includes("/trackingPlan/eventSpec")) {
-        // Mock event spec endpoint response (new wire format)
+        // Mock event spec endpoint response (correct wire format with events array)
         this.status = 200;
         const mockSpec: EventSpecResponseWire = {
-          branchId: "main",
-          baseEvent: {
-            name: "test_event",
-            id: "evt_test",
-            props: {
-              test_prop: {
-                t: "string",
-                r: true
+          events: [
+            {
+              b: "main",
+              id: "evt_test",
+              vids: [],
+              p: {
+                test_prop: {
+                  t: "string",
+                  r: true
+                }
               }
             }
-          },
-          variants: []
+          ],
+          metadata: {
+            schemaId: "test-schema",
+            branchId: "main",
+            latestActionId: "test-action"
+          }
         };
         const responseBody = JSON.stringify(mockSpec);
         this.responseText = responseBody;

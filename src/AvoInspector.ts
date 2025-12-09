@@ -122,17 +122,18 @@ export class AvoInspector {
       options.suffix != null ? options.suffix : ""
     );
 
+    this.publicEncryptionKey = options.publicEncryptionKey;
+
     this.avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion
+      libVersion,
+      this.publicEncryptionKey
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
     this.avoDeduplicator = new AvoDeduplicator();
-
-    this.publicEncryptionKey = options.publicEncryptionKey;
     this.streamId = AvoStreamId.streamId;
 
     // Enable event spec fetching if streamId is present (and not "unknown")

@@ -7,7 +7,9 @@ import {
   createMinMaxProperty,
   createEventSpecEntry,
   createEventSpecResponse,
-  createNestedProperty
+  createNestedProperty,
+  createListProperty,
+  createListOfObjectsProperty
 } from "./helpers/mockFactories";
 
 // =============================================================================
@@ -488,6 +490,82 @@ describe("Min/Max Range Validation", () => {
     const result = validateEvent({ price: "not a number" }, specResponse);
 
     expect(result.propertyResults["price"].failedEventIds).toContain("evt_1");
+  });
+
+  test("should handle min-only range (empty max)", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          price: createMinMaxProperty({
+            "0,": ["evt_1"]  // min=0, no max
+          })
+        }
+      })
+    ]);
+
+    // Value above min should pass
+    const resultPass = validateEvent({ price: 999999 }, specResponse);
+    expect(resultPass.propertyResults["price"].failedEventIds).toBeUndefined();
+
+    // Value at min should pass
+    const resultAtMin = validateEvent({ price: 0 }, specResponse);
+    expect(resultAtMin.propertyResults["price"].failedEventIds).toBeUndefined();
+
+    // Value below min should fail
+    const resultFail = validateEvent({ price: -1 }, specResponse);
+    expect(resultFail.propertyResults["price"].failedEventIds).toContain("evt_1");
+  });
+
+  test("should handle max-only range (empty min)", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          score: createMinMaxProperty({
+            ",100": ["evt_1"]  // no min, max=100
+          })
+        }
+      })
+    ]);
+
+    // Value below max should pass
+    const resultPass = validateEvent({ score: -999999 }, specResponse);
+    expect(resultPass.propertyResults["score"].failedEventIds).toBeUndefined();
+
+    // Value at max should pass
+    const resultAtMax = validateEvent({ score: 100 }, specResponse);
+    expect(resultAtMax.propertyResults["score"].failedEventIds).toBeUndefined();
+
+    // Value above max should fail
+    const resultFail = validateEvent({ score: 101 }, specResponse);
+    expect(resultFail.propertyResults["score"].failedEventIds).toContain("evt_1");
+  });
+
+  test("should handle unbounded range (both empty)", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          value: createMinMaxProperty({
+            ",": ["evt_1"]  // no min, no max - any number passes
+          })
+        }
+      })
+    ]);
+
+    // Any number should pass
+    const resultLarge = validateEvent({ value: 999999999 }, specResponse);
+    expect(resultLarge.propertyResults["value"].failedEventIds).toBeUndefined();
+
+    const resultSmall = validateEvent({ value: -999999999 }, specResponse);
+    expect(resultSmall.propertyResults["value"].failedEventIds).toBeUndefined();
+
+    const resultZero = validateEvent({ value: 0 }, specResponse);
+    expect(resultZero.propertyResults["value"].failedEventIds).toBeUndefined();
   });
 });
 
@@ -1539,6 +1617,270 @@ describe("Nested Property Validation", () => {
         expect(typeValidation.passedEventIds).toContain("evt_1");
         expect(typeValidation.passedEventIds).not.toContain("evt_2");
       }
+    });
+  });
+});
+
+// =============================================================================
+// LIST TYPE VALIDATION TESTS
+// =============================================================================
+
+describe("List Type Validation", () => {
+  describe("List of Primitives with Allowed Values", () => {
+    test("should pass when all items are in allowed values", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            tags: createListProperty({
+              allowedValues: {
+                '["red","green","blue"]': ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({ tags: ["red", "green"] }, specResponse);
+
+      expect(result.propertyResults["tags"].failedEventIds).toBeUndefined();
+    });
+
+    test("should fail when any item is not in allowed values", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            tags: createListProperty({
+              allowedValues: {
+                '["red","green","blue"]': ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({ tags: ["red", "yellow"] }, specResponse);
+
+      expect(result.propertyResults["tags"].failedEventIds).toContain("evt_1");
+    });
+
+    test("should pass for empty array", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            tags: createListProperty({
+              allowedValues: {
+                '["red","green","blue"]': ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({ tags: [] }, specResponse);
+
+      // Empty array - no items to validate, should pass
+      expect(result.propertyResults["tags"].failedEventIds).toBeUndefined();
+    });
+  });
+
+  describe("List of Primitives with Min/Max Ranges", () => {
+    test("should pass when all items are within range", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            quantities: createListProperty({
+              type: "int",
+              minMaxRanges: {
+                "1,99": ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({ quantities: [1, 50, 99] }, specResponse);
+
+      expect(result.propertyResults["quantities"].failedEventIds).toBeUndefined();
+    });
+
+    test("should fail when any item is out of range", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            quantities: createListProperty({
+              type: "int",
+              minMaxRanges: {
+                "1,99": ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({ quantities: [1, 50, 100] }, specResponse);
+
+      expect(result.propertyResults["quantities"].failedEventIds).toContain("evt_1");
+    });
+  });
+
+  describe("List of Primitives with Regex", () => {
+    test("should pass when all items match regex", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            codes: createListProperty({
+              regexPatterns: {
+                "^[A-Z]{3}$": ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({ codes: ["USD", "EUR", "GBP"] }, specResponse);
+
+      expect(result.propertyResults["codes"].failedEventIds).toBeUndefined();
+    });
+
+    test("should fail when any item does not match regex", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            codes: createListProperty({
+              regexPatterns: {
+                "^[A-Z]{3}$": ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({ codes: ["USD", "euro", "GBP"] }, specResponse);
+
+      expect(result.propertyResults["codes"].failedEventIds).toContain("evt_1");
+    });
+  });
+
+  describe("List of Objects with Children", () => {
+    test("should pass when all items have valid children", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            items: createListOfObjectsProperty({
+              quantity: createMinMaxProperty({
+                "1,99": ["evt_1"]
+              }),
+              item_type: createAllowedValuesProperty({
+                '["product","service"]': ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({
+        items: [
+          { quantity: 5, item_type: "product" },
+          { quantity: 10, item_type: "service" }
+        ]
+      }, specResponse);
+
+      expect(result.propertyResults["items"].children?.["quantity"]?.failedEventIds).toBeUndefined();
+      expect(result.propertyResults["items"].children?.["item_type"]?.failedEventIds).toBeUndefined();
+    });
+
+    test("should fail when any item has invalid child", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            items: createListOfObjectsProperty({
+              quantity: createMinMaxProperty({
+                "1,99": ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({
+        items: [
+          { quantity: 5 },
+          { quantity: 100 }  // Out of range
+        ]
+      }, specResponse);
+
+      expect(result.propertyResults["items"].children?.["quantity"]?.failedEventIds).toContain("evt_1");
+    });
+
+    test("should aggregate failures across all items", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: ["evt_1.v1"],
+          props: {
+            items: createListOfObjectsProperty({
+              category: createAllowedValuesProperty({
+                '["electronics","clothing"]': ["evt_1"],
+                '["electronics","clothing","food"]': ["evt_1.v1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent({
+        items: [
+          { category: "electronics" },
+          { category: "food" }  // Only valid for evt_1.v1
+        ]
+      }, specResponse);
+
+      // evt_1 should fail (doesn't allow "food"), evt_1.v1 should pass
+      const categoryResult = result.propertyResults["items"].children?.["category"];
+      expect(categoryResult?.failedEventIds).toContain("evt_1");
+      expect(categoryResult?.failedEventIds).not.toContain("evt_1.v1");
+    });
+  });
+
+  describe("Non-Array Value for List Property", () => {
+    test("should return empty result when non-array passed to list property", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            tags: createListProperty({
+              allowedValues: {
+                '["red","green","blue"]': ["evt_1"]
+              }
+            })
+          }
+        })
+      ]);
+
+      // Passing a string instead of array
+      const result = validateEvent({ tags: "red" }, specResponse);
+
+      // Non-array for list property - type mismatch not validated
+      expect(result.propertyResults["tags"]).toEqual({});
     });
   });
 });

@@ -200,7 +200,7 @@ export function createMultiEventSpecResponse(): EventSpecResponse {
 }
 
 /**
- * Creates a property with nested children constraints.
+ * Creates a property with nested children constraints (single object).
  * children maps each child property name to its PropertyConstraints.
  */
 export function createNestedProperty(
@@ -209,6 +209,36 @@ export function createNestedProperty(
 ): PropertyConstraints {
   return createPropertyConstraints({
     type: "object",
+    children,
+    ...extraOverrides
+  });
+}
+
+/**
+ * Creates a list property (array of items).
+ * For list of primitives: pass constraints like allowedValues, minMaxRanges, etc.
+ * For list of objects: pass children constraints.
+ */
+export function createListProperty(
+  extraOverrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
+  return createPropertyConstraints({
+    type: "list",
+    isList: true,
+    ...extraOverrides
+  });
+}
+
+/**
+ * Creates a list of objects property with children constraints.
+ */
+export function createListOfObjectsProperty(
+  children: Record<string, PropertyConstraints>,
+  extraOverrides: Partial<PropertyConstraints> = {}
+): PropertyConstraints {
+  return createPropertyConstraints({
+    type: "object",
+    isList: true,
     children,
     ...extraOverrides
   });

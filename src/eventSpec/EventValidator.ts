@@ -234,6 +234,32 @@ function getOrCompileRegex(pattern: string): RegExp {
   return regex;
 }
 
+/**
+ * Cache for parsed allowed values JSON.
+ * Key: JSON string, Value: Set of allowed values for O(1) lookup.
+ */
+const allowedValuesCache = new Map<string, Set<string>>();
+
+/**
+ * Parses allowed values JSON string and returns a Set for O(1) lookup.
+ * Results are cached to avoid repeated JSON.parse calls.
+ * @returns Set of allowed values, or null if JSON is invalid
+ */
+function getOrParseAllowedValues(jsonString: string): Set<string> | null {
+  let allowedSet = allowedValuesCache.get(jsonString);
+  if (!allowedSet) {
+    try {
+      const allowedArray: string[] = JSON.parse(jsonString);
+      allowedSet = new Set(allowedArray);
+      allowedValuesCache.set(jsonString, allowedSet);
+    } catch (e) {
+      // Invalid JSON - return null
+      return null;
+    }
+  }
+  return allowedSet;
+}
+
 // =============================================================================
 // MAIN VALIDATION FUNCTION
 // =============================================================================
@@ -382,6 +408,10 @@ const MAX_VALIDATION_DEPTH = 100;
  * - Skip value-level validation (pinned/allowed/regex/minmax)
  * - Recursively validate child properties
  *
+ * For list properties (isList=true):
+ * - If list of objects with children: validate each array item's children
+ * - If list of primitives: validate each array item against constraints
+ *
  * @param depth - Current recursion depth (internal use)
  */
 function validatePropertyConstraints(
@@ -398,21 +428,84 @@ function validatePropertyConstraints(
     return result;
   }
 
-  // Handle nested object properties with children
-  if (constraints.children) {
-    // For object properties, recursively validate children
-    // Object properties themselves have no value constraints to validate
-    const childrenResults: Record<string, PropertyValidationResult> = {};
-    const valueObj = (typeof value === "object" && value !== null && !Array.isArray(value))
-      ? (value as Record<string, RuntimePropertyValue>)
-      : {};
+  // Handle list types (isList=true)
+  if (constraints.isList) {
+    return validateListProperty(value, constraints, allEventIds, depth);
+  }
 
+  // Handle nested object properties with children (single object, not list)
+  if (constraints.children) {
+    return validateObjectProperty(value, constraints, allEventIds, depth);
+  }
+
+  // Validate value constraints for primitive properties
+  return validatePrimitiveProperty(value, constraints, allEventIds);
+}
+
+/**
+ * Validates a list property (array of items).
+ * For list of objects: validates each item's children.
+ * For list of primitives: validates each item against constraints.
+ * Any item failing causes the eventId to fail for that constraint.
+ */
+function validateListProperty(
+  value: RuntimePropertyValue,
+  constraints: PropertyConstraints,
+  allEventIds: string[],
+  depth: number
+): PropertyValidationResult {
+  const result: PropertyValidationResult = {};
+
+  // If value is not an array, we can't validate list items
+  if (!Array.isArray(value)) {
+    // Non-array value for a list property - return empty result (type mismatch not validated here)
+    return result;
+  }
+
+  // List of objects with children
+  if (constraints.children) {
+    const childrenResults: Record<string, PropertyValidationResult> = {};
+
+    // For each child property, collect failures across ALL array items
     for (const [childName, childConstraints] of Object.entries(constraints.children)) {
-      const childValue = valueObj[childName];
-      const childResult = validatePropertyConstraints(childValue, childConstraints, allEventIds, depth + 1);
-      // Only include non-empty results
-      if (childResult.failedEventIds || childResult.passedEventIds || childResult.children) {
-        childrenResults[childName] = childResult;
+      const aggregatedFailedIds = new Set<string>();
+
+      // Validate this child property in each array item
+      for (const item of value) {
+        const itemObj = (typeof item === "object" && item !== null && !Array.isArray(item))
+          ? (item as Record<string, RuntimePropertyValue>)
+          : {};
+        const childValue = itemObj[childName];
+        const childResult = validatePropertyConstraints(childValue, childConstraints, allEventIds, depth + 1);
+
+        // Collect failed IDs from this item
+        if (childResult.failedEventIds) {
+          for (const id of childResult.failedEventIds) {
+            aggregatedFailedIds.add(id);
+          }
+        }
+        // If passedEventIds is returned, failed = allEventIds - passedEventIds
+        // Use Set for O(1) lookup instead of O(n) .includes()
+        if (childResult.passedEventIds) {
+          const passedSet = new Set(childResult.passedEventIds);
+          for (const id of allEventIds) {
+            if (!passedSet.has(id)) {
+              aggregatedFailedIds.add(id);
+            }
+          }
+        }
+      }
+
+      // Build result for this child property
+      if (aggregatedFailedIds.size > 0) {
+        const failedArray = Array.from(aggregatedFailedIds);
+        const passedIds = allEventIds.filter((id) => !aggregatedFailedIds.has(id));
+
+        if (passedIds.length < failedArray.length && passedIds.length > 0) {
+          childrenResults[childName] = { passedEventIds: passedIds };
+        } else {
+          childrenResults[childName] = { failedEventIds: failedArray };
+        }
       }
     }
 
@@ -423,7 +516,74 @@ function validatePropertyConstraints(
     return result;
   }
 
-  // Validate value constraints for non-object properties
+  // List of primitives - validate each item against constraints
+  const failedIds = new Set<string>();
+
+  for (const item of value) {
+    // Check pinned values for this item
+    if (constraints.pinnedValues) {
+      checkPinnedValues(item, constraints.pinnedValues, failedIds);
+    }
+
+    // Check allowed values for this item
+    if (constraints.allowedValues) {
+      checkAllowedValues(item, constraints.allowedValues, failedIds);
+    }
+
+    // Check regex patterns for this item
+    if (constraints.regexPatterns) {
+      checkRegexPatterns(item, constraints.regexPatterns, failedIds);
+    }
+
+    // Check min/max ranges for this item
+    if (constraints.minMaxRanges) {
+      checkMinMaxRanges(item, constraints.minMaxRanges, failedIds);
+    }
+  }
+
+  return buildValidationResult(failedIds, allEventIds);
+}
+
+/**
+ * Validates an object property (single object with children).
+ */
+function validateObjectProperty(
+  value: RuntimePropertyValue,
+  constraints: PropertyConstraints,
+  allEventIds: string[],
+  depth: number
+): PropertyValidationResult {
+  const result: PropertyValidationResult = {};
+  const childrenResults: Record<string, PropertyValidationResult> = {};
+
+  const valueObj = (typeof value === "object" && value !== null && !Array.isArray(value))
+    ? (value as Record<string, RuntimePropertyValue>)
+    : {};
+
+  for (const [childName, childConstraints] of Object.entries(constraints.children!)) {
+    const childValue = valueObj[childName];
+    const childResult = validatePropertyConstraints(childValue, childConstraints, allEventIds, depth + 1);
+    // Only include non-empty results
+    if (childResult.failedEventIds || childResult.passedEventIds || childResult.children) {
+      childrenResults[childName] = childResult;
+    }
+  }
+
+  if (Object.keys(childrenResults).length > 0) {
+    result.children = childrenResults;
+  }
+
+  return result;
+}
+
+/**
+ * Validates a primitive property (not list, not object with children).
+ */
+function validatePrimitiveProperty(
+  value: RuntimePropertyValue,
+  constraints: PropertyConstraints,
+  allEventIds: string[]
+): PropertyValidationResult {
   const failedIds = new Set<string>();
 
   // Check pinned values
@@ -446,7 +606,16 @@ function validatePropertyConstraints(
     checkMinMaxRanges(value, constraints.minMaxRanges, failedIds);
   }
 
-  // Calculate passed IDs
+  return buildValidationResult(failedIds, allEventIds);
+}
+
+/**
+ * Builds the validation result from failed IDs, returning whichever list is smaller.
+ */
+function buildValidationResult(
+  failedIds: Set<string>,
+  allEventIds: string[]
+): PropertyValidationResult {
   const passedIds = allEventIds.filter((id) => !failedIds.has(id));
   const failedArray = Array.from(failedIds);
 
@@ -530,6 +699,7 @@ function checkPinnedValues(
 /**
  * Checks allowed values constraint.
  * For each "[...array]" -> eventIds entry, if runtime value NOT in array, those eventIds FAIL.
+ * Uses cached Set for O(1) lookup instead of O(n) .includes().
  */
 function checkAllowedValues(
   value: RuntimePropertyValue,
@@ -539,17 +709,17 @@ function checkAllowedValues(
   const stringValue = convertValueToString(value);
 
   for (const [allowedArrayJson, eventIds] of Object.entries(allowedValues)) {
-    try {
-      const allowedArray: string[] = JSON.parse(allowedArrayJson);
-      if (!allowedArray.includes(stringValue)) {
-        // Value not in allowed list, so these eventIds fail
-        addIdsToSet(eventIds, failedIds);
-      }
-    } catch (e) {
+    const allowedSet = getOrParseAllowedValues(allowedArrayJson);
+    if (allowedSet === null) {
       // Invalid JSON - skip this constraint
       console.warn(
         `[Avo Inspector] Invalid allowed values JSON: ${allowedArrayJson}`
       );
+      continue;
+    }
+    if (!allowedSet.has(stringValue)) {
+      // Value not in allowed list, so these eventIds fail
+      addIdsToSet(eventIds, failedIds);
     }
   }
 }
@@ -589,6 +759,7 @@ function checkRegexPatterns(
 /**
  * Checks min/max range constraint.
  * For each "min,max" -> eventIds entry, if runtime value < min OR > max, those eventIds FAIL.
+ * Empty bounds are supported: "0," means min=0 with no max, ",100" means no min with max=100.
  */
 function checkMinMaxRanges(
   value: RuntimePropertyValue,
@@ -615,11 +786,16 @@ function checkMinMaxRanges(
 
   for (const [rangeStr, eventIds] of Object.entries(minMaxRanges)) {
     const [minStr, maxStr] = rangeStr.split(",");
-    const min = parseFloat(minStr);
-    const max = parseFloat(maxStr);
 
-    if (isNaN(min) || isNaN(max)) {
-      // Invalid range format - skip this constraint
+    // Handle empty bounds: empty string means no constraint on that side
+    const hasMin = minStr !== "" && minStr !== undefined;
+    const hasMax = maxStr !== "" && maxStr !== undefined;
+
+    const min = hasMin ? parseFloat(minStr) : -Infinity;
+    const max = hasMax ? parseFloat(maxStr) : Infinity;
+
+    // Only check for invalid format if a bound was specified but couldn't be parsed
+    if ((hasMin && isNaN(min)) || (hasMax && isNaN(max))) {
       console.warn(`[Avo Inspector] Invalid min/max range: ${rangeStr}`);
       continue;
     }
