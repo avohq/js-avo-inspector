@@ -1279,14 +1279,18 @@ describe("Nested Property Validation", () => {
   });
 
   describe("Deeply Nested Properties", () => {
-    test("should validate properties at multiple nesting levels", () => {
+    test("should NOT validate constraints at child2 level (depth limit)", () => {
+      // Validation depth is limited to 2 levels: prop (depth 0), prop.child1 (depth 1)
+      // At depth 2+ (prop.child1.child2), we stop validating to match schema validation behavior
       const specResponse = createEventSpecResponse([
         createEventSpecEntry({
           baseEventId: "evt_1",
           variantIds: [],
           props: {
+            // order is depth 0, shipping is depth 1 (child1), address is depth 2 (child2)
             order: createNestedProperty({
               shipping: createNestedProperty({
+                // This constraint is at depth 2 (address.country) and should NOT be validated
                 address: createNestedProperty({
                   country: createPinnedValueProperty({
                     US: ["evt_1"]
@@ -1298,28 +1302,51 @@ describe("Nested Property Validation", () => {
         })
       ]);
 
-      const resultPass = validateEvent(
-        { order: { shipping: { address: { country: "US" } } } },
-        specResponse
-      );
-      const resultFail = validateEvent(
+      // "CA" would fail the pinned value constraint if validated, but we don't validate at depth 2+
+      const result = validateEvent(
         { order: { shipping: { address: { country: "CA" } } } },
         specResponse
       );
 
-      // Navigate through nested children
+      // No validation failures should be reported because depth 2+ is not validated
+      // Empty result means no constraints were checked/failed
+      expect(result.propertyResults["order"]).toEqual({});
+    });
+
+    test("should validate constraints at child1 level (within depth limit)", () => {
+      // Test with 2 levels: prop (depth 0) -> child1 (depth 1)
+      // child1 IS within the depth limit and should be validated
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            order: createNestedProperty({
+              status: createPinnedValueProperty({
+                pending: ["evt_1"]
+              })
+            })
+          }
+        })
+      ]);
+
+      const resultPass = validateEvent(
+        { order: { status: "pending" } },
+        specResponse
+      );
+      const resultFail = validateEvent(
+        { order: { status: "shipped" } },
+        specResponse
+      );
+
+      // child1 (status at depth 1) should be validated - no failures when value matches
       expect(
-        resultPass.propertyResults["order"]
-          .children?.["shipping"]
-          .children?.["address"]
-          .children?.["country"].failedEventIds
+        resultPass.propertyResults["order"].children?.["status"].failedEventIds
       ).toBeUndefined();
 
+      // child1 (status at depth 1) should be validated - failures when value doesn't match
       expect(
-        resultFail.propertyResults["order"]
-          .children?.["shipping"]
-          .children?.["address"]
-          .children?.["country"].failedEventIds
+        resultFail.propertyResults["order"].children?.["status"].failedEventIds
       ).toContain("evt_1");
     });
   });

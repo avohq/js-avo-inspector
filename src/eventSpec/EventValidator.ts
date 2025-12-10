@@ -396,8 +396,13 @@ function collectConstraintsByPropertyName(
   return result;
 }
 
-/** Maximum nesting depth for recursive validation to prevent stack overflow */
-const MAX_VALIDATION_DEPTH = 100;
+/**
+ * Maximum nesting depth for recursive value validation.
+ * We validate prop (depth 0), prop.child1 (depth 1), but NOT prop.child1.child2 (depth 2+).
+ * At depth 2+, we know there's an object but don't dive into its children for value validation.
+ * This matches the behavior of schema validation.
+ */
+const MAX_CHILD_DEPTH = 2;
 
 /**
  * Validates a property value against its constraints.
@@ -406,11 +411,14 @@ const MAX_VALIDATION_DEPTH = 100;
  *
  * For object properties with children:
  * - Skip value-level validation (pinned/allowed/regex/minmax)
- * - Recursively validate child properties
+ * - Recursively validate child properties (up to MAX_CHILD_DEPTH)
  *
  * For list properties (isList=true):
  * - If list of objects with children: validate each array item's children
  * - If list of primitives: validate each array item against constraints
+ *
+ * Depth limiting: We validate prop (depth 0), prop.child1 (depth 1), but stop
+ * at prop.child1.child2 (depth 2+). This matches schema validation behavior.
  *
  * @param depth - Current recursion depth (internal use)
  */
@@ -422,9 +430,9 @@ function validatePropertyConstraints(
 ): PropertyValidationResult {
   const result: PropertyValidationResult = {};
 
-  // Guard against excessive nesting (potential malformed spec or DoS)
-  if (depth > MAX_VALIDATION_DEPTH) {
-    console.warn(`[Avo Inspector] Max validation depth (${MAX_VALIDATION_DEPTH}) exceeded, stopping recursive validation`);
+  // Stop recursion at depth 2+ - we don't validate child2 and deeper
+  // This matches schema validation which shows prop.child1.child2: object without diving in
+  if (depth >= MAX_CHILD_DEPTH) {
     return result;
   }
 

@@ -719,20 +719,22 @@ describe("Validation Integration", () => {
       expect(shippingProp).toBeDefined();
       expect(shippingProp.children).toBeDefined();
 
-      // Find shipping.address (nested object)
+      // Find shipping.method (depth 1 child - should have validation results)
+      const methodChild = shippingProp.children.find(
+        (c: any) => c.propertyName === "method"
+      );
+      expect(methodChild).toBeDefined();
+      expect(methodChild.propertyType).toBe("string");
+
+      // Find shipping.address (depth 1 child, nested object)
       const addressChild = shippingProp.children.find(
         (c: any) => c.propertyName === "address"
       );
       expect(addressChild).toBeDefined();
       expect(addressChild.propertyType).toBe("object");
+      // Note: children at depth 2 (zip, country) are NOT validated due to depth limit
+      // They still appear in the schema structure but without validation results
       expect(addressChild.children).toBeDefined();
-
-      // Find shipping.address.zip (deeply nested)
-      const zipChild = addressChild.children.find(
-        (c: any) => c.propertyName === "zip"
-      );
-      expect(zipChild).toBeDefined();
-      // "12345" matches the regex, so no failures expected
     });
 
     test("should include failedEventIds on nested children when validation fails", async () => {
@@ -771,7 +773,7 @@ describe("Validation Integration", () => {
 
       const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
 
-      // Check user.id has failures (invalid regex)
+      // Check user.id has failures (invalid regex) - depth 1, should be validated
       const userProp = eventBody.eventProperties.find(
         (p: any) => p.propertyName === "user"
       );
@@ -783,24 +785,25 @@ describe("Validation Integration", () => {
       expect(idChild.failedEventIds).toContain("evt_purchase.v1");
       expect(idChild.failedEventIds).toContain("evt_purchase.v2");
 
-      // Check user.tier has failures (not in any allowed list)
+      // Check user.tier has failures (not in any allowed list) - depth 1, should be validated
       const tierChild = userProp.children.find(
         (c: any) => c.propertyName === "tier"
       );
       expect(tierChild.failedEventIds).toBeDefined();
 
-      // Check shipping.address.zip has failures (invalid regex)
+      // Check shipping.method has failures (invalid value) - depth 1, should be validated
       const shippingProp = eventBody.eventProperties.find(
         (p: any) => p.propertyName === "shipping"
       );
-      const addressChild = shippingProp.children.find(
-        (c: any) => c.propertyName === "address"
+      const methodChild = shippingProp.children.find(
+        (c: any) => c.propertyName === "method"
       );
-      const zipChild = addressChild.children.find(
-        (c: any) => c.propertyName === "zip"
-      );
-      expect(zipChild.failedEventIds).toBeDefined();
-      expect(zipChild.failedEventIds).toContain("evt_purchase");
+      expect(methodChild.failedEventIds).toBeDefined();
+      expect(methodChild.failedEventIds).toContain("evt_purchase");
+
+      // Note: shipping.address.zip and shipping.address.country are at depth 2
+      // They are NOT validated due to the depth limit (max child depth = 2)
+      // This matches schema validation behavior where we don't dive into child2+
     });
 
     test("should produce correct inspector request structure for nested properties", async () => {
