@@ -16,6 +16,6 @@ export function generateKeyPair(): { publicKey: string; privateKey: string } {
  * Test helper: Decrypts a value that was encrypted using encryptValue.
  * Used for testing purposes only.
  */
-export async function decryptValue(encryptedValue: string, privateKey: string): Promise<any> {
-  return await decryptValueImpl(encryptedValue, privateKey);
+export function decryptValue(encryptedValue: string, privateKey: string): any {
+  return decryptValueImpl(encryptedValue, privateKey);
 }

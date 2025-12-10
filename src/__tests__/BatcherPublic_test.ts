@@ -78,7 +78,7 @@ describe("Batcher", () => {
       prop4: 0.0
     };
 
-    const schema = await inspector.extractSchema(properties);
+    const schema = inspector.extractSchema(properties);
 
     await inspector.trackSchemaFromEvent(eventName, properties);
 
@@ -102,7 +102,7 @@ describe("Batcher", () => {
     const eventId = "testId";
     const eventHash = "testHash";
 
-    const schema = await inspector.extractSchema(properties);
+    const schema = inspector.extractSchema(properties);
 
     // @ts-expect-error
     await inspector._avoFunctionTrackSchemaFromEvent(eventName, properties, eventId, eventHash);
