@@ -1,6 +1,7 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import type { EventSpecResponseWire } from "../eventSpec/AvoEventSpecFetchTypes";
+import { TEST_KEY_PAIR } from "./helpers/encryptionHelpers";
 
 // Mock XMLHttpRequest for event spec fetching
 class MockXMLHttpRequest {
@@ -191,11 +192,13 @@ describe("AvoInspector Event Spec Integration", () => {
     });
 
     test("should track events and fetch spec WITH encryption key", async () => {
+      const { publicKey: testPublicKey } = TEST_KEY_PAIR;
+
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        publicEncryptionKey: "test-public-key-123"
+        publicEncryptionKey: testPublicKey
       });
 
       const result = await inspector.trackSchemaFromEvent("test_event", {
