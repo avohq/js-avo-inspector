@@ -6,78 +6,78 @@ describe("AvoEncryption", () => {
   const { publicKey: testPublicKey, privateKey: testPrivateKey } = generateKeyPair();
 
   describe("encryptValue", () => {
-    test("should encrypt and decrypt a string value", () => {
+    test("should encrypt and decrypt a string value", async () => {
       const originalValue = "test string";
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(encrypted).not.toBe(originalValue);
       expect(decrypted).toBe(originalValue);
     });
 
-    test("should encrypt and decrypt a number value", () => {
+    test("should encrypt and decrypt a number value", async () => {
       const originalValue = 42;
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(encrypted).not.toBe(originalValue.toString());
       expect(decrypted).toBe(originalValue);
     });
 
-    test("should encrypt and decrypt a boolean value", () => {
+    test("should encrypt and decrypt a boolean value", async () => {
       const originalValue = true;
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toBe(originalValue);
     });
 
-    test("should encrypt and decrypt a null value", () => {
+    test("should encrypt and decrypt a null value", async () => {
       const originalValue = null;
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toBe(originalValue);
     });
 
-    test("should encrypt and decrypt an object value", () => {
+    test("should encrypt and decrypt an object value", async () => {
       const originalValue = { key: "value", nested: { prop: 123 } };
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toEqual(originalValue);
     });
 
-    test("should encrypt and decrypt an array value", () => {
+    test("should encrypt and decrypt an array value", async () => {
       const originalValue = [1, 2, "three", { four: 4 }];
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toEqual(originalValue);
     });
 
-    test("should produce different encrypted values for the same input with different public keys", () => {
+    test("should produce different encrypted values for the same input with different public keys", async () => {
       const value = "test";
 
       // Generate two different key pairs
       const { publicKey: publicKey1 } = generateKeyPair();
       const { publicKey: publicKey2 } = generateKeyPair();
 
-      const encrypted1 = encryptValue(value, publicKey1);
-      const encrypted2 = encryptValue(value, publicKey2);
+      const encrypted1 = await encryptValue(value, publicKey1);
+      const encrypted2 = await encryptValue(value, publicKey2);
 
       expect(encrypted1).not.toBe(encrypted2);
     });
 
-    test("should return a base64 string", () => {
+    test("should return a base64 string", async () => {
       const value = "test";
-      const encrypted = encryptValue(value, testPublicKey);
+      const encrypted = await encryptValue(value, testPublicKey);
 
       // Base64 string should only contain alphanumeric chars, +, /, =, and newlines
       expect(encrypted).toMatch(/^[A-Za-z0-9+/=\n\r]+$/);
     });
 
-    test("should encrypt and decrypt large payloads (1KB+)", () => {
+    test("should encrypt and decrypt large payloads (1KB+)", async () => {
       // Create a large object that would exceed RSA-2048's ~245 byte limit
       const largeObject = {
         description: "A".repeat(500), // 500 character string
@@ -98,13 +98,13 @@ describe("AvoEncryption", () => {
       expect(jsonSize).toBeGreaterThan(1000);
 
       // Should successfully encrypt and decrypt without errors
-      const encrypted = encryptValue(largeObject, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(largeObject, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toEqual(largeObject);
     });
 
-    test("should encrypt and decrypt very large payloads (5KB+)", () => {
+    test("should encrypt and decrypt very large payloads (5KB+)", async () => {
       // Create an even larger object
       const veryLargeObject = {
         data: "X".repeat(5000), // 5000 character string
@@ -119,25 +119,25 @@ describe("AvoEncryption", () => {
       expect(jsonSize).toBeGreaterThan(5000);
 
       // ECIES should handle this without any issues
-      const encrypted = encryptValue(veryLargeObject, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(veryLargeObject, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toEqual(veryLargeObject);
     });
 
-    test("should produce different ciphertexts for the same plaintext (ephemeral keys)", () => {
+    test("should produce different ciphertexts for the same plaintext (ephemeral keys)", async () => {
       const value = "test";
 
       // Encrypt the same value twice with the same public key
       // ECIES uses ephemeral keys, so the ciphertext should be different each time
-      const encrypted1 = encryptValue(value, testPublicKey);
-      const encrypted2 = encryptValue(value, testPublicKey);
+      const encrypted1 = await encryptValue(value, testPublicKey);
+      const encrypted2 = await encryptValue(value, testPublicKey);
 
       expect(encrypted1).not.toBe(encrypted2);
 
       // But both should decrypt to the same value
-      const decrypted1 = decryptValue(encrypted1, testPrivateKey);
-      const decrypted2 = decryptValue(encrypted2, testPrivateKey);
+      const decrypted1 = await decryptValue(encrypted1, testPrivateKey);
+      const decrypted2 = await decryptValue(encrypted2, testPrivateKey);
 
       expect(decrypted1).toBe(value);
       expect(decrypted2).toBe(value);
@@ -145,44 +145,44 @@ describe("AvoEncryption", () => {
   });
 
   describe("decryptValue", () => {
-    test("should fail to decrypt with wrong private key", () => {
+    test("should fail to decrypt with wrong private key", async () => {
       const value = "test";
 
       // Generate another key pair with different private key
       const { privateKey: wrongPrivateKey } = generateKeyPair();
 
-      const encrypted = encryptValue(value, testPublicKey);
+      const encrypted = await encryptValue(value, testPublicKey);
 
-      expect(() => {
-        decryptValue(encrypted, wrongPrivateKey);
-      }).toThrow();
+      await expect(async () => {
+        await decryptValue(encrypted, wrongPrivateKey);
+      }).rejects.toThrow();
     });
 
-    test("should handle empty string value", () => {
+    test("should handle empty string value", async () => {
       const originalValue = "";
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toBe(originalValue);
     });
 
-    test("should handle zero value", () => {
+    test("should handle zero value", async () => {
       const originalValue = 0;
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toBe(originalValue);
     });
 
-    test("should handle false value", () => {
+    test("should handle false value", async () => {
       const originalValue = false;
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toBe(originalValue);
     });
 
-    test("should handle complex nested objects", () => {
+    test("should handle complex nested objects", async () => {
       const originalValue = {
         string: "test",
         number: 42,
@@ -195,8 +195,8 @@ describe("AvoEncryption", () => {
           }
         }
       };
-      const encrypted = encryptValue(originalValue, testPublicKey);
-      const decrypted = decryptValue(encrypted, testPrivateKey);
+      const encrypted = await encryptValue(originalValue, testPublicKey);
+      const decrypted = await decryptValue(encrypted, testPrivateKey);
 
       expect(decrypted).toEqual(originalValue);
     });

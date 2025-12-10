@@ -8,14 +8,14 @@ describe("Schema Parsing", () => {
     inspector.enableLogging(false);
   });
 
-  test("Empty array returned if eventProperties are not set", () => {
+  test("Empty array returned if eventProperties are not set", async () => {
     // @ts-expect-error
-    const schema = inspector.extractSchema();
+    const schema = await inspector.extractSchema();
 
     expect(schema).toEqual([]);
   });
 
-  test("Record is parsed correctly", () => {
+  test("Record is parsed correctly", async () => {
     // Given
     const eventProperrtiesaRecord: Record<string, unknown> = {
       prop0: true,
@@ -38,7 +38,7 @@ describe("Schema Parsing", () => {
     };
 
     // When
-    const res = inspector.extractSchema(eventProperrtiesaRecord);
+    const res = await inspector.extractSchema(eventProperrtiesaRecord);
 
     // Then
     res.forEach(({ propertyName }, index) => {
@@ -80,7 +80,7 @@ describe("Schema Parsing", () => {
     ]);
   });
 
-  test("Property types and names are set", () => {
+  test("Property types and names are set", async () => {
     // Given
     const eventProperties = {
       prop0: true,
@@ -103,7 +103,7 @@ describe("Schema Parsing", () => {
     };
 
     // When
-    const res = inspector.extractSchema(eventProperties);
+    const res = await inspector.extractSchema(eventProperties);
 
     // Then
     res.forEach(({ propertyName }, index) => {
@@ -143,14 +143,14 @@ describe("Schema Parsing", () => {
     ]);
   });
 
-  test("Duplicated values are removed", () => {
+  test("Duplicated values are removed", async () => {
     // Given
     const eventProperties = {
       prop0: ["true", "false", true, 10, "true", true, 11, 10, 0.1, 0.1]
     };
 
     // When
-    const res = inspector.extractSchema(eventProperties);
+    const res = await inspector.extractSchema(eventProperties);
 
     // Then
     expect(res[0].propertyType).toBe(type.LIST);
@@ -162,7 +162,7 @@ describe("Schema Parsing", () => {
     ]);
   });
 
-  test("Empty and falsy values are set correctly", () => {
+  test("Empty and falsy values are set correctly", async () => {
     // Given
     const eventProperties = {
       prop0: false,
@@ -176,7 +176,7 @@ describe("Schema Parsing", () => {
     };
 
     // When
-    const res = inspector.extractSchema(eventProperties);
+    const res = await inspector.extractSchema(eventProperties);
 
     // Then
     expect(res[0].propertyType).toBe(type.BOOL);
@@ -193,7 +193,7 @@ describe("Schema Parsing", () => {
     expect(res[7].children).toMatchObject([]);
   });
 
-  test("List of nested objects (like Cmd Palette Results) is parsed correctly", () => {
+  test("List of nested objects (like Cmd Palette Results) is parsed correctly", async () => {
     // Given - event structure matching real Avo event "Cmd Palette Results Received"
     const eventProperties = {
       "Schema Id": "schema-123",
@@ -251,7 +251,7 @@ describe("Schema Parsing", () => {
     };
 
     // When
-    const res = inspector.extractSchema(eventProperties);
+    const res = await inspector.extractSchema(eventProperties);
 
     // Then - verify all properties are extracted
     expect(res.length).toBe(20);
@@ -301,7 +301,7 @@ describe("Schema Parsing", () => {
     }
   });
 
-  test("List of nested objects serializes correctly for API", () => {
+  test("List of nested objects serializes correctly for API", async () => {
     // Given - simpler example focusing on the nested structure
     const eventProperties = {
       "Items": [
@@ -311,7 +311,7 @@ describe("Schema Parsing", () => {
     };
 
     // When
-    const res = inspector.extractSchema(eventProperties);
+    const res = await inspector.extractSchema(eventProperties);
 
     // Then
     expect(res.length).toBe(1);
@@ -332,7 +332,7 @@ describe("Schema Parsing", () => {
     expect(parsed[0].children[0].length).toBe(3); // name, count, active
   });
 
-  test("Full Cmd Palette event JSON structure is correct for API", () => {
+  test("Full Cmd Palette event JSON structure is correct for API", async () => {
     // Given - the exact structure from the bug report
     const eventProperties = {
       "Schema Id": "schema-123",
@@ -363,7 +363,7 @@ describe("Schema Parsing", () => {
     };
 
     // When
-    const schema = inspector.extractSchema(eventProperties);
+    const schema = await inspector.extractSchema(eventProperties);
     const jsonPayload = JSON.stringify(schema, null, 2);
 
     // Log the full JSON for debugging
@@ -373,8 +373,8 @@ describe("Schema Parsing", () => {
     expect(schema.length).toBe(9);
 
     // Find the nested properties
-    const visibleSmartResults = schema.find(p => p.propertyName === "Visible Smart Results");
-    const visibleFuzzyMatches = schema.find(p => p.propertyName === "Visible Fuzzy Matches");
+    const visibleSmartResults = schema.find((p: any) => p.propertyName === "Visible Smart Results");
+    const visibleFuzzyMatches = schema.find((p: any) => p.propertyName === "Visible Fuzzy Matches");
 
     expect(visibleSmartResults).toBeDefined();
     expect(visibleFuzzyMatches).toBeDefined();

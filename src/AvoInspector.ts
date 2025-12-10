@@ -10,7 +10,7 @@ import { AvoStreamId } from "./AvoStreamId";
 import { validateEvent } from "./eventSpec/EventValidator";
 
 import { isValueEmpty } from "./utils";
-import type { EventSpecResponse, ValidationResult, PropertyValidationResult } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { ValidationResult, PropertyValidationResult } from "./eventSpec/AvoEventSpecFetchTypes";
 
 const libVersion = require("../package.json").version;
 

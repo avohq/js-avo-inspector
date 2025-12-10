@@ -979,7 +979,7 @@ describe("Validation Integration", () => {
       callInspectorImmediatelySpy.mockRestore();
     });
 
-    test("debug: trace extractSchema output for nested list of objects", () => {
+    test("debug: trace extractSchema output for nested list of objects", async () => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
@@ -1000,7 +1000,7 @@ describe("Validation Integration", () => {
         ]
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       // The schema should NOT be empty
       expect(schema.length).toBe(2);
@@ -1083,7 +1083,7 @@ describe("Validation Integration", () => {
 
       // Mock extractSchema to return empty (simulating error)
       const originalExtractSchema = inspector.extractSchema.bind(inspector);
-      jest.spyOn(inspector, "extractSchema").mockReturnValue([]);
+      jest.spyOn(inspector, "extractSchema").mockResolvedValue([]);
 
       let capturedEventBody: any = null;
       jest.spyOn(
@@ -1154,7 +1154,7 @@ describe("Validation Integration", () => {
       };
 
       // Get the schema via extractSchema
-      const expectedSchema = inspector.extractSchema(eventProps);
+      const expectedSchema = await inspector.extractSchema(eventProps);
 
       // Track the event
       const returnedSchema = await inspector.trackSchemaFromEvent("return_test", eventProps);

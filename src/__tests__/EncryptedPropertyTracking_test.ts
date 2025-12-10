@@ -29,7 +29,7 @@ describe("Encrypted Property Tracking", () => {
       inspector.enableLogging(false);
     });
 
-    test("should include encryptedPropertyValue for all properties", () => {
+    test("should include encryptedPropertyValue for all properties", async () => {
       const eventProperties = {
         stringProp: "test",
         numberProp: 42,
@@ -37,7 +37,7 @@ describe("Encrypted Property Tracking", () => {
         nullProp: null
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema.length).toBe(4);
 
@@ -47,35 +47,35 @@ describe("Encrypted Property Tracking", () => {
       });
     });
 
-    test("encrypted values should be decryptable", () => {
+    test("encrypted values should be decryptable", async () => {
       const eventProperties = {
         stringProp: "test string",
         numberProp: 123,
         booleanProp: false
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema[0].propertyName).toBe("stringProp");
       expect(schema[0].propertyType).toBe(type.STRING);
       expect(schema[0].encryptedPropertyValue).toBeDefined();
-      const decrypted0 = decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
+      const decrypted0 = await decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
       expect(decrypted0).toBe("test string");
 
       expect(schema[1].propertyName).toBe("numberProp");
       expect(schema[1].propertyType).toBe(type.INT);
       expect(schema[1].encryptedPropertyValue).toBeDefined();
-      const decrypted1 = decryptValue(schema[1].encryptedPropertyValue!, testPrivateKey);
+      const decrypted1 = await decryptValue(schema[1].encryptedPropertyValue!, testPrivateKey);
       expect(decrypted1).toBe(123);
 
       expect(schema[2].propertyName).toBe("booleanProp");
       expect(schema[2].propertyType).toBe(type.BOOL);
       expect(schema[2].encryptedPropertyValue).toBeDefined();
-      const decrypted2 = decryptValue(schema[2].encryptedPropertyValue!, testPrivateKey);
+      const decrypted2 = await decryptValue(schema[2].encryptedPropertyValue!, testPrivateKey);
       expect(decrypted2).toBe(false);
     });
 
-    test("should encrypt nested object children but not the parent object", () => {
+    test("should encrypt nested object children but not the parent object", async () => {
       const eventProperties = {
         nestedObject: {
           innerProp: "inner value",
@@ -85,7 +85,7 @@ describe("Encrypted Property Tracking", () => {
         }
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema[0].propertyName).toBe("nestedObject");
       expect(schema[0].propertyType).toBe(type.OBJECT);
@@ -98,23 +98,23 @@ describe("Encrypted Property Tracking", () => {
       
       // innerProp is a primitive - should be encrypted
       expect(schema[0].children[0].encryptedPropertyValue).toBeDefined();
-      const decryptedInner = decryptValue(schema[0].children[0].encryptedPropertyValue!, testPrivateKey);
+      const decryptedInner = await decryptValue(schema[0].children[0].encryptedPropertyValue!, testPrivateKey);
       expect(decryptedInner).toBe("inner value");
       
       // deepNested is an object - should NOT be encrypted, but its children should be
       expect(schema[0].children[1].encryptedPropertyValue).toBeUndefined();
       expect(schema[0].children[1].children).toBeDefined();
       expect(schema[0].children[1].children[0].encryptedPropertyValue).toBeDefined();
-      const decryptedDeep = decryptValue(schema[0].children[1].children[0].encryptedPropertyValue!, testPrivateKey);
+      const decryptedDeep = await decryptValue(schema[0].children[1].children[0].encryptedPropertyValue!, testPrivateKey);
       expect(decryptedDeep).toBe(456);
     });
 
-    test("should not encrypt array properties (children are type strings)", () => {
+    test("should not encrypt array properties (children are type strings)", async () => {
       const eventProperties = {
         arrayProp: [1, 2, 3, "four"]
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema[0].propertyName).toBe("arrayProp");
       expect(schema[0].propertyType).toBe(type.LIST);
@@ -138,15 +138,15 @@ describe("Encrypted Property Tracking", () => {
       inspector.enableLogging(false);
     });
 
-    test("should include encryptedPropertyValue in staging", () => {
+    test("should include encryptedPropertyValue in staging", async () => {
       const eventProperties = {
         prop: "value"
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema[0].encryptedPropertyValue).toBeDefined();
-      const decrypted = decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
+      const decrypted = await decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
       expect(decrypted).toBe("value");
     });
   });
@@ -163,12 +163,12 @@ describe("Encrypted Property Tracking", () => {
       inspector.enableLogging(false);
     });
 
-    test("should NOT include encryptedPropertyValue in production", () => {
+    test("should NOT include encryptedPropertyValue in production", async () => {
       const eventProperties = {
         prop: "value"
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema[0].encryptedPropertyValue).toBeUndefined();
     });
@@ -185,12 +185,12 @@ describe("Encrypted Property Tracking", () => {
       inspector.enableLogging(false);
     });
 
-    test("should NOT include encryptedPropertyValue when key not provided", () => {
+    test("should NOT include encryptedPropertyValue when key not provided", async () => {
       const eventProperties = {
         prop: "value"
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema[0].encryptedPropertyValue).toBeUndefined();
     });
@@ -208,12 +208,12 @@ describe("Encrypted Property Tracking", () => {
       inspector.enableLogging(false);
     });
 
-    test("should NOT include encryptedPropertyValue when key is empty", () => {
+    test("should NOT include encryptedPropertyValue when key is empty", async () => {
       const eventProperties = {
         prop: "value"
       };
 
-      const schema = inspector.extractSchema(eventProperties);
+      const schema = await inspector.extractSchema(eventProperties);
 
       expect(schema[0].encryptedPropertyValue).toBeUndefined();
     });
@@ -244,8 +244,8 @@ describe("Encrypted Property Tracking", () => {
       expect(schema[0].encryptedPropertyValue).toBeDefined();
       expect(schema[1].encryptedPropertyValue).toBeDefined();
 
-      const decrypted0 = decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
-      const decrypted1 = decryptValue(schema[1].encryptedPropertyValue!, testPrivateKey);
+      const decrypted0 = await decryptValue(schema[0].encryptedPropertyValue!, testPrivateKey);
+      const decrypted1 = await decryptValue(schema[1].encryptedPropertyValue!, testPrivateKey);
 
       expect(decrypted0).toBe("value1");
       expect(decrypted1).toBe(42);

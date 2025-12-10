@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0-alpha.1] - 2025-12-09
+
+### Changed
+
+- **Encryption Migration**: Migrated encryption implementation from `eciesjs` (secp256k1) to `elliptic` library + Web Crypto API (prime256v1 / NIST P-256) for browser compatibility
+  - Uses `elliptic` library for ECDH operations (browser-compatible)
+  - Uses Web Crypto API for AES-256-GCM encryption/decryption
+  - Updated curve to prime256v1 (NIST P-256), standard for Web Crypto API
+  - Updated CLI tool to use Node.js crypto (Node-only, so crypto module is fine)
+  - Maintains same encryption format specification: `[Version(1b)] + [EphemeralPubKey(65b)] + [IV(16b)] + [AuthTag(16b)] + [Ciphertext]`
+
+### Breaking Changes
+
+- **[Breaking]** `extractSchema()` is now an async function and returns `Promise<EventProperty[]>`
+  - All callers must now use `await` when calling `extractSchema()`
+  - Example migration:
+    ```javascript
+    // Before (v2.x)
+    const schema = inspector.extractSchema(eventProperties);
+    
+    // After (v3.0)
+    const schema = await inspector.extractSchema(eventProperties);
+    ```
+- **[Breaking]** `shouldRegisterSchemaFromManually()` in `AvoDeduplicator` is now async
+
+### Removed
+
+- Removed `eciesjs` dependency (replaced with `elliptic`)
+
+### Added
+
+- Added `elliptic` dependency for browser-compatible ECDH operations
+- Added `@types/elliptic` dev dependency
+
 ## [2.2.1-alpha] - 2025-11-24
 
 ### Added
