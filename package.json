@@ -1,6 +1,6 @@
 {
   "name": "avo-inspector",
-  "version": "3.0.0-alpha.2",
+  "version": "3.0.0-alpha.3",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",

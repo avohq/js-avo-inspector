@@ -136,8 +136,10 @@ export async function encryptValue(value: any, publicKey: string): Promise<strin
     const ephemeralPublicKeyBytes = p256.getPublicKey(ephemeralPrivateKeyBytes, false) // Uncompressed format (65 bytes)
 
     // 3. Derive Shared Secret (ECDH)
-    // getSharedSecret returns the shared secret as Uint8Array (32 bytes, X-coordinate)
-    const sharedSecret = p256.getSharedSecret(ephemeralPrivateKeyBytes, recipientPublicKeyBytes)
+    // getSharedSecret returns compressed point (33 bytes: 0x02/0x03 + X-coordinate)
+    // Extract X-coordinate (last 32 bytes) to match elliptic's derive().toArray("be", 32)
+    const sharedSecretPoint = p256.getSharedSecret(ephemeralPrivateKeyBytes, recipientPublicKeyBytes)
+    const sharedSecret = sharedSecretPoint.slice(-32) // Extract X-coordinate (last 32 bytes)
 
     // 4. Key Derivation (Hash with SHA-256)
     const derivedKeyBuffer = await deriveKey(sharedSecret)
@@ -277,8 +279,10 @@ export async function decryptValue(encryptedValue: string, privateKey: string): 
     const recipientPrivateKeyBytes = hexToBytes(privateKeyStr)
 
     // 3. Derive Shared Secret (ECDH)
-    // getSharedSecret returns the shared secret as Uint8Array (32 bytes, X-coordinate)
-    const sharedSecret = p256.getSharedSecret(recipientPrivateKeyBytes, ephemeralPublicKey)
+    // getSharedSecret returns compressed point (33 bytes: 0x02/0x03 + X-coordinate)
+    // Extract X-coordinate (last 32 bytes) to match elliptic's derive().toArray("be", 32)
+    const sharedSecretPoint = p256.getSharedSecret(recipientPrivateKeyBytes, ephemeralPublicKey)
+    const sharedSecret = sharedSecretPoint.slice(-32) // Extract X-coordinate (last 32 bytes)
 
     // 4. Key Derivation (Hash with SHA-256)
     const derivedKeyBuffer = await deriveKey(sharedSecret)
