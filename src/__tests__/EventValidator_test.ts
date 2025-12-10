@@ -742,25 +742,131 @@ describe("Edge Cases", () => {
     expect(result.propertyResults["any_prop"]).toEqual({});
   });
 
-  test("should handle null and undefined values", () => {
+  test("should handle null and undefined values for required properties", () => {
     const specResponse = createEventSpecResponse([
       createEventSpecEntry({
         baseEventId: "evt_1",
         variantIds: [],
         props: {
-          nullable: createPinnedValueProperty({
+          requiredProp: createPinnedValueProperty({
             expected: ["evt_1"]
-          })
+          }, { required: true })
         }
       })
     ]);
 
-    const resultNull = validateEvent({ nullable: null }, specResponse);
-    const resultUndefined = validateEvent({ nullable: undefined }, specResponse);
+    const resultNull = validateEvent({ requiredProp: null }, specResponse);
+    const resultUndefined = validateEvent({ requiredProp: undefined }, specResponse);
 
+    // For required properties, null/undefined values should fail constraints
     // "null" and "undefined" strings won't match "expected"
-    expect(resultNull.propertyResults["nullable"].failedEventIds).toContain("evt_1");
-    expect(resultUndefined.propertyResults["nullable"].failedEventIds).toContain("evt_1");
+    expect(resultNull.propertyResults["requiredProp"].failedEventIds).toContain("evt_1");
+    expect(resultUndefined.propertyResults["requiredProp"].failedEventIds).toContain("evt_1");
+  });
+
+  test("should skip validation for null/undefined values on non-required properties", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: ["evt_1.v1"],
+        props: {
+          optionalProp: createPinnedValueProperty({
+            expected: ["evt_1"]
+          }, { required: false })
+        }
+      })
+    ]);
+
+    const resultNull = validateEvent({ optionalProp: null }, specResponse);
+    const resultUndefined = validateEvent({ optionalProp: undefined }, specResponse);
+
+    // For non-required properties, null/undefined means "not sent" - should not fail
+    expect(resultNull.propertyResults["optionalProp"].failedEventIds).toBeUndefined();
+    expect(resultUndefined.propertyResults["optionalProp"].failedEventIds).toBeUndefined();
+  });
+
+  test("should skip validation for null/undefined on non-required property with allowed values", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          optionalStatus: createAllowedValuesProperty({
+            '["active","inactive"]': ["evt_1"]
+          }, { required: false })
+        }
+      })
+    ]);
+
+    const resultNull = validateEvent({ optionalStatus: null }, specResponse);
+    const resultUndefined = validateEvent({ optionalStatus: undefined }, specResponse);
+
+    // Optional property not sent (null/undefined) should not fail allowed values check
+    expect(resultNull.propertyResults["optionalStatus"].failedEventIds).toBeUndefined();
+    expect(resultUndefined.propertyResults["optionalStatus"].failedEventIds).toBeUndefined();
+  });
+
+  test("should skip validation for null/undefined on non-required property with regex", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          optionalEmail: createRegexProperty({
+            "^[a-z]+@[a-z]+\\.[a-z]+$": ["evt_1"]
+          }, { required: false })
+        }
+      })
+    ]);
+
+    const resultNull = validateEvent({ optionalEmail: null }, specResponse);
+    const resultUndefined = validateEvent({ optionalEmail: undefined }, specResponse);
+
+    // Optional property not sent should not fail regex check
+    expect(resultNull.propertyResults["optionalEmail"].failedEventIds).toBeUndefined();
+    expect(resultUndefined.propertyResults["optionalEmail"].failedEventIds).toBeUndefined();
+  });
+
+  test("should skip validation for null/undefined on non-required property with min/max", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          optionalAmount: createMinMaxProperty({
+            "0,100": ["evt_1"]
+          }, { required: false })
+        }
+      })
+    ]);
+
+    const resultNull = validateEvent({ optionalAmount: null }, specResponse);
+    const resultUndefined = validateEvent({ optionalAmount: undefined }, specResponse);
+
+    // Optional property not sent should not fail min/max check
+    expect(resultNull.propertyResults["optionalAmount"].failedEventIds).toBeUndefined();
+    expect(resultUndefined.propertyResults["optionalAmount"].failedEventIds).toBeUndefined();
+  });
+
+  test("should validate non-required properties when value is provided", () => {
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          optionalProp: createPinnedValueProperty({
+            expected: ["evt_1"]
+          }, { required: false })
+        }
+      })
+    ]);
+
+    const resultValid = validateEvent({ optionalProp: "expected" }, specResponse);
+    const resultInvalid = validateEvent({ optionalProp: "wrong" }, specResponse);
+
+    // When a value IS provided for optional property, it should be validated
+    expect(resultValid.propertyResults["optionalProp"].failedEventIds).toBeUndefined();
+    expect(resultInvalid.propertyResults["optionalProp"].failedEventIds).toContain("evt_1");
   });
 
   test("should handle special characters in property names", () => {
@@ -1475,7 +1581,7 @@ describe("Nested Property Validation", () => {
   });
 
   describe("Edge Cases for Nested Properties", () => {
-    test("should handle missing nested object in runtime value", () => {
+    test("should handle missing nested object in runtime value (optional child)", () => {
       const specResponse = createEventSpecResponse([
         createEventSpecEntry({
           baseEventId: "evt_1",
@@ -1484,7 +1590,7 @@ describe("Nested Property Validation", () => {
             config: createNestedProperty({
               setting: createPinnedValueProperty({
                 enabled: ["evt_1"]
-              })
+              }) // required: false by default
             })
           }
         })
@@ -1496,12 +1602,37 @@ describe("Nested Property Validation", () => {
         specResponse
       );
 
-      // Child validation should still occur, but with undefined value
-      // undefined !== "enabled", so it should fail
+      // Child value is undefined because parent is not an object
+      // For optional children, undefined should not fail validation
+      expect(result.propertyResults["config"].children?.["setting"]?.failedEventIds).toBeUndefined();
+    });
+
+    test("should handle missing nested object in runtime value (required child)", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            config: createNestedProperty({
+              setting: createPinnedValueProperty({
+                enabled: ["evt_1"]
+              }, { required: true })
+            })
+          }
+        })
+      ]);
+
+      // Runtime value is not an object
+      const result = validateEvent(
+        { config: "not an object" },
+        specResponse
+      );
+
+      // Child value is undefined, but it's required - should fail
       expect(result.propertyResults["config"].children?.["setting"].failedEventIds).toContain("evt_1");
     });
 
-    test("should handle null nested object in runtime value", () => {
+    test("should handle null nested object in runtime value (optional child)", () => {
       const specResponse = createEventSpecResponse([
         createEventSpecEntry({
           baseEventId: "evt_1",
@@ -1510,7 +1641,7 @@ describe("Nested Property Validation", () => {
             user: createNestedProperty({
               id: createMinMaxProperty({
                 "1,1000000": ["evt_1"]
-              })
+              }) // required: false by default
             })
           }
         })
@@ -1522,11 +1653,36 @@ describe("Nested Property Validation", () => {
       );
 
       // null is not an object, so child value is undefined
-      // Non-numeric value fails min/max
+      // For optional children, undefined should not fail validation
+      expect(result.propertyResults["user"].children?.["id"]?.failedEventIds).toBeUndefined();
+    });
+
+    test("should handle null nested object in runtime value (required child)", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            user: createNestedProperty({
+              id: createMinMaxProperty({
+                "1,1000000": ["evt_1"]
+              }, { required: true })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        { user: null },
+        specResponse
+      );
+
+      // null is not an object, so child value is undefined
+      // Required child with undefined value should fail min/max
       expect(result.propertyResults["user"].children?.["id"].failedEventIds).toContain("evt_1");
     });
 
-    test("should handle array as nested value (not treated as object)", () => {
+    test("should handle array as nested value (optional child)", () => {
       const specResponse = createEventSpecResponse([
         createEventSpecEntry({
           baseEventId: "evt_1",
@@ -1535,7 +1691,7 @@ describe("Nested Property Validation", () => {
             data: createNestedProperty({
               value: createPinnedValueProperty({
                 expected: ["evt_1"]
-              })
+              }) // required: false by default
             })
           }
         })
@@ -1547,6 +1703,32 @@ describe("Nested Property Validation", () => {
       );
 
       // Array is not treated as object, so child value is undefined
+      // For optional children, undefined should not fail validation
+      expect(result.propertyResults["data"].children?.["value"]?.failedEventIds).toBeUndefined();
+    });
+
+    test("should handle array as nested value (required child)", () => {
+      const specResponse = createEventSpecResponse([
+        createEventSpecEntry({
+          baseEventId: "evt_1",
+          variantIds: [],
+          props: {
+            data: createNestedProperty({
+              value: createPinnedValueProperty({
+                expected: ["evt_1"]
+              }, { required: true })
+            })
+          }
+        })
+      ]);
+
+      const result = validateEvent(
+        { data: ["array", "not", "object"] },
+        specResponse
+      );
+
+      // Array is not treated as object, so child value is undefined
+      // Required child with undefined value should fail
       expect(result.propertyResults["data"].children?.["value"].failedEventIds).toContain("evt_1");
     });
 

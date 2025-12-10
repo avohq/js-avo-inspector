@@ -446,6 +446,15 @@ function validatePropertyConstraints(
     return validateObjectProperty(value, constraints, allEventIds, depth);
   }
 
+  // For primitive properties only: skip validation for null/undefined on non-required properties.
+  // For optional properties, null/undefined means "not sent" which is valid.
+  // Only required properties should fail validation when value is null/undefined.
+  // Note: We check this AFTER checking for children, because object/list properties
+  // need to validate their children even when the parent value is null/undefined.
+  if ((value === null || value === undefined) && !constraints.required) {
+    return result;
+  }
+
   // Validate value constraints for primitive properties
   return validatePrimitiveProperty(value, constraints, allEventIds);
 }
