@@ -146,30 +146,34 @@ describe("EventSpecCache", () => {
       expect(stats.entries[1].eventCount).toBe(1); // event2 hit once
     });
 
-    test("should evict oldest entry after 50 cache hits", () => {
-      // Add first entry
+    test("should evict LRU entry after 50 global cache hits", () => {
+      // Add two entries
       cache.set("apiKey1", "stream1", "event1", mockEventSpecResponse);
-
-      // Simulate 10 cache hits on event1
-      for (let i = 0; i < 10; i++) {
-        cache.get("apiKey1", "stream1", "event1");
-      }
-
-      // Add second entry (newer)
       cache.set("apiKey1", "stream1", "event2", mockEventSpecResponse);
 
-      // Simulate 40 more cache hits on event1 (total 50 hits)
-      for (let i = 0; i < 40; i++) {
+      // Hit event1 25 times (just under half)
+      for (let i = 0; i < 25; i++) {
         cache.get("apiKey1", "stream1", "event1");
       }
 
-      // After 50 hits, next get should trigger eviction of the oldest entry
-      // First entry should be evicted (oldest timestamp)
+      // Hit event2 24 times (event2's lastAccessed is now more recent)
+      for (let i = 0; i < 24; i++) {
+        cache.get("apiKey1", "stream1", "event2");
+      }
+
+      // 49 total hits - both entries should still exist
+      expect(cache.size()).toBe(2);
+
+      // 50th hit triggers global rotation - event1 is LRU (last accessed earlier)
+      cache.get("apiKey1", "stream1", "event2");
+
+      // After 50 global hits, the LRU entry (event1) should be evicted
+      expect(cache.size()).toBe(1);
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
+      // event2 was more recently accessed, so it's still there
       expect(cache.get("apiKey1", "stream1", "event2")).toEqual(
         mockEventSpecResponse
       );
-      // The cache should have rotated after 50 hits
-      expect(cache.size()).toBe(1);
     });
 
     test("should reset global hit count after rotation", () => {
@@ -247,33 +251,35 @@ describe("EventSpecCache", () => {
       );
     });
 
-    test("should evict LRU entry correctly with staggered additions", () => {
-      // Add first entry
+    test("should evict LRU entry correctly with staggered access", () => {
+      // Add two entries with a time gap
       cache.set("apiKey1", "stream1", "event1", mockEventSpecResponse);
       jest.advanceTimersByTime(1000);
-
-      // Hit event1 10 times
-      for (let i = 0; i < 10; i++) {
-        cache.get("apiKey1", "stream1", "event1");
-      }
-
-      // Add second entry (newer, with lower hit count)
       cache.set("apiKey1", "stream1", "event2", mockEventSpecResponse);
 
       // Verify both are cached
       expect(cache.size()).toBe(2);
 
-      // Hit event1 40 more times (total 50 from start, triggers rotation)
-      for (let i = 0; i < 40; i++) {
+      // Hit event1 25 times (lastAccessed updated to current time)
+      for (let i = 0; i < 25; i++) {
         cache.get("apiKey1", "stream1", "event1");
       }
+      jest.advanceTimersByTime(1000);
 
-      // After rotation, oldest entry should be gone, size should be 1
+      // Hit event2 24 times (lastAccessed is now more recent than event1)
+      for (let i = 0; i < 24; i++) {
+        cache.get("apiKey1", "stream1", "event2");
+      }
+
+      // 50th hit triggers rotation - event1 is LRU (last accessed earlier)
+      cache.get("apiKey1", "stream1", "event2");
+
+      // After rotation, LRU entry should be gone, size should be 1
       expect(cache.size()).toBe(1);
 
-      // event1 should be evicted (oldest by timestamp)
+      // event1 should be evicted (LRU - last accessed earlier)
       expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
-      // event2 should still be there
+      // event2 should still be there (more recently accessed)
       expect(cache.get("apiKey1", "stream1", "event2")).toEqual(
         mockEventSpecResponse
       );
