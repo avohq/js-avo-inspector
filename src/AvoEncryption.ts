@@ -93,6 +93,31 @@ async function deriveKey(sharedSecret: Uint8Array): Promise<ArrayBuffer> {
 }
 
 /**
+ * Safely converts Uint8Array to base64 string.
+ * Uses Buffer in Node.js for efficiency, or chunked conversion in browsers
+ * to avoid call stack overflow with large arrays.
+ */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  // Check if we're in Node.js and Buffer is available
+  if (typeof Buffer !== 'undefined' && Buffer.from) {
+    return Buffer.from(bytes).toString('base64')
+  }
+
+  // Browser fallback: use chunked conversion to avoid call stack overflow
+  // Chunk size of 8192 (8k) is safe for String.fromCharCode.apply
+  const CHUNK_SIZE = 8192
+  let binaryString = ''
+
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const chunk = bytes.slice(i, i + CHUNK_SIZE)
+    // Convert chunk to array and use apply for this small chunk
+    binaryString += String.fromCharCode.apply(null, Array.from(chunk))
+  }
+
+  return btoa(binaryString)
+}
+
+/**
  * Encrypts a value using ECC public key encryption (ECIES).
  * The encrypted output can only be decrypted by the client using their private key.
  * This ensures that Avo cannot decrypt the values on the backend.
@@ -201,9 +226,8 @@ export async function encryptValue(value: any, publicKey: string): Promise<strin
 
     result.set(ciphertext, offset)
 
-    // Convert to base64
-    // Use Array.from to avoid downlevelIteration issue
-    return btoa(String.fromCharCode.apply(null, Array.from(result)))
+    // Convert to base64 using safe conversion that handles large arrays
+    return uint8ArrayToBase64(result)
   } catch (error) {
     throw new Error(
       `Failed to encrypt value. Please check that the public key is valid. Error: ${

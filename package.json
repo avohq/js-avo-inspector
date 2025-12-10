@@ -35,6 +35,9 @@
     "url": "https://github.com/avohq/web-avo-inspector/issues"
   },
   "homepage": "https://github.com/avohq/web-avo-inspector#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@noble/curves": "^1.4.0"
   },
