@@ -25,7 +25,7 @@ export const TEST_KEY_PAIR_2 = {
  * Test helper: Decrypts a value that was encrypted using encryptValue.
  * Used for testing purposes only.
  */
-export function decryptValue(encryptedValue: string, privateKey: string): any {
+export function decryptValue(encryptedValue: string, privateKey: string): Promise<any> {
   return decryptValueImpl(encryptedValue, privateKey);
 }
 

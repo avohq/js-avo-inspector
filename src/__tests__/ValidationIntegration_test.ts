@@ -1054,8 +1054,14 @@ describe("Validation Integration", () => {
       extractSchemaSpy.mockRestore();
     });
 
-    test("CRITICAL: if extractSchema fails, validation still runs but eventProperties is empty", async () => {
-      // This test demonstrates the bug scenario:
+    test("BUG REPRODUCTION: if extractSchema fails, validation still runs but eventProperties is empty", async () => {
+      // This test documents a known bug in the codebase:
+      // When extractSchema fails (returns []), validation still runs against original eventProperties,
+      // but mergeValidationResults receives [] for eventSchema, resulting in empty eventProperties.
+      // 
+      // The correct behavior is tested in "should NOT produce empty eventProperties when tracking with validation" (line 900).
+      // 
+      // Bug scenario:
       // 1. extractSchema fails (returns [])
       // 2. validation still runs against original eventProperties
       // 3. mergeValidationResults receives [] for eventSchema
@@ -1085,7 +1091,6 @@ describe("Validation Integration", () => {
       });
 
       // Mock extractSchema to return empty (simulating error)
-      const originalExtractSchema = inspector.extractSchema.bind(inspector);
       jest.spyOn(inspector, "extractSchema").mockResolvedValue([]);
 
       let capturedEventBody: any = null;

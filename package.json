@@ -1,6 +1,6 @@
 {
   "name": "avo-inspector",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
@@ -36,12 +36,11 @@
   },
   "homepage": "https://github.com/avohq/web-avo-inspector#readme",
   "dependencies": {
-    "elliptic": "^6.6.1"
+    "@noble/curves": "^1.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
-    "@types/elliptic": "^6.4.18",
     "@types/jest": "^29.5.12",
     "@types/node": "^22.3.0",
     "@typescript-eslint/eslint-plugin": "^8.1.0",

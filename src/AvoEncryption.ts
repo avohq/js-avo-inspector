@@ -1,8 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import * as EC from 'elliptic'
+import { p256 } from '@noble/curves/p256'
 
-// Initialize EC context for P-256 curve
-const ec = new EC.ec('p256')
+/**
+ * Converts bytes (Uint8Array) to hex string
+ */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/**
+ * Converts hex string to bytes (Uint8Array)
+ */
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16)
+  }
+  return bytes
+}
 
 // Get crypto API - works in both browser and Node.js environments
 // In browser: window.crypto or globalThis.crypto
@@ -50,15 +67,15 @@ const getCrypto = (): any => {
  * @returns An object containing the private and public keys as hex strings
  */
 export function generateKeyPair(): { privateKey: string; publicKey: string } {
-  // Generate a new random key pair
-  const keyPair = ec.genKeyPair()
+  // Generate a new random private key (32 bytes)
+  const privateKeyBytes = p256.utils.randomPrivateKey()
 
-  // Get private key as hex string (64 characters = 32 bytes)
-  const privateKey = keyPair.getPrivate('hex').padStart(64, '0')
+  // Get public key (uncompressed format: 65 bytes = 0x04 + 32-byte x + 32-byte y)
+  const publicKeyBytes = p256.getPublicKey(privateKeyBytes, false)
 
-  // Get public key as hex string (uncompressed format: 130 characters = 65 bytes)
-  // Format: '04' + x-coordinate (64 chars) + y-coordinate (64 chars)
-  const publicKey = keyPair.getPublic('hex')
+  // Convert to hex strings
+  const privateKey = bytesToHex(privateKeyBytes).padStart(64, '0')
+  const publicKey = bytesToHex(publicKeyBytes)
 
   return {
     privateKey,
@@ -66,25 +83,6 @@ export function generateKeyPair(): { privateKey: string; publicKey: string } {
   }
 }
 
-/**
- * Converts a hex string to Uint8Array
- */
-function hexToUint8Array(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substr(i, 2), 16)
-  }
-  return bytes
-}
-
-/**
- * Converts a Uint8Array to hex string
- */
-function uint8ArrayToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-}
 
 /**
  * Derives a key from shared secret using SHA-256
@@ -130,22 +128,16 @@ export async function encryptValue(value: any, publicKey: string): Promise<strin
     // 1. Prepare Public Key
     // Ensure publicKey is a string
     const publicKeyStr = typeof publicKey === 'string' ? publicKey : String(publicKey)
-    // Parse the recipient's public key
-    const recipientPublicKey = ec.keyFromPublic(publicKeyStr, 'hex')
+    // Convert recipient's public key from hex to bytes
+    const recipientPublicKeyBytes = hexToBytes(publicKeyStr)
 
     // 2. Generate Ephemeral Key Pair on P-256
-    const ephemeralKeyPair = ec.genKeyPair()
-    const ephemeralPublicKeyHex = ephemeralKeyPair.getPublic('hex') // Uncompressed format (130 chars = 65 bytes)
-    const ephemeralPublicKeyBytes = hexToUint8Array(ephemeralPublicKeyHex)
+    const ephemeralPrivateKeyBytes = p256.utils.randomPrivateKey()
+    const ephemeralPublicKeyBytes = p256.getPublicKey(ephemeralPrivateKeyBytes, false) // Uncompressed format (65 bytes)
 
     // 3. Derive Shared Secret (ECDH)
-    // Get the public key point from recipient's key
-    const recipientPublicPoint = recipientPublicKey.getPublic()
-    // Derive shared secret (returns a BN - BigNumber)
-    const sharedSecretBN = ephemeralKeyPair.derive(recipientPublicPoint)
-    // Convert BigNumber to Uint8Array (32 bytes, big-endian)
-    const sharedSecretArray = sharedSecretBN.toArray('be', 32)
-    const sharedSecret = new Uint8Array(sharedSecretArray)
+    // getSharedSecret returns the shared secret as Uint8Array (32 bytes, X-coordinate)
+    const sharedSecret = p256.getSharedSecret(ephemeralPrivateKeyBytes, recipientPublicKeyBytes)
 
     // 4. Key Derivation (Hash with SHA-256)
     const derivedKeyBuffer = await deriveKey(sharedSecret)
@@ -242,6 +234,11 @@ export async function decryptValue(encryptedValue: string, privateKey: string): 
       encryptedBuffer[i] = binaryString.charCodeAt(i)
     }
 
+    // Minimum size: version(1) + pubkey(33 min) + iv(16) + authTag(16) + ciphertext(1 min) = 67 bytes
+    if (encryptedBuffer.length < 67) {
+      throw new Error('Invalid encrypted data: payload too short')
+    }
+
     // Ensure privateKey is a string
     const privateKeyStr = typeof privateKey === 'string' ? privateKey : String(privateKey)
 
@@ -259,6 +256,12 @@ export async function decryptValue(encryptedValue: string, privateKey: string): 
     const keyHeader = encryptedBuffer[offset]
     const pubKeySize = keyHeader === 0x02 || keyHeader === 0x03 ? 33 : 65
 
+    // Validate buffer has enough bytes for this key format
+    const minRequired = 1 + pubKeySize + 16 + 16 + 1
+    if (encryptedBuffer.length < minRequired) {
+      throw new Error(`Invalid encrypted data: expected at least ${minRequired} bytes, got ${encryptedBuffer.length}`)
+    }
+
     const ephemeralPublicKey = encryptedBuffer.slice(offset, offset + pubKeySize)
     offset += pubKeySize
 
@@ -271,16 +274,11 @@ export async function decryptValue(encryptedValue: string, privateKey: string): 
     const ciphertext = encryptedBuffer.slice(offset) // Remaining bytes are ciphertext
 
     // 2. Prepare Private Key
-    const recipientKey = ec.keyFromPrivate(privateKeyStr, 'hex')
+    const recipientPrivateKeyBytes = hexToBytes(privateKeyStr)
 
     // 3. Derive Shared Secret (ECDH)
-    const ephemeralKey = ec.keyFromPublic(ephemeralPublicKey)
-    const ephemeralPublicPoint = ephemeralKey.getPublic()
-    const sharedSecretBN = recipientKey.derive(ephemeralPublicPoint)
-
-    // Convert BigNumber to Uint8Array (32 bytes, big-endian)
-    const sharedSecretArray = sharedSecretBN.toArray('be', 32)
-    const sharedSecret = new Uint8Array(sharedSecretArray)
+    // getSharedSecret returns the shared secret as Uint8Array (32 bytes, X-coordinate)
+    const sharedSecret = p256.getSharedSecret(recipientPrivateKeyBytes, ephemeralPublicKey)
 
     // 4. Key Derivation (Hash with SHA-256)
     const derivedKeyBuffer = await deriveKey(sharedSecret)
