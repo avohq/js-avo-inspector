@@ -1,7 +1,14 @@
+/**
+ * This file is generated. Internal development changes should be made in the generator
+ * and the file should be re-generated. External contributions are welcome to submit
+ * changes directly to this file, and we'll apply them to the generator internally.
+ */
+
 import type {
   EventSpecResponse,
   EventSpecResponseWire,
   EventSpecEntry,
+  EventSpecEntryWire,
   PropertyConstraints,
   PropertyConstraintsWire,
   FetchEventSpecParams,
@@ -202,253 +209,78 @@ export class AvoEventSpecFetcher {
 
   /**
    * Basic shape check for wire format - ensures response has the minimum expected structure.
-   * API returns: { branchId, baseEvent: { name, id, props }, variants: [...] }
+   * Uses short field names from wire format.
    */
   private hasExpectedShape(response: any): response is EventSpecResponseWire {
     return (
       response &&
       typeof response === "object" &&
-      typeof response.branchId === "string" &&
-      response.baseEvent &&
-      typeof response.baseEvent === "object" &&
-      typeof response.baseEvent.name === "string" &&
-      typeof response.baseEvent.id === "string" &&
-      response.baseEvent.props &&
-      typeof response.baseEvent.props === "object" &&
-      Array.isArray(response.variants)
+      Array.isArray(response.events) &&
+      response.metadata &&
+      typeof response.metadata === "object" &&
+      typeof response.metadata.schemaId === "string" &&
+      typeof response.metadata.branchId === "string" &&
+      typeof response.metadata.latestActionId === "string"
     );
   }
 
-  /**
-   * Parses the wire format response into internal format.
-   *
-   * The API returns a single event with its variants. We transform this into
-   * our internal format which has an array of EventSpecEntry (one entry containing
-   * the base event ID and all variant IDs, with merged property constraints).
-   */
+  /** Parses the wire format response into internal format with meaningful field names. */
   private static parseEventSpecResponse(
     wire: EventSpecResponseWire
   ): EventSpecResponse {
-    const baseEventId = wire.baseEvent.id;
-    const variantIds = wire.variants.map((v) => v.eventId);
-
-    // Collect all event IDs (base + variants)
-    const allEventIds = [baseEventId, ...variantIds];
-
-    // Parse base event props and merge with variant props
-    const mergedProps = AvoEventSpecFetcher.parseAndMergeProps(
-      wire.baseEvent.props,
-      baseEventId,
-      wire.variants,
-      allEventIds
-    );
-
-    const entry: EventSpecEntry = {
-      branchId: wire.branchId,
-      baseEventId: baseEventId,
-      variantIds: variantIds,
-      props: mergedProps,
-    };
-
     return {
-      events: [entry],
-      metadata: {
-        schemaId: "", // Not provided in this API format
-        branchId: wire.branchId,
-        latestActionId: "", // Not provided in this API format
-      },
+      events: wire.events.map(AvoEventSpecFetcher.parseEventSpecEntry),
+      metadata: wire.metadata,
     };
   }
 
-  /**
-   * Parses and merges property constraints from base event and variants.
-   *
-   * For each property, we need to:
-   * 1. Parse the wire format into internal format
-   * 2. Convert allowed values array to Record<string, eventIds>
-   * 3. Convert min/max to Record<string, eventIds>
-   * 4. Track which event IDs have which constraints
-   */
-  private static parseAndMergeProps(
-    baseProps: Record<string, PropertyConstraintsWire>,
-    baseEventId: string,
-    variants: Array<{ eventId: string; props: Record<string, PropertyConstraintsWire> }>,
-    allEventIds: string[]
-  ): Record<string, PropertyConstraints> {
-    const result: Record<string, PropertyConstraints> = {};
-
-    // Collect all property names from base and all variants
-    const allPropNames = new Set<string>(Object.keys(baseProps));
-    for (const variant of variants) {
-      for (const propName of Object.keys(variant.props)) {
-        allPropNames.add(propName);
-      }
-    }
-
-    // Process each property
-    for (const propName of Array.from(allPropNames)) {
-      const baseProp = baseProps[propName];
-      const variantProps = variants.map((v) => ({
-        eventId: v.eventId,
-        prop: v.props[propName],
-      }));
-
-      result[propName] = AvoEventSpecFetcher.mergePropertyConstraints(
-        baseProp,
-        baseEventId,
-        variantProps,
-        allEventIds
+  /** Parses a single event spec entry from wire format. */
+  private static parseEventSpecEntry(wire: EventSpecEntryWire): EventSpecEntry {
+    const props: Record<string, PropertyConstraints> = {};
+    for (const entry of Object.entries(wire.p)) {
+      const propName: string = Reflect.get(entry, "0");
+      const propWire: PropertyConstraintsWire = Reflect.get(entry, "1");
+      Reflect.set(
+        props,
+        propName,
+        AvoEventSpecFetcher.parsePropertyConstraints(propWire)
       );
     }
-
-    return result;
+    return {
+      branchId: wire.b,
+      baseEventId: wire.id,
+      variantIds: wire.vids,
+      props: props,
+    };
   }
 
-  /**
-   * Merges property constraints from base event and variants into a single PropertyConstraints.
-   */
-  private static mergePropertyConstraints(
-    baseProp: PropertyConstraintsWire | undefined,
-    baseEventId: string,
-    variantProps: Array<{ eventId: string; prop: PropertyConstraintsWire | undefined }>,
-    allEventIds: string[]
+  /** Parses property constraints from wire format. */
+  private static parsePropertyConstraints(
+    wire: PropertyConstraintsWire
   ): PropertyConstraints {
-    // Determine type and required from first available definition
-    let type = "unknown";
-    let required = false;
-    let isListType = false;
-
-    if (baseProp) {
-      type = AvoEventSpecFetcher.getTypeString(baseProp);
-      required = baseProp.r;
-      isListType = baseProp.l === true;
-    } else {
-      for (const vp of variantProps) {
-        if (vp.prop) {
-          type = AvoEventSpecFetcher.getTypeString(vp.prop);
-          required = vp.prop.r;
-          isListType = vp.prop.l === true;
-          break;
-        }
-      }
+    const result: PropertyConstraints = { type: wire.t, required: wire.r };
+    if (wire.l) {
+      result.isList = wire.l;
     }
-
-    const result: PropertyConstraints = {
-      type: isListType ? "list" : type,
-      required,
-    };
-
-    // Collect allowed values from all sources
-    const allowedValuesMap: Record<string, string[]> = {};
-    const minMaxRangesMap: Record<string, string[]> = {};
-
-    // Process base prop
-    if (baseProp) {
-      AvoEventSpecFetcher.addConstraintsFromProp(
-        baseProp,
-        baseEventId,
-        allowedValuesMap,
-        minMaxRangesMap
-      );
+    if (wire.p) {
+      result.pinnedValues = wire.p;
     }
-
-    // Process variant props
-    for (const vp of variantProps) {
-      if (vp.prop) {
-        AvoEventSpecFetcher.addConstraintsFromProp(
-          vp.prop,
-          vp.eventId,
-          allowedValuesMap,
-          minMaxRangesMap
-        );
-      }
+    if (wire.v) {
+      result.allowedValues = wire.v;
     }
-
-    // Add merged constraints to result
-    if (Object.keys(allowedValuesMap).length > 0) {
-      result.allowedValues = allowedValuesMap;
+    if (wire.rx) {
+      result.regexPatterns = wire.rx;
     }
-    if (Object.keys(minMaxRangesMap).length > 0) {
-      result.minMaxRanges = minMaxRangesMap;
+    if (wire.minmax) {
+      result.minMaxRanges = wire.minmax;
     }
-
-    // Handle nested properties (for object or list of objects)
-    const nestedSchema = AvoEventSpecFetcher.getNestedSchema(baseProp);
-    if (nestedSchema) {
+    if (wire.children) {
       result.children = {};
-      for (const [childName, childWire] of Object.entries(nestedSchema)) {
-        // For nested properties, collect constraints from all variants too
-        const variantChildProps = variantProps.map((vp) => ({
-          eventId: vp.eventId,
-          prop: vp.prop ? AvoEventSpecFetcher.getNestedSchema(vp.prop)?.[childName] : undefined,
-        }));
-
-        result.children[childName] = AvoEventSpecFetcher.mergePropertyConstraints(
-          childWire,
-          baseEventId,
-          variantChildProps,
-          allEventIds
-        );
+      for (const [propName, childWire] of Object.entries(wire.children)) {
+        result.children[propName] =
+          AvoEventSpecFetcher.parsePropertyConstraints(childWire);
       }
     }
-
     return result;
-  }
-
-  /**
-   * Gets the type string from a wire property.
-   * If `t` is an object (for nested objects), returns "object".
-   */
-  private static getTypeString(wire: PropertyConstraintsWire): string {
-    if (typeof wire.t === "string") {
-      return wire.t;
-    }
-    // t is an object containing nested property schemas
-    return "object";
-  }
-
-  /**
-   * Gets the nested schema from a wire property.
-   * Returns the nested property schemas if `t` is an object, otherwise undefined.
-   */
-  private static getNestedSchema(
-    wire: PropertyConstraintsWire | undefined
-  ): Record<string, PropertyConstraintsWire> | undefined {
-    if (!wire) return undefined;
-    if (typeof wire.t === "object" && wire.t !== null) {
-      return wire.t;
-    }
-    return undefined;
-  }
-
-  /**
-   * Adds constraints from a wire property to the accumulator maps.
-   */
-  private static addConstraintsFromProp(
-    wire: PropertyConstraintsWire,
-    eventId: string,
-    allowedValuesMap: Record<string, string[]>,
-    minMaxRangesMap: Record<string, string[]>
-  ): void {
-    // Handle allowed values (v is an array of strings in the API)
-    if (wire.v && Array.isArray(wire.v)) {
-      // Convert array to JSON string key for internal format
-      const key = JSON.stringify(wire.v);
-      if (!allowedValuesMap[key]) {
-        allowedValuesMap[key] = [];
-      }
-      allowedValuesMap[key].push(eventId);
-    }
-
-    // Handle min/max ranges
-    if (wire.min !== undefined || wire.max !== undefined) {
-      const min = wire.min ?? Number.MIN_SAFE_INTEGER;
-      const max = wire.max ?? Number.MAX_SAFE_INTEGER;
-      const key = `${min},${max}`;
-      if (!minMaxRangesMap[key]) {
-        minMaxRangesMap[key] = [];
-      }
-      minMaxRangesMap[key].push(eventId);
-    }
   }
 }

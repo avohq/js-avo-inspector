@@ -313,4 +313,107 @@ describe("NetworkCallsHandler", () => {
     expect(parsedNestedProp.children[0][0].propertyName).toBe("itemName");
     expect(parsedNestedProp.children[0][1].propertyName).toBe("itemType");
   });
+
+  describe("publicEncryptionKey", () => {
+    test("bodyForSessionStartedCall includes publicEncryptionKey when provided", () => {
+      const testEncryptionKey = "test-encryption-key-123";
+      const handlerWithKey = new AvoNetworkCallsHandler(
+        apiKey,
+        env,
+        "",
+        version,
+        inspectorVersion,
+        testEncryptionKey
+      );
+
+      const body = handlerWithKey.bodyForSessionStartedCall();
+
+      expect(body.publicEncryptionKey).toBe(testEncryptionKey);
+    });
+
+    test("bodyForEventSchemaCall includes publicEncryptionKey when provided", () => {
+      const testEncryptionKey = "test-encryption-key-456";
+      const handlerWithKey = new AvoNetworkCallsHandler(
+        apiKey,
+        env,
+        "",
+        version,
+        inspectorVersion,
+        testEncryptionKey
+      );
+
+      const eventName = "test event";
+      const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
+
+      const body = handlerWithKey.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null
+      );
+
+      expect(body.publicEncryptionKey).toBe(testEncryptionKey);
+    });
+
+    test("body does not include publicEncryptionKey when not provided", () => {
+      const handlerWithoutKey = new AvoNetworkCallsHandler(
+        apiKey,
+        env,
+        "",
+        version,
+        inspectorVersion
+        // No encryption key
+      );
+
+      const sessionBody = handlerWithoutKey.bodyForSessionStartedCall();
+      const eventBody = handlerWithoutKey.bodyForEventSchemaCall(
+        "test event",
+        [{ propertyName: "prop0", propertyType: "string" }],
+        null,
+        null
+      );
+
+      expect(sessionBody.publicEncryptionKey).toBeUndefined();
+      expect(eventBody.publicEncryptionKey).toBeUndefined();
+    });
+
+    test("body does not include publicEncryptionKey when empty string provided", () => {
+      const handlerWithEmptyKey = new AvoNetworkCallsHandler(
+        apiKey,
+        env,
+        "",
+        version,
+        inspectorVersion,
+        "" // Empty string
+      );
+
+      const body = handlerWithEmptyKey.bodyForSessionStartedCall();
+
+      expect(body.publicEncryptionKey).toBeUndefined();
+    });
+
+    test("publicEncryptionKey is included in JSON payload sent to API", () => {
+      const testEncryptionKey = "test-encryption-key-789";
+      const handlerWithKey = new AvoNetworkCallsHandler(
+        apiKey,
+        env,
+        "",
+        version,
+        inspectorVersion,
+        testEncryptionKey
+      );
+
+      const eventBody = handlerWithKey.bodyForEventSchemaCall(
+        "test event",
+        [{ propertyName: "prop0", propertyType: "string" }],
+        null,
+        null
+      );
+
+      const jsonPayload = JSON.stringify([eventBody]);
+      const parsed = JSON.parse(jsonPayload);
+
+      expect(parsed[0].publicEncryptionKey).toBe(testEncryptionKey);
+    });
+  });
 });

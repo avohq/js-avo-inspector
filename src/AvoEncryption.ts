@@ -4,6 +4,45 @@ import * as EC from 'elliptic'
 // Initialize EC context for P-256 curve
 const ec = new EC.ec('p256')
 
+// Get crypto API - works in both browser and Node.js environments
+// In browser: window.crypto or globalThis.crypto
+// In Node.js: global.crypto or globalThis.crypto (polyfilled in tests)
+const getCrypto = (): any => {
+  // Try globalThis first (works in both Node.js and browsers)
+  if (typeof globalThis !== 'undefined' && globalThis.crypto) {
+    const crypto = globalThis.crypto as any;
+    if (crypto && crypto.subtle) {
+      return crypto;
+    }
+  }
+  // Try window (browser)
+  if (typeof window !== 'undefined' && window.crypto) {
+    const crypto = window.crypto as any;
+    if (crypto && crypto.subtle) {
+      return crypto;
+    }
+  }
+  // Try global (Node.js)
+  if (typeof global !== 'undefined' && global.crypto) {
+    const crypto = global.crypto as any;
+    if (crypto && crypto.subtle) {
+      return crypto;
+    }
+  }
+  // Fallback - should not happen in proper environments
+  const debugInfo = {
+    hasGlobalThis: typeof globalThis !== 'undefined',
+    hasGlobalThisCrypto: typeof globalThis !== 'undefined' && !!globalThis.crypto,
+    hasGlobalThisCryptoSubtle: typeof globalThis !== 'undefined' && !!globalThis.crypto && !!(globalThis.crypto as any).subtle,
+    hasWindow: typeof window !== 'undefined',
+    hasWindowCrypto: typeof window !== 'undefined' && !!window.crypto,
+    hasGlobal: typeof global !== 'undefined',
+    hasGlobalCrypto: typeof global !== 'undefined' && !!global.crypto,
+    hasGlobalCryptoSubtle: typeof global !== 'undefined' && !!global.crypto && !!(global.crypto as any).subtle
+  };
+  throw new Error('crypto.subtle not available. Debug: ' + JSON.stringify(debugInfo));
+};
+
 /**
  * Generates a new ECC key pair for encryption/decryption.
  * Uses P-256 (prime256v1 / NIST P-256) curve which is standard for Web Crypto API.
@@ -51,7 +90,8 @@ function uint8ArrayToHex(bytes: Uint8Array): string {
  * Derives a key from shared secret using SHA-256
  */
 async function deriveKey(sharedSecret: Uint8Array): Promise<ArrayBuffer> {
-  return await crypto.subtle.digest('SHA-256', sharedSecret as any)
+  const cryptoAPI = getCrypto();
+  return await cryptoAPI.subtle.digest('SHA-256', sharedSecret as any)
 }
 
 /**
@@ -111,7 +151,8 @@ export async function encryptValue(value: any, publicKey: string): Promise<strin
     const derivedKeyBuffer = await deriveKey(sharedSecret)
 
     // 5. Import Key for Web Crypto AES-GCM
-    const keyMaterial = await crypto.subtle.importKey(
+    const cryptoAPI = getCrypto();
+    const keyMaterial = await cryptoAPI.subtle.importKey(
       'raw',
       derivedKeyBuffer,
       { name: 'AES-GCM' },
@@ -120,12 +161,12 @@ export async function encryptValue(value: any, publicKey: string): Promise<strin
     )
 
     // 6. Generate random IV (16 bytes)
-    const iv = crypto.getRandomValues(new Uint8Array(16))
+    const iv = cryptoAPI.getRandomValues(new Uint8Array(16))
 
     // 7. Encrypt using AES-256-GCM
     // Convert string to Uint8Array
     const plaintext = new TextEncoder().encode(stringValue)
-    const encryptedData = await crypto.subtle.encrypt(
+    const encryptedData = await cryptoAPI.subtle.encrypt(
       {
         name: 'AES-GCM',
         iv,
@@ -245,7 +286,8 @@ export async function decryptValue(encryptedValue: string, privateKey: string): 
     const derivedKeyBuffer = await deriveKey(sharedSecret)
 
     // 5. Import Key for Web Crypto AES-GCM
-    const keyMaterial = await crypto.subtle.importKey(
+    const cryptoAPI = getCrypto();
+    const keyMaterial = await cryptoAPI.subtle.importKey(
       'raw',
       derivedKeyBuffer,
       { name: 'AES-GCM' },
@@ -260,7 +302,7 @@ export async function decryptValue(encryptedValue: string, privateKey: string): 
     data.set(ciphertext, 0)
     data.set(authTag, ciphertext.length)
 
-    const decryptedBuffer = await crypto.subtle.decrypt(
+    const decryptedBuffer = await cryptoAPI.subtle.decrypt(
       {
         name: 'AES-GCM',
         iv,

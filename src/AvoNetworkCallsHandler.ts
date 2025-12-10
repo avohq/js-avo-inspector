@@ -39,6 +39,8 @@ export interface BaseBody {
   samplingRate: number;
   /** Event spec metadata from EventSpecResponse (moved from EventSchemaBody) */
   eventSpecMetadata?: EventSpecMetadata;
+  /** RSA public encryption key - allows Inspector to validate encrypted values against tracking plan */
+  publicEncryptionKey?: string;
 }
 
 export interface SessionStartedBody extends BaseBody {
@@ -71,6 +73,7 @@ export class AvoNetworkCallsHandler {
   private readonly appName: string;
   private readonly appVersion: string;
   private readonly libVersion: string;
+  private readonly publicEncryptionKey?: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
 
@@ -82,13 +85,15 @@ export class AvoNetworkCallsHandler {
     envName: string,
     appName: string,
     appVersion: string,
-    libVersion: string
+    libVersion: string,
+    publicEncryptionKey?: string
   ) {
     this.apiKey = apiKey;
     this.envName = envName;
     this.appName = appName;
     this.appVersion = appVersion;
     this.libVersion = libVersion;
+    this.publicEncryptionKey = publicEncryptionKey;
   }
 
   callInspectorWithBatchBody(
@@ -210,7 +215,7 @@ export class AvoNetworkCallsHandler {
   }
 
   private createBaseCallBody(): BaseBody {
-    return {
+    const body: BaseBody = {
       apiKey: this.apiKey,
       appName: this.appName,
       appVersion: this.appVersion,
@@ -224,6 +229,10 @@ export class AvoNetworkCallsHandler {
       streamId: AvoStreamId.streamId,
       samplingRate: this.samplingRate
     };
+    if (this.publicEncryptionKey) {
+      body.publicEncryptionKey = this.publicEncryptionKey;
+    }
+    return body;
   }
 
   /**

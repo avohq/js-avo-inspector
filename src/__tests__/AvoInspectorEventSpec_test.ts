@@ -1,7 +1,6 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import type { EventSpecResponseWire } from "../eventSpec/AvoEventSpecFetchTypes";
-import { generateKeyPair } from "./helpers/encryptionHelpers";
 
 // Mock XMLHttpRequest for event spec fetching
 class MockXMLHttpRequest {
@@ -33,21 +32,27 @@ class MockXMLHttpRequest {
         this.response = responseBody;
         if (this.onload) this.onload();
       } else if (this.url.includes("/trackingPlan/eventSpec")) {
-        // Mock event spec endpoint response (new wire format)
+        // Mock event spec endpoint response (correct wire format with events array)
         this.status = 200;
         const mockSpec: EventSpecResponseWire = {
-          branchId: "main",
-          baseEvent: {
-            name: "test_event",
-            id: "evt_test",
-            props: {
-              test_prop: {
-                t: "string",
-                r: true
+          events: [
+            {
+              b: "main",
+              id: "evt_test",
+              vids: [],
+              p: {
+                test_prop: {
+                  t: "string",
+                  r: true
+                }
               }
             }
-          },
-          variants: []
+          ],
+          metadata: {
+            schemaId: "test-schema",
+            branchId: "main",
+            latestActionId: "test-action"
+          }
         };
         const responseBody = JSON.stringify(mockSpec);
         this.responseText = responseBody;
@@ -186,14 +191,11 @@ describe("AvoInspector Event Spec Integration", () => {
     });
 
     test("should track events and fetch spec WITH encryption key", async () => {
-      // Generate a real RSA key pair for this test
-      const { publicKey: testPublicKey } = generateKeyPair();
-
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
         version: "1.0.0",
-        publicEncryptionKey: testPublicKey
+        publicEncryptionKey: "test-public-key-123"
       });
 
       const result = await inspector.trackSchemaFromEvent("test_event", {
