@@ -104,7 +104,7 @@ Inspector supports encrypting property values in development and staging environ
 
 ## Key Features
 
-- Uses ECC (Elliptic Curve Cryptography) with secp256k1 for strong security
+- Uses ECC (Elliptic Curve Cryptography) with prime256v1 (NIST P-256) for strong security, standard for Web Crypto API
 - Zero-knowledge architecture: Avo never has access to your private key
 - No message size limitations
 - Only active in dev/staging environments (production is unaffected)

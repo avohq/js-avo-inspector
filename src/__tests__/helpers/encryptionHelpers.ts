@@ -1,46 +1,31 @@
-import { PrivateKey, decrypt as eciesDecrypt } from "eciesjs";
+import { decryptValue as decryptValueImpl } from "../../AvoEncryption";
 
 /**
- * Test helper: Generates a new ECC key pair for testing encryption.
- * This is also available in the CLI tool (bin/avo-inspector.js) for production use.
+ * Hardcoded test key pair for consistent test results.
+ * Private Key: 94f89e29dd69262a94a43928fdcbc9ecea37984821077c97527cb0155bff6b47
+ * Public Key: 03cc229e87bbfed91571a6d995292bd5e4558fef4002a055d063dccafc5bfc3c45
  */
-export function generateKeyPair(): { publicKey: string; privateKey: string } {
-  const privateKey = new PrivateKey();
-  const publicKey = privateKey.publicKey;
+export const TEST_KEY_PAIR = {
+  publicKey: "03cc229e87bbfed91571a6d995292bd5e4558fef4002a055d063dccafc5bfc3c45",
+  privateKey: "94f89e29dd69262a94a43928fdcbc9ecea37984821077c97527cb0155bff6b47"
+};
 
-  return {
-    publicKey: publicKey.toHex(),
-    privateKey: privateKey.toHex()
-  };
-}
+/**
+ * Second hardcoded test key pair for tests that need multiple keys.
+ * Generated using: const keyPair = ec.genKeyPair(); keyPair.getPublic('hex')
+ * Private Key: 89798bb1bda92fee8c18361bc37d18f0a7f22ed3d67c571e8d23164c284372f6
+ * Public Key: 04d89a33fa18d1d9a3a551f558fba7a41c1cb8329084b5b5ebbf359db0eba1b93a036be701bbe8c73402db96bba745854b3c880b87062363c3596625cc4988364c
+ */
+export const TEST_KEY_PAIR_2 = {
+  publicKey: "04d89a33fa18d1d9a3a551f558fba7a41c1cb8329084b5b5ebbf359db0eba1b93a036be701bbe8c73402db96bba745854b3c880b87062363c3596625cc4988364c",
+  privateKey: "89798bb1bda92fee8c18361bc37d18f0a7f22ed3d67c571e8d23164c284372f6"
+};
 
 /**
  * Test helper: Decrypts a value that was encrypted using encryptValue.
  * Used for testing purposes only.
  */
-export function decryptValue(encryptedValue: string, privateKey: string): any {
-  try {
-    // Convert encrypted value from base64 to Uint8Array
-    // Note: We use Uint8Array directly instead of Buffer because in some environments
-    // (like jsdom), Buffer instanceof Uint8Array returns false due to different realms
-    const encryptedBuffer = new Uint8Array(Buffer.from(encryptedValue, "base64"));
-
-    // eciesjs decrypt expects a hex string for the private key and a Uint8Array for data
-    // Ensure privateKey is a string
-    const privateKeyStr = typeof privateKey === "string" ? privateKey : String(privateKey);
-
-    // Decrypt using ECIES (returns Uint8Array)
-    const decrypted = eciesDecrypt(privateKeyStr, encryptedBuffer);
-
-    // Convert to string and parse JSON
-    // Use Buffer.from() to handle both Buffer and Uint8Array return types across environments
-    const stringValue = Buffer.from(decrypted).toString("utf8");
-    return JSON.parse(stringValue);
-  } catch (error) {
-    throw new Error(
-      `Failed to decrypt value. Please check that the private key is valid and matches the public key used for encryption. Error: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
+export function decryptValue(encryptedValue: string, privateKey: string): Promise<any> {
+  return decryptValueImpl(encryptedValue, privateKey);
 }
+

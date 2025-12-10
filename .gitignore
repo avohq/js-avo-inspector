@@ -22,6 +22,8 @@ yarn-debug.log*
 yarn-error.log*
 
 *.bs.js
+*.mjs
+/lib/
 
 
 .vscode

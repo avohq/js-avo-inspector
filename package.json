@@ -1,6 +1,6 @@
 {
   "name": "avo-inspector",
-  "version": "2.2.2-alpha.11",
+  "version": "3.0.0-alpha.3",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
@@ -35,8 +35,11 @@
     "url": "https://github.com/avohq/web-avo-inspector/issues"
   },
   "homepage": "https://github.com/avohq/web-avo-inspector#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "eciesjs": "^0.4.11"
+    "@noble/curves": "^1.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

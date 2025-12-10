@@ -1,7 +1,40 @@
-// Polyfill TextEncoder and TextDecoder for eciesjs and other crypto libraries
+// Polyfill TextEncoder and TextDecoder
 const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
+
+// Use Node.js native WebCrypto API (Node 15+)
+// This provides a real, compliant crypto.subtle implementation for tests
+const { webcrypto } = require('crypto');
+
+// Make crypto available globally for encryption tests
+// JSDOM creates a partial crypto implementation that doesn't have subtle,
+// so we need to completely replace it with Node's webcrypto
+// Delete existing crypto first (if it exists and is configurable), then set ours
+try {
+  delete globalThis.crypto;
+} catch (e) {
+  // Ignore if not configurable
+}
+
+try {
+  delete global.crypto;
+} catch (e) {
+  // Ignore if not configurable
+}
+
+// Now set Node's webcrypto
+globalThis.crypto = webcrypto;
+global.crypto = webcrypto;
+
+if (typeof window !== 'undefined') {
+  try {
+    delete window.crypto;
+  } catch (e) {
+    // Ignore if not configurable
+  }
+  window.crypto = webcrypto;
+}
 
 // Set process.env.BROWSER so BrowserAvoStorage uses localStorage in tests
 process.env.BROWSER = "true";

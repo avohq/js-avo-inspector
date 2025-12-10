@@ -57,9 +57,9 @@ describe("Deduplicator", () => {
     expect(shouldRegisterFromAvo).toBe(false);
   });
 
-  test("Detects duplications when track in avo and then schema manually", () => {
+  test("Detects duplications when track in avo and then schema manually", async () => {
     const shouldRegisterFromAvo = deduplicator.shouldRegisterEvent("Test", testObject, true);
-    const shouldRegisterSchemaManual = deduplicator.shouldRegisterSchemaFromManually("Test", AvoSchemaParser.extractSchema(testObject));
+    const shouldRegisterSchemaManual = await deduplicator.shouldRegisterSchemaFromManually("Test", await AvoSchemaParser.extractSchema(testObject));
 
     expect(shouldRegisterFromAvo).toBe(true);
     expect(shouldRegisterSchemaManual).toBe(false);

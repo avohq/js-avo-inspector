@@ -23,7 +23,11 @@ module.exports = {
     "<rootDir>/dist-native/",
   ],
   transform: {
-    "^.+\\.(ts|tsx)$": "ts-jest",
+    "^.+\\.(ts|tsx)$": ["ts-jest", {
+      tsconfig: {
+        types: ["jest", "node"]
+      }
+    }],
   },
   transformIgnorePatterns: ["/node_modules/", "\\.d\\.ts$"],
 };

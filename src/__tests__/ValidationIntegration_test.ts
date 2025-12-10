@@ -892,6 +892,293 @@ describe("Validation Integration", () => {
     });
   });
 
+  describe("End-to-end eventProperties flow", () => {
+    // This test traces through the EXACT flow that caused the bug:
+    // extractSchema -> fetchAndValidateEvent -> mergeValidationResults -> bodyForEventSchemaCall
+    // The issue: eventProperties was empty even though validation returned data
+
+    test("should NOT produce empty eventProperties when tracking with validation", async () => {
+      // Mock spec response for this test
+      const testSpec: EventSpecResponse = {
+        events: [{
+          branchId: "main",
+          baseEventId: "test_evt",
+          variantIds: [],
+          props: {
+            "simple_prop": { type: "string", required: true },
+            "nested_list": {
+              type: "list",
+              required: true,
+              children: {
+                "child_name": { type: "string", required: false },
+                "child_value": { type: "int", required: true }
+              }
+            }
+          }
+        }],
+        metadata: { schemaId: "test", branchId: "main", latestActionId: "act" }
+      };
+
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(testSpec),
+        set: jest.fn()
+      }));
+
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      let capturedEventBody: any = null;
+      const callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((eventBody: any, callback: any) => {
+          capturedEventBody = eventBody;
+          callback(null);
+        });
+
+      // Track with nested array of objects
+      await inspector.trackSchemaFromEvent("test_event", {
+        simple_prop: "hello",
+        nested_list: [
+          { child_name: "Item 1", child_value: 10 },
+          { child_name: "Item 2", child_value: 20 }
+        ]
+      });
+
+      // CRITICAL ASSERTION: eventProperties must NOT be empty!
+      expect(capturedEventBody).not.toBeNull();
+      expect(capturedEventBody.eventProperties).toBeDefined();
+      expect(capturedEventBody.eventProperties.length).toBeGreaterThan(0);
+
+      // Should have 2 properties: simple_prop and nested_list
+      expect(capturedEventBody.eventProperties.length).toBe(2);
+
+      // Find the properties
+      const simpleProp = capturedEventBody.eventProperties.find(
+        (p: any) => p.propertyName === "simple_prop"
+      );
+      const nestedList = capturedEventBody.eventProperties.find(
+        (p: any) => p.propertyName === "nested_list"
+      );
+
+      expect(simpleProp).toBeDefined();
+      expect(simpleProp.propertyType).toBe("string");
+
+      expect(nestedList).toBeDefined();
+      expect(nestedList.propertyType).toBe("list");
+      expect(nestedList.children).toBeDefined();
+      expect(nestedList.children.length).toBe(2); // Two objects in the array
+
+      // Verify the nested structure
+      const firstItem = nestedList.children[0];
+      expect(Array.isArray(firstItem)).toBe(true);
+      expect(firstItem.length).toBe(2); // child_name, child_value
+
+      callInspectorImmediatelySpy.mockRestore();
+    });
+
+    test("debug: trace extractSchema output for nested list of objects", async () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      // This is the exact structure from the bug report
+      const eventProperties = {
+        "Schema Id": "schema-123",
+        "Visible Smart Results": [
+          {
+            itemName: "User Signed Up",
+            itemType: "Event",
+            searchResultPosition: 1,
+            searchResultRanking: 0.95,
+            searchTerm: "sign"
+          }
+        ]
+      };
+
+      const schema = await inspector.extractSchema(eventProperties);
+
+      // The schema should NOT be empty
+      expect(schema.length).toBe(2);
+
+      // Find Visible Smart Results
+      const smartResults = schema.find(p => p.propertyName === "Visible Smart Results");
+      expect(smartResults).toBeDefined();
+      expect(smartResults!.propertyType).toBe("list");
+      expect(smartResults!.children).toBeDefined();
+      expect(smartResults!.children!.length).toBe(1);
+
+      // The child should be an array of properties
+      const firstChild = smartResults!.children![0];
+      expect(Array.isArray(firstChild)).toBe(true);
+      expect((firstChild as any[]).length).toBe(5);
+    });
+
+    test("debug: verify extractSchema is called on every unique event", async () => {
+      // This test verifies that extractSchema is always called for events that aren't deduplicated
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      // Spy on extractSchema
+      const extractSchemaSpy = jest.spyOn(inspector, "extractSchema");
+
+      // Track two different events
+      const result1 = await inspector.trackSchemaFromEvent("event_1", {
+        prop: "value1"
+      });
+
+      const result2 = await inspector.trackSchemaFromEvent("event_2", {
+        prop: "value2"
+      });
+
+      // Both calls should have schema
+      expect(result1.length).toBe(1);
+      expect(result1[0].propertyName).toBe("prop");
+
+      expect(result2.length).toBe(1);
+      expect(result2[0].propertyName).toBe("prop");
+
+      // extractSchema should have been called twice (once per event)
+      expect(extractSchemaSpy).toHaveBeenCalledTimes(2);
+
+      extractSchemaSpy.mockRestore();
+    });
+
+    test("BUG REPRODUCTION: if extractSchema fails, validation still runs but eventProperties is empty", async () => {
+      // This test documents a known bug in the codebase:
+      // When extractSchema fails (returns []), validation still runs against original eventProperties,
+      // but mergeValidationResults receives [] for eventSchema, resulting in empty eventProperties.
+      // 
+      // The correct behavior is tested in "should NOT produce empty eventProperties when tracking with validation" (line 900).
+      // 
+      // Bug scenario:
+      // 1. extractSchema fails (returns [])
+      // 2. validation still runs against original eventProperties
+      // 3. mergeValidationResults receives [] for eventSchema
+      // 4. Final eventProperties is []
+
+      const testSpec: EventSpecResponse = {
+        events: [{
+          branchId: "main",
+          baseEventId: "test_evt",
+          variantIds: [],
+          props: {
+            "prop": { type: "string", required: true }
+          }
+        }],
+        metadata: { schemaId: "test", branchId: "main", latestActionId: "act" }
+      };
+
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(testSpec),
+        set: jest.fn()
+      }));
+
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      // Mock extractSchema to return empty (simulating error)
+      jest.spyOn(inspector, "extractSchema").mockResolvedValue([]);
+
+      let capturedEventBody: any = null;
+      jest.spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      ).mockImplementation((eventBody: any, callback: any) => {
+        capturedEventBody = eventBody;
+        callback(null);
+      });
+
+      // Track an event - extractSchema will return [], but validation may still run
+      await inspector.trackSchemaFromEvent("test_event", {
+        prop: "value"
+      });
+
+      // The event body has EMPTY eventProperties - this is the bug!
+      expect(capturedEventBody).not.toBeNull();
+      expect(capturedEventBody.eventProperties).toEqual([]);
+
+      // But validation result would have had data...
+      // This shows the disconnect between schema extraction and validation
+    });
+
+    test("verify the returned schema from trackSchemaFromEvent matches extractSchema output", async () => {
+      // This test verifies that trackSchemaFromEvent returns the same schema as extractSchema
+      // even when validation is performed
+
+      const testSpec: EventSpecResponse = {
+        events: [{
+          branchId: "main",
+          baseEventId: "test_evt",
+          variantIds: [],
+          props: {
+            "items": {
+              type: "list",
+              required: true,
+              children: {
+                "name": { type: "string", required: true }
+              }
+            }
+          }
+        }],
+        metadata: { schemaId: "test", branchId: "main", latestActionId: "act" }
+      };
+
+      (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        get: jest.fn().mockReturnValue(testSpec),
+        set: jest.fn()
+      }));
+
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Dev,
+        version: "1.0.0"
+      });
+
+      let capturedEventBody: any = null;
+      jest.spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      ).mockImplementation((eventBody: any, callback: any) => {
+        capturedEventBody = eventBody;
+        callback(null);
+      });
+
+      const eventProps = {
+        items: [{ name: "Item 1" }, { name: "Item 2" }]
+      };
+
+      // Get the schema via extractSchema
+      const expectedSchema = await inspector.extractSchema(eventProps);
+
+      // Track the event
+      const returnedSchema = await inspector.trackSchemaFromEvent("return_test", eventProps);
+
+      // The returned schema should match extractSchema output
+      // (not empty, and has the same structure)
+      expect(returnedSchema.length).toBe(expectedSchema.length);
+      expect(returnedSchema[0].propertyName).toBe(expectedSchema[0].propertyName);
+      expect(returnedSchema[0].propertyType).toBe(expectedSchema[0].propertyType);
+
+      // And the event body should also have eventProperties
+      expect(capturedEventBody.eventProperties.length).toBe(1);
+      expect(capturedEventBody.eventProperties[0].propertyName).toBe("items");
+    });
+  });
+
   // =========================================================================
   // COMPREHENSIVE LIST + OBJECT + VARIANT VALIDATION TESTS
   // =========================================================================

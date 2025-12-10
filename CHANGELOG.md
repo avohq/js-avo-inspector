@@ -5,12 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0-alpha.1] - 2025-12-09
+
+### Changed
+
+- **Encryption Migration**: Migrated encryption implementation from `eciesjs` (secp256k1) to `@noble/curves` + Web Crypto API (prime256v1 / NIST P-256) for browser compatibility
+  - Uses `@noble/curves` library for ECDH operations (lightweight, modern, audited - ~20KB)
+  - Uses Web Crypto API for AES-256-GCM encryption/decryption
+  - Updated curve to prime256v1 (NIST P-256), standard for Web Crypto API
+  - Updated CLI tool to use Node.js crypto (Node-only, so crypto module is fine)
+  - Maintains same encryption format specification: `[Version(1b)] + [EphemeralPubKey(65b)] + [IV(16b)] + [AuthTag(16b)] + [Ciphertext]`
+  - Maintains same key format (Hex strings) for compatibility with other languages
+
+### Breaking Changes
+
+- **[Breaking]** `extractSchema()` is now an async function and returns `Promise<EventProperty[]>`
+  - All callers must now use `await` when calling `extractSchema()`
+  - Example migration:
+    ```javascript
+    // Before (v2.x)
+    const schema = inspector.extractSchema(eventProperties);
+    
+    // After (v3.0)
+    const schema = await inspector.extractSchema(eventProperties);
+    ```
+- **[Breaking]** `shouldRegisterSchemaFromManually()` in `AvoDeduplicator` is now async. It should not be used in the client code though.
+
+### Removed
+
+- Removed `eciesjs` dependency (replaced with `@noble/curves`)
+- Removed `elliptic` dependency (replaced with `@noble/curves`)
+
+### Added
+
+- Added `@noble/curves` dependency for browser-compatible ECDH operations (lightweight, modern, audited)
+
 ## [2.2.1-alpha] - 2025-11-24
 
 ### Added
 
 - **ECC Property Value Encryption**: Optional `publicEncryptionKey` parameter on SDK initialization enables zero-knowledge encryption of property values in dev/staging environments using ECIES (Elliptic Curve Integrated Encryption Scheme). Avo never has access to the private key, ensuring complete data privacy.
-  - Uses secp256k1 curve with AES-256-GCM for hybrid encryption
+  - Uses prime256v1 (NIST P-256) curve with AES-256-GCM for hybrid encryption (standard for Web Crypto API)
   - Only encrypts in dev/staging environments (production sends schema only)
   - Adds optional `encryptedPropertyValue` field to event schema
   - CLI tool for key generation: `npx avo-inspector generate-keys`
@@ -26,10 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Production environment now optimized: no property values, no encryption, no EventSpec API calls
 - Dev/Staging environments now support rich debugging with encrypted values and event specs
-
-### Dependencies
-
-- Added `eciesjs` ^0.4.11 for ECC/ECIES encryption
 
 ## 2.2.0
 
