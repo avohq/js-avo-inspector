@@ -21,7 +21,6 @@ describe("Initialization", () => {
 
   test("Error is thrown when Api Key is not set", () => {
     // Given
-    // @ts-expect-error
     let apiKey;
 
     // Then
@@ -199,7 +198,6 @@ describe("Initialization", () => {
 
   test("Error is thrown when version is not set", () => {
     // Given
-    // @ts-expect-error
     let version;
 
     // Then
