@@ -400,6 +400,37 @@ export class AvoInspector {
   }
 
   /**
+   * Handles branch change detection and cache storage for a fetched event spec.
+   * This logic is shared between fetchEventSpecIfNeeded and fetchAndValidateEvent.
+   */
+  private handleBranchChangeAndCache(
+    specResponse: EventSpecResponse,
+    eventName: string
+  ): void {
+    // Check for branch change
+    const newBranchId = specResponse.metadata.branchId;
+    if (this.currentBranchId !== null && this.currentBranchId !== newBranchId) {
+      if (AvoInspector.shouldLog) {
+        console.log(
+          `[Avo Inspector] Branch changed from ${this.currentBranchId} to ${newBranchId}. Flushing cache.`
+        );
+      }
+      this.eventSpecCache?.clear();
+    }
+    this.currentBranchId = newBranchId;
+
+    // Store in cache
+    if (this.eventSpecCache && this.streamId) {
+      this.eventSpecCache.set(
+        this.apiKey,
+        this.streamId,
+        eventName,
+        specResponse
+      );
+    }
+  }
+
+  /**
    * Fetches the event spec if spec fetching is enabled.
    * Used by trackSchema when we don't have raw properties to validate.
    *
@@ -436,27 +467,7 @@ export class AvoInspector {
         });
 
         if (specResponse) {
-          // Check for branch change
-          const newBranchId = specResponse.metadata.branchId;
-          if (this.currentBranchId !== null && this.currentBranchId !== newBranchId) {
-             if (AvoInspector.shouldLog) {
-               console.log(
-                 `[Avo Inspector] Branch changed from ${this.currentBranchId} to ${newBranchId}. Flushing cache.`
-               );
-             }
-             this.eventSpecCache?.clear();
-          }
-          this.currentBranchId = newBranchId;
-
-          // Store in cache
-          if (this.eventSpecCache && this.streamId) {
-            this.eventSpecCache.set(
-              this.apiKey,
-              this.streamId,
-              eventName,
-              specResponse
-            );
-          }
+          this.handleBranchChangeAndCache(specResponse, eventName);
         }
       }
     } catch (error) {
@@ -509,27 +520,7 @@ export class AvoInspector {
         });
 
         if (specResponse) {
-          // Check for branch change
-          const newBranchId = specResponse.metadata.branchId;
-          if (this.currentBranchId !== null && this.currentBranchId !== newBranchId) {
-             if (AvoInspector.shouldLog) {
-               console.log(
-                 `[Avo Inspector] Branch changed from ${this.currentBranchId} to ${newBranchId}. Flushing cache.`
-               );
-             }
-             this.eventSpecCache?.clear();
-          }
-          this.currentBranchId = newBranchId;
-
-          // Store in cache
-          if (this.eventSpecCache && this.streamId) {
-            this.eventSpecCache.set(
-              this.apiKey,
-              this.streamId,
-              eventName,
-              specResponse
-            );
-          }
+          this.handleBranchChangeAndCache(specResponse, eventName);
         }
       }
 

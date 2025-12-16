@@ -8,7 +8,7 @@ import type { EventSpecResponse, EventSpecCacheEntry } from "./AvoEventSpecFetch
  * - When 50 cache hits occur globally, the oldest cached entry is evicted
  * - Each cache entry tracks: spec, timestamp, and hit count
  *
- * Cache Key Format: ${apiKey}:${streamId}:${branchId}:${eventName}
+ * Cache Key Format: ${apiKey}:${streamId}:${eventName}
  *
  * Note: Event count only increments on cache hits, not on every tracked event.
  * This ensures the cache evicts based on actual usage, not overall tracking volume.
@@ -57,7 +57,7 @@ export class EventSpecCache {
     eventName: string
   ): EventSpecResponse | null {
     const key = this.generateKey(apiKey, streamId, eventName);
-    const entry = this.cache.get(key);
+    const entry = this.cache.get(key); 
 
     if (!entry) {
       if (this.shouldLog) {
