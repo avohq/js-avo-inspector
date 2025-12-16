@@ -60,23 +60,17 @@ export class EventSpecCache {
     const entry = this.cache.get(key); 
 
     if (!entry) {
-      if (this.shouldLog) {
-        console.log(`[EventSpecCache] Cache miss for key: ${key}`);
-      }
       return null;
     }
 
     // Check if entry has expired
     if (this.shouldEvict(entry)) {
-      if (this.shouldLog) {
-        console.log(`[EventSpecCache] Cache entry expired for key: ${key}`);
-      }
       this.cache.delete(key);
       return null;
     }
 
     if (this.shouldLog) {
-      console.log(`[EventSpecCache] Cache hit for key: ${key}`);
+      console.log(`[Avo Inspector] Cache hit for key: ${key}`);
     }
 
     // Update lastAccessed for LRU (Least Recently Used) eviction
@@ -115,10 +109,6 @@ export class EventSpecCache {
     };
 
     this.cache.set(key, entry);
-
-    if (this.shouldLog) {
-      console.log(`[EventSpecCache] Cached spec for key: ${key}`);
-    }
   }
 
 
@@ -158,9 +148,6 @@ export class EventSpecCache {
     // Remove the least recently used entry
     if (lruKey !== null) {
       this.cache.delete(lruKey);
-      if (this.shouldLog) {
-        console.log(`[EventSpecCache] Evicted LRU entry: ${lruKey}`);
-      }
     }
   }
 
@@ -171,7 +158,7 @@ export class EventSpecCache {
     this.cache.clear();
     this.globalEventCount = 0;
     if (this.shouldLog) {
-      console.log("[EventSpecCache] Cache cleared");
+      console.log("[Avo Inspector] Cache cleared");
     }
   }
 

@@ -115,7 +115,7 @@ describe("EventSpecCache", () => {
       );
 
       // Fast forward 2 more seconds (total 61 seconds) - should be expired
-      jest.advanceTimersByTime(61 * 1000);
+      jest.advanceTimersByTime(2 * 1000);
       expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
     });
   });
