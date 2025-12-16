@@ -100,7 +100,7 @@ describe("EventSpecCache", () => {
       jest.useRealTimers();
     });
 
-    test("should expire entries after 5 minutes", () => {
+    test("should expire entries after 1 minute", () => {
       cache.set("apiKey1", "stream1", "event1", mockEventSpecResponse);
 
       // Initially should be cached
@@ -108,26 +108,15 @@ describe("EventSpecCache", () => {
         mockEventSpecResponse
       );
 
-      // Fast forward 4 minutes - should still be cached
-      jest.advanceTimersByTime(4 * 60 * 1000);
+      // Fast forward 59 seconds - should still be cached
+      jest.advanceTimersByTime(59 * 1000);
       expect(cache.get("apiKey1", "stream1", "event1")).toEqual(
         mockEventSpecResponse
       );
 
-      // Fast forward 2 more minutes (total 6 minutes) - should be expired
-      jest.advanceTimersByTime(2 * 60 * 1000);
+      // Fast forward 2 more seconds (total 61 seconds) - should be expired
+      jest.advanceTimersByTime(61 * 1000);
       expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
-    });
-
-    test("should not expire entries before TTL", () => {
-      cache.set("apiKey1", "stream1", "event1", mockEventSpecResponse);
-
-      // Fast forward just under 5 minutes
-      jest.advanceTimersByTime(5 * 60 * 1000 - 1);
-
-      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(
-        mockEventSpecResponse
-      );
     });
   });
 

@@ -17,8 +17,8 @@ export class EventSpecCache {
   /** Cache storage: key -> CacheEntry */
   private cache: Map<string, EventSpecCacheEntry>;
 
-  /** Time-to-live in milliseconds (5 minutes) */
-  private readonly TTL_MS = 5 * 60 * 1000;
+  /** Time-to-live in milliseconds (1 minute) */
+  private readonly TTL_MS = 60 * 1000;
 
   /** Maximum cache hit count before rotating cache (50 hits) */
   private readonly MAX_EVENT_COUNT = 50;
