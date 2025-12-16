@@ -17,8 +17,8 @@ export class EventSpecCache {
   /** Cache storage: key -> CacheEntry */
   private cache: Map<string, EventSpecCacheEntry>;
 
-  /** Time-to-live in milliseconds (5 minutes) */
-  private readonly TTL_MS = 5 * 60 * 1000;
+  /** Time-to-live in milliseconds (1 minute) */
+  private readonly TTL_MS = 60 * 1000;
 
   /** Maximum cache hit count before rotating cache (50 hits) */
   private readonly MAX_EVENT_COUNT = 50;
@@ -57,26 +57,20 @@ export class EventSpecCache {
     eventName: string
   ): EventSpecResponse | null {
     const key = this.generateKey(apiKey, streamId, eventName);
-    const entry = this.cache.get(key);
+    const entry = this.cache.get(key); 
 
     if (!entry) {
-      if (this.shouldLog) {
-        console.log(`[EventSpecCache] Cache miss for key: ${key}`);
-      }
       return null;
     }
 
     // Check if entry has expired
     if (this.shouldEvict(entry)) {
-      if (this.shouldLog) {
-        console.log(`[EventSpecCache] Cache entry expired for key: ${key}`);
-      }
       this.cache.delete(key);
       return null;
     }
 
     if (this.shouldLog) {
-      console.log(`[EventSpecCache] Cache hit for key: ${key}`);
+      console.log(`[Avo Inspector] Cache hit for key: ${key}`);
     }
 
     // Update lastAccessed for LRU (Least Recently Used) eviction
@@ -115,10 +109,6 @@ export class EventSpecCache {
     };
 
     this.cache.set(key, entry);
-
-    if (this.shouldLog) {
-      console.log(`[EventSpecCache] Cached spec for key: ${key}`);
-    }
   }
 
 
@@ -158,9 +148,6 @@ export class EventSpecCache {
     // Remove the least recently used entry
     if (lruKey !== null) {
       this.cache.delete(lruKey);
-      if (this.shouldLog) {
-        console.log(`[EventSpecCache] Evicted LRU entry: ${lruKey}`);
-      }
     }
   }
 
@@ -171,7 +158,7 @@ export class EventSpecCache {
     this.cache.clear();
     this.globalEventCount = 0;
     if (this.shouldLog) {
-      console.log("[EventSpecCache] Cache cleared");
+      console.log("[Avo Inspector] Cache cleared");
     }
   }
 

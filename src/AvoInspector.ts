@@ -10,7 +10,7 @@ import { AvoStreamId } from "./AvoStreamId";
 import { validateEvent } from "./eventSpec/EventValidator";
 
 import { isValueEmpty } from "./utils";
-import type { ValidationResult, PropertyValidationResult } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { ValidationResult, PropertyValidationResult, EventSpecResponse } from "./eventSpec/AvoEventSpecFetchTypes";
 
 const libVersion = require("../package.json").version;
 
@@ -30,6 +30,7 @@ export class AvoInspector {
   private streamId?: string;
   private eventSpecCache?: EventSpecCache;
   private eventSpecFetcher?: AvoEventSpecFetcher;
+  private currentBranchId: string | null = null;
 
   static avoStorage: AvoStorage;
 
@@ -399,6 +400,37 @@ export class AvoInspector {
   }
 
   /**
+   * Handles branch change detection and cache storage for a fetched event spec.
+   * This logic is shared between fetchEventSpecIfNeeded and fetchAndValidateEvent.
+   */
+  private handleBranchChangeAndCache(
+    specResponse: EventSpecResponse,
+    eventName: string
+  ): void {
+    // Check for branch change
+    const newBranchId = specResponse.metadata.branchId;
+    if (this.currentBranchId !== null && this.currentBranchId !== newBranchId) {
+      if (AvoInspector.shouldLog) {
+        console.log(
+          `[Avo Inspector] Branch changed from ${this.currentBranchId} to ${newBranchId}. Flushing cache.`
+        );
+      }
+      this.eventSpecCache?.clear();
+    }
+    this.currentBranchId = newBranchId;
+
+    // Store in cache
+    if (this.eventSpecCache && this.streamId) {
+      this.eventSpecCache.set(
+        this.apiKey,
+        this.streamId,
+        eventName,
+        specResponse
+      );
+    }
+  }
+
+  /**
    * Fetches the event spec if spec fetching is enabled.
    * Used by trackSchema when we don't have raw properties to validate.
    *
@@ -417,32 +449,26 @@ export class AvoInspector {
 
     try {
       // Check cache first
-      const cachedSpec = this.eventSpecCache.get(
-        this.apiKey,
-        this.streamId,
-        eventName
-      );
-
-      if (cachedSpec) {
-        // Cache hit - no need to fetch
-        return;
-      }
-
-      // Cache miss - fetch from API (blocking)
-      const response = await this.eventSpecFetcher.fetch({
-        apiKey: this.apiKey,
-        streamId: this.streamId,
-        eventName
-      });
-
-      if (response && this.eventSpecCache && this.streamId) {
-        // Store in cache
-        this.eventSpecCache.set(
+      let specResponse: EventSpecResponse | null = null;
+      if (this.eventSpecCache) {
+        specResponse = this.eventSpecCache.get(
           this.apiKey,
           this.streamId,
-          eventName,
-          response
+          eventName
         );
+      }
+      
+      // Cache miss - fetch from API (blocking)
+      if (!specResponse) {
+        specResponse = await this.eventSpecFetcher.fetch({
+          apiKey: this.apiKey,
+          streamId: this.streamId,
+          eventName
+        });
+
+        if (specResponse) {
+          this.handleBranchChangeAndCache(specResponse, eventName);
+        }
       }
     } catch (error) {
       // Graceful degradation - log but don't fail
@@ -454,7 +480,6 @@ export class AvoInspector {
       }
     }
   }
-
   /**
    * Fetches event spec and validates the event against it.
    * Returns ValidationResult if spec is available, null otherwise.
@@ -477,11 +502,14 @@ export class AvoInspector {
 
     try {
       // Check cache first
-      let specResponse = this.eventSpecCache.get(
-        this.apiKey,
-        this.streamId,
-        eventName
-      );
+      let specResponse: EventSpecResponse | null = null;
+      if (this.eventSpecCache) {
+        specResponse = this.eventSpecCache.get(
+          this.apiKey,
+          this.streamId,
+          eventName
+        );
+      }
 
       // Cache miss - fetch from API (blocking)
       if (!specResponse) {
@@ -491,14 +519,8 @@ export class AvoInspector {
           eventName
         });
 
-        // Store in cache if fetched successfully
-        if (specResponse && this.eventSpecCache && this.streamId) {
-          this.eventSpecCache.set(
-            this.apiKey,
-            this.streamId,
-            eventName,
-            specResponse
-          );
+        if (specResponse) {
+          this.handleBranchChangeAndCache(specResponse, eventName);
         }
       }
 

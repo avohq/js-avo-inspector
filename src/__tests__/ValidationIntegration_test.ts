@@ -308,6 +308,10 @@ describe("Validation Integration", () => {
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
+
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse)
+      }));
     });
 
     test("should fall back to batcher if immediate send fails", async () => {
@@ -349,6 +353,10 @@ describe("Validation Integration", () => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
+      }));
+
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse)
       }));
     });
 
@@ -392,6 +400,10 @@ describe("Validation Integration", () => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
+      }));
+
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse)
       }));
     });
 
@@ -439,6 +451,10 @@ describe("Validation Integration", () => {
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
+
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse)
+      }));
     });
 
     test("should NOT drop validated events due to sampling", async () => {
@@ -478,6 +494,10 @@ describe("Validation Integration", () => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
+      }));
+
+      (AvoEventSpecFetcher as unknown as jest.Mock).mockImplementation(() => ({
+        fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse)
       }));
     });
 

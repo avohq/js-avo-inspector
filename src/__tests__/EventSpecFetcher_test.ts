@@ -360,19 +360,6 @@ describe("EventSpecFetcher", () => {
 
       expect(console.log).not.toHaveBeenCalled();
     });
-
-    test("should log when shouldLog is true", async () => {
-      (console.log as jest.Mock).mockClear();
-      const logFetcher = new AvoEventSpecFetcher(2000, true, "dev");
-
-      await logFetcher.fetch({
-        apiKey: "apiKey1",
-        streamId: "stream1",
-        eventName: "success"
-      });
-
-      expect(console.log).toHaveBeenCalled();
-    });
   });
 
   describe("Custom Base URL", () => {

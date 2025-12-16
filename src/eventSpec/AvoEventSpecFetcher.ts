@@ -68,11 +68,6 @@ export class AvoEventSpecFetcher {
     const existingRequest: Promise<EventSpecResponse | null> | undefined =
       this.inFlightRequests.get(requestKey);
     if (existingRequest) {
-      if (this.shouldLog) {
-        console.log(
-          `[EventSpecFetcher] Returning existing in-flight request for streamId=${params.streamId}, eventName=${params.eventName}`
-        );
-      }
       return existingRequest;
     }
     // Create and track the new request
@@ -96,12 +91,6 @@ export class AvoEventSpecFetcher {
       return null;
     }
     const url: string = this.buildUrl(params);
-    if (this.shouldLog) {
-      console.log(
-        `[EventSpecFetcher] Fetching event spec for: ${params.eventName}`
-      );
-      console.log(`[EventSpecFetcher] Using base URL: ${this.baseUrl}`);
-    }
     try {
       const wireResponse: EventSpecResponseWire | null = await this.makeRequest(
         url
@@ -109,7 +98,7 @@ export class AvoEventSpecFetcher {
       if (!wireResponse) {
         if (this.shouldLog) {
           console.warn(
-            `[EventSpecFetcher] Failed to fetch event spec for: ${params.eventName}`
+            `[Avo Inspector] Failed to fetch event spec for: ${params.eventName}`
           );
         }
         return null;
@@ -118,7 +107,7 @@ export class AvoEventSpecFetcher {
       if (!this.hasExpectedShape(wireResponse)) {
         if (this.shouldLog) {
           console.warn(
-            `[EventSpecFetcher] Invalid event spec response for: ${params.eventName}`
+            `[Avo Inspector] Invalid event spec response for: ${params.eventName}`
           );
         }
         return null;
@@ -126,16 +115,11 @@ export class AvoEventSpecFetcher {
       // Parse wire format to internal format
       const response: EventSpecResponse =
         AvoEventSpecFetcher.parseEventSpecResponse(wireResponse);
-      if (this.shouldLog) {
-        console.log(
-          `[EventSpecFetcher] Successfully fetched event spec for: ${params.eventName}`
-        );
-      }
       return response;
     } catch (error) {
       if (this.shouldLog) {
         console.error(
-          `[EventSpecFetcher] Error fetching event spec for: ${params.eventName}`,
+          `[Avo Inspector] Error fetching event spec for: ${params.eventName}`,
           error
         );
       }
@@ -173,7 +157,7 @@ export class AvoEventSpecFetcher {
             } catch (error) {
               if (this.shouldLog) {
                 console.error(
-                  "[EventSpecFetcher] Failed to parse response:",
+                  "[Avo Inspector] Failed to parse response:",
                   error
                 );
               }
@@ -182,7 +166,7 @@ export class AvoEventSpecFetcher {
           } else {
             if (this.shouldLog) {
               console.warn(
-                `[EventSpecFetcher] Request failed with status: ${xhr.status}`
+                `[Avo Inspector] Request failed with status: ${xhr.status}`
               );
             }
             resolve(null);
@@ -190,14 +174,14 @@ export class AvoEventSpecFetcher {
         };
         xhr.onerror = () => {
           if (this.shouldLog) {
-            console.error("[EventSpecFetcher] Network error occurred");
+            console.error("[Avo Inspector] Network error occurred");
           }
           resolve(null);
         };
         xhr.ontimeout = () => {
           if (this.shouldLog) {
             console.error(
-              `[EventSpecFetcher] Request timed out after ${this.timeout}ms`
+              `[Avo Inspector] Request timed out after ${this.timeout}ms`
             );
           }
           resolve(null);
