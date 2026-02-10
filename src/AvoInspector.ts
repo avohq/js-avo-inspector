@@ -448,26 +448,40 @@ export class AvoInspector {
     }
 
     try {
-      // Check cache first
-      let specResponse: EventSpecResponse | null = null;
-      if (this.eventSpecCache) {
-        specResponse = this.eventSpecCache.get(
+      // Check cache first (includes cached empty responses)
+      if (this.eventSpecCache.contains(this.apiKey, this.streamId, eventName)) {
+        const cached = this.eventSpecCache.get(
           this.apiKey,
           this.streamId,
           eventName
         );
+        if (!cached) {
+          // Cached empty response — no spec exists for this event
+          if (AvoInspector.shouldLog) {
+            console.log(
+              `[Avo Inspector] Cache hit (empty) for event: ${eventName}. Sending without validation.`
+            );
+          }
+        }
+        return;
       }
-      
-      // Cache miss - fetch from API (blocking)
-      if (!specResponse) {
-        specResponse = await this.eventSpecFetcher.fetch({
-          apiKey: this.apiKey,
-          streamId: this.streamId,
-          eventName
-        });
 
-        if (specResponse) {
-          this.handleBranchChangeAndCache(specResponse, eventName);
+      // Cache miss - fetch from API (blocking)
+      const specResponse = await this.eventSpecFetcher.fetch({
+        apiKey: this.apiKey,
+        streamId: this.streamId,
+        eventName
+      });
+
+      if (specResponse) {
+        this.handleBranchChangeAndCache(specResponse, eventName);
+      } else {
+        // Cache the empty response so we don't re-fetch
+        this.eventSpecCache.set(this.apiKey, this.streamId, eventName, null);
+        if (AvoInspector.shouldLog) {
+          console.log(
+            `[Avo Inspector] Event spec fetch returned null for event: ${eventName}. Cached empty response.`
+          );
         }
       }
     } catch (error) {
@@ -501,36 +515,51 @@ export class AvoInspector {
     }
 
     try {
-      // Check cache first
-      let specResponse: EventSpecResponse | null = null;
-      if (this.eventSpecCache) {
-        specResponse = this.eventSpecCache.get(
+      // Check cache first (includes cached empty responses)
+      if (this.eventSpecCache.contains(this.apiKey, this.streamId, eventName)) {
+        const cached = this.eventSpecCache.get(
           this.apiKey,
           this.streamId,
           eventName
         );
-      }
-
-      // Cache miss - fetch from API (blocking)
-      if (!specResponse) {
-        specResponse = await this.eventSpecFetcher.fetch({
-          apiKey: this.apiKey,
-          streamId: this.streamId,
-          eventName
-        });
-
-        if (specResponse) {
-          this.handleBranchChangeAndCache(specResponse, eventName);
+        if (cached) {
+          if (AvoInspector.shouldLog) {
+            console.log(
+              `[Avo Inspector] Cache hit for event: ${eventName}`
+            );
+          }
+          return validateEvent(eventProperties, cached);
+        } else {
+          // Cached empty response — no spec exists for this event
+          if (AvoInspector.shouldLog) {
+            console.log(
+              `[Avo Inspector] Cache hit (empty) for event: ${eventName}. Sending without validation.`
+            );
+          }
+          return null;
         }
       }
 
-      // If we have a spec, validate the event
-      if (specResponse) {
-        const validationResult = validateEvent(eventProperties, specResponse);
-        return validationResult;
-      }
+      // Cache miss - fetch from API (blocking)
+      const specResponse = await this.eventSpecFetcher.fetch({
+        apiKey: this.apiKey,
+        streamId: this.streamId,
+        eventName
+      });
 
-      return null;
+      if (specResponse) {
+        this.handleBranchChangeAndCache(specResponse, eventName);
+        return validateEvent(eventProperties, specResponse);
+      } else {
+        // Cache the empty response so we don't re-fetch
+        this.eventSpecCache.set(this.apiKey, this.streamId, eventName, null);
+        if (AvoInspector.shouldLog) {
+          console.log(
+            `[Avo Inspector] Event spec fetch returned null for event: ${eventName}. Cached empty response.`
+          );
+        }
+        return null;
+      }
     } catch (error) {
       // Graceful degradation - log but don't fail
       if (AvoInspector.shouldLog) {

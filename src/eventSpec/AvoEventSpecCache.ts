@@ -46,8 +46,34 @@ export class EventSpecCache {
   }
 
   /**
+   * Checks if a non-expired cache entry exists for the given key.
+   * Returns true even for cached null specs (empty backend responses).
+   * Use this to distinguish between "cache miss" and "cached empty response".
+   */
+  contains(
+    apiKey: string,
+    streamId: string,
+    eventName: string
+  ): boolean {
+    const key = this.generateKey(apiKey, streamId, eventName);
+    const entry = this.cache.get(key);
+
+    if (!entry) {
+      return false;
+    }
+
+    if (this.shouldEvict(entry)) {
+      this.cache.delete(key);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Retrieves an event spec response from the cache if it exists and is valid.
-   * Returns null if the entry is missing, expired, or has exceeded event count.
+   * Returns null if the entry is missing, expired, has exceeded event count,
+   * or if the cached spec itself is null (empty backend response).
    *
    * On cache hit, increments the hit count for this entry and the global counter.
    */
@@ -91,12 +117,13 @@ export class EventSpecCache {
 
   /**
    * Stores an event spec response in the cache.
+   * Pass null to cache an empty response (event not found on backend).
    */
   set(
     apiKey: string,
     streamId: string,
     eventName: string,
-    spec: EventSpecResponse
+    spec: EventSpecResponse | null
   ): void {
     const key = this.generateKey(apiKey, streamId, eventName);
 

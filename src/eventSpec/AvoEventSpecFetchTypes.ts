@@ -117,8 +117,8 @@ export interface EventSpecMetadata {
 
 /** Cache entry for storing event specs with metadata. */
 export interface EventSpecCacheEntry {
-  /** The cached event specification response (internal format) */
-  spec: EventSpecResponse;
+  /** The cached event specification response (internal format), or null for cached empty responses */
+  spec: EventSpecResponse | null;
   /** Timestamp when this entry was cached (used for TTL expiration) */
   timestamp: number;
   /** Timestamp when this entry was last accessed (used for LRU eviction) */

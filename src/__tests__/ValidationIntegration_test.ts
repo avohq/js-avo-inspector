@@ -67,6 +67,7 @@ describe("Validation Integration", () => {
     beforeEach(() => {
       // Mock cache to return spec
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
@@ -229,6 +230,7 @@ describe("Validation Integration", () => {
     beforeEach(() => {
       // Mock cache to return null (cache miss)
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(false),
         get: jest.fn().mockReturnValue(null),
         set: jest.fn()
       }));
@@ -270,6 +272,7 @@ describe("Validation Integration", () => {
     beforeEach(() => {
       // Reset mocks
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
@@ -305,6 +308,7 @@ describe("Validation Integration", () => {
   describe("Error handling", () => {
     beforeEach(() => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
@@ -351,6 +355,7 @@ describe("Validation Integration", () => {
   describe("Bandwidth optimization - failedEventIds vs passedEventIds", () => {
     beforeEach(() => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
@@ -398,6 +403,7 @@ describe("Validation Integration", () => {
   describe("Property name correlation", () => {
     beforeEach(() => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
@@ -448,6 +454,7 @@ describe("Validation Integration", () => {
   describe("Sampling behavior for validated events", () => {
     beforeEach(() => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
@@ -492,6 +499,7 @@ describe("Validation Integration", () => {
   describe("Avo Functions validation", () => {
     beforeEach(() => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
         set: jest.fn()
       }));
@@ -660,6 +668,7 @@ describe("Validation Integration", () => {
 
     beforeEach(() => {
       (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(nestedEventSpecResponse),
         set: jest.fn()
       }));
@@ -940,6 +949,7 @@ describe("Validation Integration", () => {
       };
 
       (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(testSpec),
         set: jest.fn()
       }));
@@ -1100,6 +1110,7 @@ describe("Validation Integration", () => {
       };
 
       (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(testSpec),
         set: jest.fn()
       }));
@@ -1158,6 +1169,7 @@ describe("Validation Integration", () => {
       };
 
       (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(testSpec),
         set: jest.fn()
       }));
@@ -1301,6 +1313,7 @@ describe("Validation Integration", () => {
 
     beforeEach(() => {
       (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(comprehensiveEventSpecResponse),
         set: jest.fn()
       }));
@@ -1768,6 +1781,7 @@ describe("Validation Integration", () => {
 
     beforeEach(() => {
       (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(primeExampleSpec),
         set: jest.fn()
       }));
@@ -1954,6 +1968,7 @@ describe("Validation Integration", () => {
 
     beforeEach(() => {
       (EventSpecCache as unknown as jest.Mock).mockImplementation(() => ({
+        contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(listSpecResponse),
         set: jest.fn()
       }));
