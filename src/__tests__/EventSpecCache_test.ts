@@ -349,6 +349,80 @@ describe("EventSpecCache", () => {
     });
   });
 
+  describe("Null Spec Caching (Empty Backend Responses)", () => {
+    test("contains should return true for cached null spec", () => {
+      cache.set("apiKey1", "stream1", "event1", null);
+      expect(cache.contains("apiKey1", "stream1", "event1")).toBe(true);
+    });
+
+    test("get should return null for cached null spec", () => {
+      cache.set("apiKey1", "stream1", "event1", null);
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
+    });
+
+    test("contains should return false for missing entry", () => {
+      expect(cache.contains("apiKey1", "stream1", "nonexistent")).toBe(false);
+    });
+
+    test("null spec entry should count toward cache size", () => {
+      cache.set("apiKey1", "stream1", "event1", null);
+      expect(cache.size()).toBe(1);
+    });
+
+    test("null spec entry should expire via TTL", () => {
+      jest.useFakeTimers();
+      cache.set("apiKey1", "stream1", "event1", null);
+
+      expect(cache.contains("apiKey1", "stream1", "event1")).toBe(true);
+
+      jest.advanceTimersByTime(61 * 1000);
+      expect(cache.contains("apiKey1", "stream1", "event1")).toBe(false);
+      jest.useRealTimers();
+    });
+
+    test("null spec entry should expire via event count", () => {
+      cache.set("apiKey1", "stream1", "event1", null);
+
+      for (let i = 0; i < 50; i++) {
+        cache.get("apiKey1", "stream1", "event1");
+      }
+
+      // After 50 hits the entry is evicted (LRU eviction + per-entry count)
+      expect(cache.contains("apiKey1", "stream1", "event1")).toBe(false);
+    });
+
+    test("should overwrite cached null spec with real spec", () => {
+      cache.set("apiKey1", "stream1", "event1", null);
+      expect(cache.get("apiKey1", "stream1", "event1")).toBeNull();
+      expect(cache.contains("apiKey1", "stream1", "event1")).toBe(true);
+
+      cache.set("apiKey1", "stream1", "event1", mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "event1")).toEqual(mockEventSpecResponse);
+    });
+
+    test("clear should remove null spec entries", () => {
+      cache.set("apiKey1", "stream1", "event1", null);
+      cache.set("apiKey1", "stream1", "event2", mockEventSpecResponse);
+
+      cache.clear();
+
+      expect(cache.size()).toBe(0);
+      expect(cache.contains("apiKey1", "stream1", "event1")).toBe(false);
+      expect(cache.contains("apiKey1", "stream1", "event2")).toBe(false);
+    });
+
+    test("null and real spec entries should coexist", () => {
+      cache.set("apiKey1", "stream1", "known_event", mockEventSpecResponse);
+      cache.set("apiKey1", "stream1", "unknown_event", null);
+
+      expect(cache.size()).toBe(2);
+      expect(cache.get("apiKey1", "stream1", "known_event")).toEqual(mockEventSpecResponse);
+      expect(cache.get("apiKey1", "stream1", "unknown_event")).toBeNull();
+      expect(cache.contains("apiKey1", "stream1", "known_event")).toBe(true);
+      expect(cache.contains("apiKey1", "stream1", "unknown_event")).toBe(true);
+    });
+  });
+
   describe("Edge Cases", () => {
     test("should handle empty cache gracefully", () => {
       expect(cache.size()).toBe(0);
