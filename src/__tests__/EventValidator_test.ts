@@ -2093,3 +2093,58 @@ describe("List Type Validation", () => {
     });
   });
 });
+
+// =============================================================================
+// ReDoS SAFETY TESTS (RE2-WASM)
+// =============================================================================
+
+describe("ReDoS Safety (RE2)", () => {
+  test("should complete in under 1 second with catastrophic backtracking pattern", () => {
+    const evilPattern = "(a+)+$";
+    const evilInput = "a".repeat(20000) + "!";
+
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          field: createRegexProperty({
+            [evilPattern]: ["evt_1"]
+          })
+        }
+      })
+    ]);
+
+    const start = Date.now();
+    const result = validateEvent({ field: evilInput }, specResponse);
+    const elapsed = Date.now() - start;
+
+    // RE2 guarantees linear time - this should complete well under 1 second
+    expect(elapsed).toBeLessThan(1000);
+    // The pattern should not match (string ends with "!")
+    expect(result.propertyResults["field"].failedEventIds).toContain("evt_1");
+  });
+
+  test("should handle unsupported RE2 pattern gracefully (constraint skipped)", () => {
+    // Lookahead is not supported by RE2
+    const lookaheadPattern = "(?=.*[A-Z]).*";
+
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          field: createRegexProperty({
+            [lookaheadPattern]: ["evt_1"]
+          })
+        }
+      })
+    ]);
+
+    // Should not throw
+    const result = validateEvent({ field: "test" }, specResponse);
+
+    // Constraint should be skipped (fail-open) - not added to failedIds
+    expect(result.propertyResults["field"].failedEventIds).toBeUndefined();
+  });
+});

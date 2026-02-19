@@ -11,6 +11,8 @@
  * Validation runs against ALL events/variants in the response.
  */
 
+import { RE2 } from 're2-wasm';
+
 import type {
   EventSpecResponse,
   EventSpecEntry,
@@ -212,26 +214,30 @@ export type RuntimeProperties = Record<string, RuntimePropertyValue>;
 // =============================================================================
 
 /**
- * Cache for compiled regex objects to avoid recompilation on every event.
+ * Cache for compiled RE2 regex objects to avoid recompilation on every event.
  * Patterns are expected to be stable per session.
+ * null values indicate patterns that RE2 rejected (e.g. unsupported syntax).
  */
-const regexCache = new Map<string, RegExp>();
+const regexCache = new Map<string, RE2 | null>();
 
 /**
- * Gets a compiled regex from cache or compiles and caches it.
- * @throws Error if pattern is invalid
+ * Gets a compiled RE2 regex from cache or compiles and caches it.
+ * Returns null if RE2 rejects the pattern (e.g. unsupported lookahead syntax).
+ * Null results are cached to avoid retrying bad patterns.
  */
-function getOrCompileRegex(pattern: string): RegExp {
-  let regex = regexCache.get(pattern);
-  if (!regex) {
-    // SECURITY: We trust regex patterns from the Avo backend (EventSpecResponse).
-    // While a malicious pattern could cause ReDoS, we assume the backend is secure
-    // and only delivers valid, non-malicious regexes derived from the Tracking Plan.
-    // A complete fix would require a safe-regex validator or timeout-based execution.
-    regex = new RegExp(pattern);
-    regexCache.set(pattern, regex);
+function getOrCompileRegex(pattern: string): RE2 | null {
+  if (regexCache.has(pattern)) {
+    return regexCache.get(pattern)!;
   }
-  return regex;
+  try {
+    const regex = new RE2(pattern, 'u');
+    regexCache.set(pattern, regex);
+    return regex;
+  } catch (e) {
+    console.warn(`[Avo Inspector] RE2 rejected regex pattern, skipping constraint: ${pattern}`);
+    regexCache.set(pattern, null);
+    return null;
+  }
 }
 
 /**
@@ -760,15 +766,14 @@ function checkRegexPatterns(
   }
 
   for (const [pattern, eventIds] of Object.entries(regexPatterns)) {
-    try {
-      const regex = getOrCompileRegex(pattern);
-      if (!regex.test(value)) {
-        // Value doesn't match pattern, so these eventIds fail
-        addIdsToSet(eventIds, failedIds);
-      }
-    } catch (e) {
-      // Invalid regex - skip this constraint
-      console.warn(`[Avo Inspector] Invalid regex pattern: ${pattern}`);
+    const regex = getOrCompileRegex(pattern);
+    if (regex === null) {
+      // RE2 rejected this pattern - skip constraint (fail-open)
+      continue;
+    }
+    if (!regex.test(value)) {
+      // Value doesn't match pattern, so these eventIds fail
+      addIdsToSet(eventIds, failedIds);
     }
   }
 }
