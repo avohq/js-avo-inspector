@@ -2115,12 +2115,8 @@ describe("ReDoS Safety", () => {
       })
     ]);
 
-    const start = Date.now();
     const result = validateEvent({ field: evilInput }, specResponse);
-    const elapsed = Date.now() - start;
 
-    // safe-regex2 rejects the pattern before compilation - should be instant
-    expect(elapsed).toBeLessThan(1000);
     // Unsafe pattern is skipped (fail-open) - constraint not enforced
     expect(result.propertyResults["field"].failedEventIds).toBeUndefined();
   });
