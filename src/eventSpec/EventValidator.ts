@@ -11,6 +11,8 @@
  * Validation runs against ALL events/variants in the response.
  */
 
+import safe from 'safe-regex2';
+
 import type {
   EventSpecResponse,
   EventSpecEntry,
@@ -214,24 +216,34 @@ export type RuntimeProperties = Record<string, RuntimePropertyValue>;
 /**
  * Cache for compiled regex objects to avoid recompilation on every event.
  * Patterns are expected to be stable per session.
+ * null values indicate patterns that were rejected (unsafe or invalid).
  */
-const regexCache = new Map<string, RegExp>();
+const regexCache = new Map<string, RegExp | null>();
 
 /**
  * Gets a compiled regex from cache or compiles and caches it.
- * @throws Error if pattern is invalid
+ * Validates patterns with safe-regex2 before compilation to prevent ReDoS.
+ * Returns null if the pattern is unsafe or invalid.
+ * Null results are cached to avoid retrying bad patterns.
  */
-function getOrCompileRegex(pattern: string): RegExp {
-  let regex = regexCache.get(pattern);
-  if (!regex) {
-    // SECURITY: We trust regex patterns from the Avo backend (EventSpecResponse).
-    // While a malicious pattern could cause ReDoS, we assume the backend is secure
-    // and only delivers valid, non-malicious regexes derived from the Tracking Plan.
-    // A complete fix would require a safe-regex validator or timeout-based execution.
-    regex = new RegExp(pattern);
-    regexCache.set(pattern, regex);
+function getOrCompileRegex(pattern: string): RegExp | null {
+  if (regexCache.has(pattern)) {
+    return regexCache.get(pattern)!;
   }
-  return regex;
+  if (!safe(pattern)) {
+    console.warn(`[Avo Inspector] Potentially unsafe regex pattern rejected, skipping constraint: ${pattern}`);
+    regexCache.set(pattern, null);
+    return null;
+  }
+  try {
+    const regex = new RegExp(pattern);
+    regexCache.set(pattern, regex);
+    return regex;
+  } catch (e) {
+    console.warn(`[Avo Inspector] Invalid regex pattern, skipping constraint: ${pattern}`);
+    regexCache.set(pattern, null);
+    return null;
+  }
 }
 
 /**
@@ -760,15 +772,14 @@ function checkRegexPatterns(
   }
 
   for (const [pattern, eventIds] of Object.entries(regexPatterns)) {
-    try {
-      const regex = getOrCompileRegex(pattern);
-      if (!regex.test(value)) {
-        // Value doesn't match pattern, so these eventIds fail
-        addIdsToSet(eventIds, failedIds);
-      }
-    } catch (e) {
-      // Invalid regex - skip this constraint
-      console.warn(`[Avo Inspector] Invalid regex pattern: ${pattern}`);
+    const regex = getOrCompileRegex(pattern);
+    if (regex === null) {
+      // Unsafe or invalid pattern - skip constraint (fail-open)
+      continue;
+    }
+    if (!regex.test(value)) {
+      // Value doesn't match pattern, so these eventIds fail
+      addIdsToSet(eventIds, failedIds);
     }
   }
 }

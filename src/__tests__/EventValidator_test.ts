@@ -2093,3 +2093,55 @@ describe("List Type Validation", () => {
     });
   });
 });
+
+// =============================================================================
+// ReDoS SAFETY TESTS (safe-regex2)
+// =============================================================================
+
+describe("ReDoS Safety", () => {
+  test("should reject catastrophic backtracking pattern and complete instantly", () => {
+    const evilPattern = "(a+)+$";
+    const evilInput = "a".repeat(20000) + "!";
+
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          field: createRegexProperty({
+            [evilPattern]: ["evt_1"]
+          })
+        }
+      })
+    ]);
+
+    const result = validateEvent({ field: evilInput }, specResponse);
+
+    // Unsafe pattern is skipped (fail-open) - constraint not enforced
+    expect(result.propertyResults["field"].failedEventIds).toBeUndefined();
+  });
+
+  test("should allow safe regex patterns to work normally", () => {
+    const safePattern = "^[a-zA-Z0-9]+$";
+
+    const specResponse = createEventSpecResponse([
+      createEventSpecEntry({
+        baseEventId: "evt_1",
+        variantIds: [],
+        props: {
+          field: createRegexProperty({
+            [safePattern]: ["evt_1"]
+          })
+        }
+      })
+    ]);
+
+    // "hello123" matches ^[a-zA-Z0-9]+$ - should pass
+    const passingResult = validateEvent({ field: "hello123" }, specResponse);
+    expect(passingResult.propertyResults["field"].failedEventIds).toBeUndefined();
+
+    // "hello world!" does NOT match - should fail
+    const failingResult = validateEvent({ field: "hello world!" }, specResponse);
+    expect(failingResult.propertyResults["field"].failedEventIds).toContain("evt_1");
+  });
+});

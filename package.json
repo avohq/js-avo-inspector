@@ -39,7 +39,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@noble/curves": "^1.4.0"
+    "@noble/curves": "^1.4.0",
+    "safe-regex2": "^5.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
