@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@noble/curves": "^1.4.0",
-    "re2-wasm": "^1.0.2"
+    "safe-regex2": "^5.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

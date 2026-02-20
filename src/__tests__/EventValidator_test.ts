@@ -2095,11 +2095,11 @@ describe("List Type Validation", () => {
 });
 
 // =============================================================================
-// ReDoS SAFETY TESTS (RE2-WASM)
+// ReDoS SAFETY TESTS (safe-regex2)
 // =============================================================================
 
-describe("ReDoS Safety (RE2)", () => {
-  test("should complete in under 1 second with catastrophic backtracking pattern", () => {
+describe("ReDoS Safety", () => {
+  test("should reject catastrophic backtracking pattern and complete instantly", () => {
     const evilPattern = "(a+)+$";
     const evilInput = "a".repeat(20000) + "!";
 
@@ -2119,15 +2119,14 @@ describe("ReDoS Safety (RE2)", () => {
     const result = validateEvent({ field: evilInput }, specResponse);
     const elapsed = Date.now() - start;
 
-    // RE2 guarantees linear time - this should complete well under 1 second
+    // safe-regex2 rejects the pattern before compilation - should be instant
     expect(elapsed).toBeLessThan(1000);
-    // The pattern should not match (string ends with "!")
-    expect(result.propertyResults["field"].failedEventIds).toContain("evt_1");
+    // Unsafe pattern is skipped (fail-open) - constraint not enforced
+    expect(result.propertyResults["field"].failedEventIds).toBeUndefined();
   });
 
-  test("should handle unsupported RE2 pattern gracefully (constraint skipped)", () => {
-    // Lookahead is not supported by RE2
-    const lookaheadPattern = "(?=.*[A-Z]).*";
+  test("should allow safe regex patterns to work normally", () => {
+    const safePattern = "^[a-zA-Z0-9]+$";
 
     const specResponse = createEventSpecResponse([
       createEventSpecEntry({
@@ -2135,16 +2134,18 @@ describe("ReDoS Safety (RE2)", () => {
         variantIds: [],
         props: {
           field: createRegexProperty({
-            [lookaheadPattern]: ["evt_1"]
+            [safePattern]: ["evt_1"]
           })
         }
       })
     ]);
 
-    // Should not throw
-    const result = validateEvent({ field: "test" }, specResponse);
+    // "hello123" matches ^[a-zA-Z0-9]+$ - should pass
+    const passingResult = validateEvent({ field: "hello123" }, specResponse);
+    expect(passingResult.propertyResults["field"].failedEventIds).toBeUndefined();
 
-    // Constraint should be skipped (fail-open) - not added to failedIds
-    expect(result.propertyResults["field"].failedEventIds).toBeUndefined();
+    // "hello world!" does NOT match - should fail
+    const failingResult = validateEvent({ field: "hello world!" }, specResponse);
+    expect(failingResult.propertyResults["field"].failedEventIds).toContain("evt_1");
   });
 });
