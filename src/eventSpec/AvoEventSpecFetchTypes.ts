@@ -1,0 +1,162 @@
+/**
+ * This file is generated. Internal development changes should be made in the generator
+ * and the file should be re-generated. External contributions are welcome to submit
+ * changes directly to this file, and we'll apply them to the generator internally.
+ */
+
+/**
+ * Wire format - Property constraints with short field names.
+ * At most one constraint type will be present per property.
+ */
+export interface PropertyConstraintsWire {
+  /** Type name (for reference only, not validated) */
+  t: string;
+  /** Required flag (for reference only, not validated) */
+  r: boolean;
+  /** List flag - true if this is an array/list of the type */
+  l?: boolean;
+  /** Pinned values: pinnedValue -> eventIds that require this exact value */
+  p?: Record<string, Array<string>>;
+  /** Allowed values: JSON array string -> eventIds that accept these values */
+  v?: Record<string, Array<string>>;
+  /** Regex patterns: pattern -> eventIds that require matching this regex */
+  rx?: Record<string, Array<string>>;
+  /** Min/max ranges: "min,max" -> eventIds that require value in this range */
+  minmax?: Record<string, Array<string>>;
+  /** Nested property constraints for object properties */
+  children?: Record<string, PropertyConstraintsWire>;
+}
+
+/**
+ * Wire format - Event spec entry with short field names.
+ * A single event entry (base event + its variants).
+ * Multiple events can match the same name request due to name mapping.
+ */
+export interface EventSpecEntryWire {
+  /** Branch identifier */
+  b: string;
+  /** Base event ID */
+  id: string;
+  /** Variant IDs (baseEventId + variantIds = complete set) */
+  vids: Array<string>;
+  /** Property constraints keyed by property name */
+  p: Record<string, PropertyConstraintsWire>;
+}
+
+/**
+ * Wire format - Response from getEventSpec endpoint.
+ * Contains array of events that match the requested name (due to name mapping).
+ */
+export interface EventSpecResponseWire {
+  /** Array of events matching the requested name */
+  events: Array<EventSpecEntryWire>;
+  /** Schema metadata (keeps long names - small, one per response) */
+  metadata: EventSpecMetadata;
+}
+
+/**
+ * Internal - Property constraints with meaningful field names.
+ * At most one constraint type will be present per property.
+ */
+export interface PropertyConstraints {
+  /** Type name (for reference only, not validated) */
+  type: string;
+  /** Required flag (for reference only, not validated) */
+  required: boolean;
+  /** List flag - true if this is an array/list of items */
+  isList?: boolean;
+  /** Pinned values: pinnedValue -> eventIds that require this exact value */
+  pinnedValues?: Record<string, Array<string>>;
+  /** Allowed values: JSON array string -> eventIds that accept these values */
+  allowedValues?: Record<string, Array<string>>;
+  /** Regex patterns: pattern -> eventIds that require matching this regex */
+  regexPatterns?: Record<string, Array<string>>;
+  /** Min/max ranges: "min,max" -> eventIds that require value in this range */
+  minMaxRanges?: Record<string, Array<string>>;
+  /** Nested property constraints for object properties (for objects or list of objects) */
+  children?: Record<string, PropertyConstraints>;
+}
+
+/**
+ * Internal - Event spec entry with meaningful field names.
+ * A single event entry (base event + its variants).
+ */
+export interface EventSpecEntry {
+  /** Branch identifier */
+  branchId: string;
+  /** Base event ID */
+  baseEventId: string;
+  /** Variant IDs (baseEventId + variantIds = complete set) */
+  variantIds: Array<string>;
+  /** Property constraints keyed by property name */
+  props: Record<string, PropertyConstraints>;
+}
+
+/**
+ * Internal - Parsed response from getEventSpec endpoint.
+ * Contains array of events that match the requested name (due to name mapping).
+ */
+export interface EventSpecResponse {
+  /** Array of events matching the requested name */
+  events: Array<EventSpecEntry>;
+  /** Schema metadata */
+  metadata: EventSpecMetadata;
+}
+
+/** Metadata returned with the event spec response. */
+export interface EventSpecMetadata {
+  /** Schema identifier */
+  schemaId: string;
+  /** Branch identifier */
+  branchId: string;
+  /** Latest action identifier */
+  latestActionId: string;
+  /** Optional source identifier */
+  sourceId?: string;
+}
+
+/** Cache entry for storing event specs with metadata. */
+export interface EventSpecCacheEntry {
+  /** The cached event specification response (internal format), or null if the spec was not found */
+  spec: EventSpecResponse | null;
+  /** Timestamp when this entry was cached (used for TTL expiration) */
+  timestamp: number;
+  /** Timestamp when this entry was last accessed (used for LRU eviction) */
+  lastAccessed: number;
+  /** Number of cache hits since this entry was cached */
+  eventCount: number;
+}
+
+/** Parameters for fetching event specifications from the API. */
+export interface FetchEventSpecParams {
+  /** The API key */
+  apiKey: string;
+  /** The stream ID */
+  streamId: string;
+  /** The name of the event */
+  eventName: string;
+}
+
+/**
+ * Result of validating a single property.
+ * Contains either failedEventIds or passedEventIds (whichever is smaller for bandwidth).
+ */
+export interface PropertyValidationResult {
+  /** Event/variant IDs that FAILED validation (present if smaller or equal to passed) */
+  failedEventIds?: Array<string>;
+  /** Event/variant IDs that PASSED validation (present if smaller than failed) */
+  passedEventIds?: Array<string>;
+  /** Nested validation results for child properties of object properties */
+  children?: Record<string, PropertyValidationResult>;
+}
+
+/**
+ * Result of validating all properties in an event.
+ * Maps property name to its validation result.
+ */
+export interface ValidationResult {
+  /** Event spec metadata */
+  metadata: EventSpecMetadata | null;
+  /** Validation results per property */
+  propertyResults: Record<string, PropertyValidationResult>;
+}

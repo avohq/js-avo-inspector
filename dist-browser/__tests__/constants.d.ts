@@ -12,6 +12,7 @@ declare const mockedReturns: {
     INSTALLATION_ID: string;
     GUID: string;
     SESSION_ID: string;
+    ANONYMOUS_ID: string;
 };
 declare const networkCallType: {
     EVENT: string;
@@ -33,4 +34,4 @@ declare const type: {
     NULL: string;
     UNKNOWN: string;
 };
-export { defaultOptions, error, mockedReturns, networkCallType, requestMsg, sessionTimeMs, type, trackingEndpoint };
+export { defaultOptions, error, mockedReturns, networkCallType, requestMsg, sessionTimeMs, type, trackingEndpoint, };

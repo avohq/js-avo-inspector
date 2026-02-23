@@ -1,15 +1,11 @@
-/**
- * This file is generated. Internal development changes should be made in the generator
- * and the file should be re-generated. External contributions are welcome to submit
- * changes directly to this file, and we'll apply them to the generator internally.
- */
 import type { EventSpecResponse, FetchEventSpecParams } from "./AvoEventSpecFetchTypes";
 /**
  * EventSpecFetcher handles fetching event specifications from the Avo API.
  *
- * Endpoint: GET /streamInspectorEventShapes
- * Base URL: http://localhost:5001/avo-web-app/us-central1 (local dev)
- *           https://us-central1-avo-web-app.cloudfunctions.net (production)
+ * Endpoint: GET /trackingPlan/eventSpec
+ * Base URL: https://api.avo.app
+ *
+ * Adapted for React Native: uses global fetch instead of XMLHttpRequest.
  */
 export declare class AvoEventSpecFetcher {
     /** Base URL for the event spec API */
@@ -35,7 +31,10 @@ export declare class AvoEventSpecFetcher {
      * - The request times out
      *
      * This method gracefully degrades - failures do not throw errors.
-     * When null is returned, validation should be skipped for that event.
+     * When null is returned, validation is skipped for that event.
+     *
+     * In-flight de-duplication: concurrent requests for the same key
+     * share a single fetch promise. On failure, all waiters receive null.
      */
     fetch(params: FetchEventSpecParams): Promise<EventSpecResponse | null>;
     /** Internal fetch implementation. */
@@ -43,13 +42,19 @@ export declare class AvoEventSpecFetcher {
     /** Builds the complete URL with query parameters. */
     private buildUrl;
     /**
-     * Makes an HTTP GET request using XMLHttpRequest.
+     * Makes an HTTP GET request using global fetch (available in React Native).
      * Returns the parsed JSON response or null on failure.
      */
     private makeRequest;
     /**
-     * Basic shape check - ensures response has the minimum expected structure.
-     * Does not perform deep validation of all fields.
+     * Basic shape check for wire format - ensures response has the minimum expected structure.
+     * Uses short field names from wire format.
      */
     private hasExpectedShape;
+    /** Parses the wire format response into internal format with meaningful field names. */
+    private static parseEventSpecResponse;
+    /** Parses a single event spec entry from wire format. */
+    private static parseEventSpecEntry;
+    /** Parses property constraints from wire format. */
+    private static parsePropertyConstraints;
 }

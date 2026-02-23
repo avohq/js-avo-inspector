@@ -1,7 +1,13 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import { AvoStreamId } from "../AvoStreamId";
+import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 
 import { error } from "../__tests__/constants";
+
+// Mock global fetch to avoid real network calls
+const mockFetch = jest.fn();
+(global as any).fetch = mockFetch;
 
 describe("Initialization", () => {
   test("Api Key is set", () => {
@@ -241,5 +247,88 @@ describe("Initialization", () => {
         version,
       });
     }).toThrow(error.VERSION);
+  });
+});
+
+describe("fetchAndValidateEvent integration", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    // Reset AvoStreamId static state between tests
+    (AvoStreamId as any)._anonymousId = null;
+    (AvoStreamId as any)._initializationPromise = null;
+  });
+
+  test("dev env creates validator, fetchAndValidateEvent merges validation results into tracked events", async () => {
+    // Given: a wire response with a pinned value constraint
+    const wireResponse = {
+      events: [
+        {
+          b: "branch1",
+          id: "evt_1",
+          vids: [],
+          p: {
+            color: {
+              t: "string",
+              r: true,
+              // pinned value: "red" is required for evt_1
+              p: { red: ["evt_1"] },
+            },
+          },
+        },
+      ],
+      metadata: {
+        schemaId: "schema1",
+        branchId: "branch1",
+        latestActionId: "action1",
+      },
+    };
+
+    mockFetch.mockResolvedValue({
+      status: 200,
+      json: async () => wireResponse,
+    });
+
+    // Inject a known streamId so fetchAndValidateEvent proceeds past the streamId guard
+    (AvoStreamId as any)._anonymousId = "test-stream-id";
+
+    const inspector = new AvoInspector({
+      apiKey: "api-key-xxx",
+      env: AvoInspectorEnv.Dev,
+      version: "1",
+    });
+
+    // Force streamId to be set synchronously (it's fire-and-forget in constructor)
+    (inspector as any).streamId = "test-stream-id";
+
+    // When: tracking an event with a non-matching value for the pinned constraint
+    const schema = await inspector.trackSchemaFromEvent("Sign Up", {
+      color: "blue", // does NOT match pinned "red"
+    });
+
+    // Then: the returned schema should contain the color property
+    const colorProp = schema.find((p) => p.propertyName === "color");
+    expect(colorProp).toBeDefined();
+
+    // The avoBatcher should have been called with validation data merged in
+    // We verify this indirectly by checking that fetch was called (validation ran)
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const calledUrl: string = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain("eventName=Sign+Up");
+    expect(calledUrl).toContain("apiKey=api-key-xxx");
+  });
+
+  test("prod env skips fetchAndValidateEvent (no fetch calls)", async () => {
+    // Given
+    const inspector = new AvoInspector({
+      apiKey: "api-key-xxx",
+      env: AvoInspectorEnv.Prod,
+      version: "1",
+    });
+
+    // When
+    await inspector.trackSchemaFromEvent("Purchase", { amount: 42 });
+
+    // Then: no fetch should have been called in prod
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });

@@ -3,23 +3,25 @@ import type { EventSpecResponse } from "./AvoEventSpecFetchTypes";
  * EventSpecCache implements a dual-condition cache with LRU eviction.
  *
  * Cache Policy:
- * - Entries expire after 5 minutes OR 50 cache hits, whichever comes first
- * - When 50 cache hits occur globally, the oldest cached entry is evicted
- * - Each cache entry tracks: spec, timestamp, and hit count
+ * - TTL: Entries expire after 60 seconds
+ * - Per-entry eviction: Entries retrieved 50+ times evicted immediately on next get
+ * - Global sweep: Runs every 50 cache operations (get/set)
+ * - Capacity: LRU eviction when size > 50 entries
+ * - Null spec responses: cached (to avoid re-fetching)
+ * - branchId flush: cache cleared when branchId changes (handled externally)
  *
  * Cache Key Format: ${apiKey}:${streamId}:${eventName}
- *
- * Note: Event count only increments on cache hits, not on every tracked event.
- * This ensures the cache evicts based on actual usage, not overall tracking volume.
  */
 export declare class EventSpecCache {
     /** Cache storage: key -> CacheEntry */
     private cache;
-    /** Time-to-live in milliseconds (5 minutes) */
+    /** Time-to-live in milliseconds (60 seconds) */
     private readonly TTL_MS;
-    /** Maximum cache hit count before rotating cache (50 hits) */
+    /** Maximum cache hit count before per-entry eviction (50 hits) */
     private readonly MAX_EVENT_COUNT;
-    /** Global cache hit counter to track when to rotate cache */
+    /** Maximum number of cache entries */
+    private readonly MAX_ENTRIES;
+    /** Global cache operation counter to track when to sweep */
     private globalEventCount;
     /** Whether to log debug information */
     private readonly shouldLog;
@@ -30,28 +32,32 @@ export declare class EventSpecCache {
     private generateKey;
     /**
      * Retrieves an event spec response from the cache if it exists and is valid.
-     * Returns null if the entry is missing, expired, or has exceeded event count.
+     * Returns undefined (cache miss) if the entry is missing.
+     * Returns null if a null spec was cached (known absent).
+     * Returns the spec if valid.
      *
      * On cache hit, increments the hit count for this entry and the global counter.
      */
-    get(apiKey: string, streamId: string, eventName: string): EventSpecResponse | null;
+    get(apiKey: string, streamId: string, eventName: string): EventSpecResponse | null | undefined;
     /**
      * Stores an event spec response in the cache.
+     * Null responses are cached to prevent re-fetching for known absent specs.
      */
-    set(apiKey: string, streamId: string, eventName: string, spec: EventSpecResponse): void;
+    set(apiKey: string, streamId: string, eventName: string, spec: EventSpecResponse | null): void;
     /**
-     * Determines if a cache entry should be evicted based on:
-     * - Age (older than 5 minutes)
-     * - Hit count (50 or more cache hits)
+     * Checks if a cache entry has expired by TTL (older than 60s).
      */
-    private shouldEvict;
+    private isExpiredByTTL;
     /**
-     * Evicts the oldest cache entry based on timestamp.
-     * This implements the LRU (Least Recently Used) eviction policy.
+     * Sweeps the cache: removes all entries expired by TTL.
      */
-    private evictOldest;
+    private sweep;
     /**
-     * Clears all cached entries. Useful for testing.
+     * Evicts the least recently used cache entry based on lastAccessed timestamp.
+     */
+    private evictLRU;
+    /**
+     * Clears all cached entries.
      */
     clear(): void;
     /**
@@ -67,6 +73,7 @@ export declare class EventSpecCache {
         entries: Array<{
             key: string;
             age: number;
+            lastAccessedAgo: number;
             eventCount: number;
         }>;
     };

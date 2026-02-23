@@ -64,7 +64,7 @@ describe("Batcher", () => {
     );
   });
 
-  test("handleTrackSchema is called on trackSchemaFromEvent", () => {
+  test("handleTrackSchema is called on trackSchemaFromEvent", async () => {
     const eventName = "event name";
     const properties = {
       prop0: "",
@@ -76,7 +76,7 @@ describe("Batcher", () => {
 
     const schema = inspector.extractSchema(properties);
 
-    inspector.trackSchemaFromEvent(eventName, properties);
+    await inspector.trackSchemaFromEvent(eventName, properties);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
@@ -87,7 +87,7 @@ describe("Batcher", () => {
     );
   });
 
-  test("handleTrackSchema is called on _avoFunctionTrackSchemaFromEvent", () => {
+  test("handleTrackSchema is called on _avoFunctionTrackSchemaFromEvent", async () => {
     const eventName = "event name";
     const properties = {
       prop0: "",
@@ -101,7 +101,7 @@ describe("Batcher", () => {
     const schema = inspector.extractSchema(properties);
 
     // @ts-ignore
-    inspector._avoFunctionTrackSchemaFromEvent(eventName, properties, eventId, eventHash);
+    await inspector._avoFunctionTrackSchemaFromEvent(eventName, properties, eventId, eventHash);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(

@@ -5,8 +5,12 @@ import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
 import { AvoStreamId } from "./AvoStreamId";
+import { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
+import { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
+import { validateEvent } from "./eventSpec/EventValidator";
 
 import { isValueEmpty } from "./utils";
+import type { ValidationResult, PropertyValidationResult, EventSpecResponse } from "./eventSpec/AvoEventSpecFetchTypes";
 
 const libVersion = require("../package.json").version;
 
@@ -17,6 +21,12 @@ export class AvoInspector {
   apiKey: string;
   version: string;
   publicEncryptionKey?: string;
+
+  // Event spec fetching and validation fields
+  private streamId?: string;
+  private eventSpecCache?: EventSpecCache;
+  private eventSpecFetcher?: AvoEventSpecFetcher;
+  private currentBranchId: string | null = null;
 
   static avoStorage: AvoStorage;
 
@@ -108,8 +118,26 @@ export class AvoInspector {
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
     this.avoDeduplicator = new AvoDeduplicator();
 
-    // Fire-and-forget: eagerly initialize the anonymous ID
-    AvoStreamId.initialize().catch((e) => {
+    // Initialize event spec validation infrastructure for dev/staging
+    if (this.environment !== AvoInspectorEnv.Prod) {
+      this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
+      this.eventSpecFetcher = new AvoEventSpecFetcher(
+        2000,
+        AvoInspector._shouldLog,
+        this.environment
+      );
+
+      if (AvoInspector._shouldLog) {
+        console.log(
+          "[Avo Inspector] Event spec fetching and validation enabled"
+        );
+      }
+    }
+
+    // Fire-and-forget: eagerly initialize the anonymous ID and capture streamId
+    AvoStreamId.initialize().then((id) => {
+      this.streamId = id;
+    }).catch((e) => {
       console.error(
         "Avo Inspector: failed to initialize anonymous ID.",
         e
@@ -117,14 +145,14 @@ export class AvoInspector {
     });
   }
 
-  trackSchemaFromEvent(
+  async trackSchemaFromEvent(
     eventName: string,
     eventProperties: { [propName: string]: any }
-  ): Array<{
+  ): Promise<Array<{
     propertyName: string;
     propertyType: string;
     children?: any;
-  }> {
+  }>> {
     try {
       if (
         this.avoDeduplicator.shouldRegisterEvent(
@@ -142,7 +170,24 @@ export class AvoInspector {
           );
         }
         let eventSchema = this.extractSchema(eventProperties, false);
-        this.trackSchemaInternal(eventName, eventSchema, null, null);
+
+        // Fetch and validate event spec (async)
+        const validationResult = await this.fetchAndValidateEvent(
+          eventName,
+          eventProperties
+        );
+
+        if (validationResult) {
+          // Merge validation results into schema
+          const schemaWithValidation = this.mergeValidationResults(
+            eventSchema,
+            validationResult
+          );
+          this.trackSchemaInternal(eventName, schemaWithValidation, null, null);
+        } else {
+          this.trackSchemaInternal(eventName, eventSchema, null, null);
+        }
+
         return eventSchema;
       } else {
         if (AvoInspector.shouldLog) {
@@ -159,16 +204,16 @@ export class AvoInspector {
     }
   }
 
-  private _avoFunctionTrackSchemaFromEvent(
+  private async _avoFunctionTrackSchemaFromEvent(
     eventName: string,
     eventProperties: { [propName: string]: any },
     eventId: string,
     eventHash: string
-  ): Array<{
+  ): Promise<Array<{
     propertyName: string;
     propertyType: string;
     children?: any;
-  }> {
+  }>> {
     try {
       if (
         this.avoDeduplicator.shouldRegisterEvent(
@@ -186,7 +231,23 @@ export class AvoInspector {
           );
         }
         let eventSchema = this.extractSchema(eventProperties, false);
-        this.trackSchemaInternal(eventName, eventSchema, eventId, eventHash);
+
+        // Fetch and validate event spec (async)
+        const validationResult = await this.fetchAndValidateEvent(
+          eventName,
+          eventProperties
+        );
+
+        if (validationResult) {
+          const schemaWithValidation = this.mergeValidationResults(
+            eventSchema,
+            validationResult
+          );
+          this.trackSchemaInternal(eventName, schemaWithValidation, eventId, eventHash);
+        } else {
+          this.trackSchemaInternal(eventName, eventSchema, eventId, eventHash);
+        }
+
         return eventSchema;
       } else {
         if (AvoInspector.shouldLog) {
@@ -313,5 +374,179 @@ export class AvoInspector {
 
   setBatchFlushSeconds(newBatchFlushSeconds: number): void {
     AvoInspector._batchFlushSeconds = newBatchFlushSeconds;
+  }
+
+  /**
+   * Handles branch change detection and cache storage for a fetched event spec.
+   */
+  private handleBranchChangeAndCache(
+    specResponse: EventSpecResponse,
+    eventName: string
+  ): void {
+    const newBranchId = specResponse.metadata.branchId;
+    if (this.currentBranchId !== null && this.currentBranchId !== newBranchId) {
+      if (AvoInspector.shouldLog) {
+        console.log(
+          `[Avo Inspector] Branch changed from ${this.currentBranchId} to ${newBranchId}. Flushing cache.`
+        );
+      }
+      this.eventSpecCache?.clear();
+    }
+    this.currentBranchId = newBranchId;
+
+    if (this.eventSpecCache && this.streamId) {
+      this.eventSpecCache.set(
+        this.apiKey,
+        this.streamId,
+        eventName,
+        specResponse
+      );
+    }
+  }
+
+  /**
+   * Fetches event spec and validates the event against it.
+   * Returns ValidationResult if spec is available, null otherwise.
+   * Only runs in dev/staging environments.
+   */
+  private async fetchAndValidateEvent(
+    eventName: string,
+    eventProperties: Record<string, any>
+  ): Promise<ValidationResult | null> {
+    // Only fetch specs in dev/staging environments (NOT in production)
+    if (this.environment === AvoInspectorEnv.Prod) {
+      return null;
+    }
+
+    // Only fetch if we have the required infrastructure
+    if (!this.eventSpecCache || !this.eventSpecFetcher || !this.streamId) {
+      return null;
+    }
+
+    try {
+      // Check cache first
+      let specResponse: EventSpecResponse | null | undefined = undefined;
+      if (this.eventSpecCache) {
+        specResponse = this.eventSpecCache.get(
+          this.apiKey,
+          this.streamId,
+          eventName
+        );
+      }
+
+      // Cache miss - fetch from API
+      if (specResponse === undefined) {
+        const fetched = await this.eventSpecFetcher.fetch({
+          apiKey: this.apiKey,
+          streamId: this.streamId,
+          eventName
+        });
+
+        if (fetched) {
+          this.handleBranchChangeAndCache(fetched, eventName);
+          specResponse = fetched;
+        } else {
+          // Cache null response to prevent re-fetching
+          if (this.eventSpecCache && this.streamId) {
+            this.eventSpecCache.set(
+              this.apiKey,
+              this.streamId,
+              eventName,
+              null
+            );
+          }
+          specResponse = null;
+        }
+      }
+
+      // If we have a spec (not null), validate the event
+      if (specResponse) {
+        const validationResult = await validateEvent(eventProperties, specResponse);
+        return validationResult;
+      }
+
+      return null;
+    } catch (error) {
+      if (AvoInspector.shouldLog) {
+        console.error(
+          `[Avo Inspector] Error validating event ${eventName}:`,
+          error
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Merges validation results into the event schema.
+   * Adds failedEventIds or passedEventIds to each property based on validation.
+   */
+  private mergeValidationResults(
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+    }>,
+    validationResult: ValidationResult
+  ): Array<{
+    propertyName: string;
+    propertyType: string;
+    children?: any;
+    failedEventIds?: string[];
+    passedEventIds?: string[];
+  }> {
+    return eventSchema.map((prop) => {
+      const propValidation = validationResult.propertyResults[prop.propertyName];
+      return this.mergePropertyValidation(prop, propValidation);
+    });
+  }
+
+  /**
+   * Merges validation result into a single property, recursively handling children.
+   */
+  private mergePropertyValidation(
+    prop: {
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+    },
+    propValidation?: PropertyValidationResult
+  ): {
+    propertyName: string;
+    propertyType: string;
+    children?: any;
+    failedEventIds?: string[];
+    passedEventIds?: string[];
+  } {
+    const result: any = {
+      propertyName: prop.propertyName,
+      propertyType: prop.propertyType
+    };
+
+    // Recursively merge validation results into children
+    if (prop.children && Array.isArray(prop.children)) {
+      result.children = prop.children.map((child: any) => {
+        if (typeof child === 'string') {
+          return child;
+        }
+        if (child && typeof child === 'object' && child.propertyName) {
+          const childValidation = propValidation?.children?.[child.propertyName];
+          return this.mergePropertyValidation(child, childValidation);
+        }
+        return child;
+      });
+    }
+
+    // Add validation result for this property
+    if (propValidation) {
+      if (propValidation.failedEventIds) {
+        result.failedEventIds = propValidation.failedEventIds;
+      }
+      if (propValidation.passedEventIds) {
+        result.passedEventIds = propValidation.passedEventIds;
+      }
+    }
+
+    return result;
   }
 }

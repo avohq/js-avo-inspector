@@ -1,5 +1,5 @@
 declare abstract class PlatformAvoStorage {
-    abstract init(shouldLog: boolean, suffix: string): void;
+    abstract init(shouldLog: boolean): void;
     abstract getItemAsync<T>(key: string): Promise<T | null>;
     abstract getItem<T>(key: string): T | null;
     abstract setItem<T>(key: string, value: T): void;
@@ -11,7 +11,7 @@ declare abstract class PlatformAvoStorage {
 export declare class AvoStorage {
     Platform: string | null;
     storageImpl: PlatformAvoStorage;
-    constructor(shouldLog: boolean, suffix?: string);
+    constructor(shouldLog: boolean);
     isInitialized(): boolean;
     getItemAsync<T>(key: string): Promise<T | null>;
     getItem<T>(key: string): T | null;

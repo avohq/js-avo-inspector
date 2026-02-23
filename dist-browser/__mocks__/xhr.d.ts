@@ -1,5 +1,4 @@
-/// <reference types="jest" />
-declare const xhrMock: {
+declare let xhrMock: {
     open: jest.Mock<any, any, any>;
     send: jest.Mock<any, any, any>;
     setRequestHeader: jest.Mock<any, any, any>;
