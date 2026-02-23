@@ -1,6 +1,7 @@
 import AvoGuid from "./AvoGuid";
 import { AvoInspector } from "./AvoInspector";
 import { AvoStreamId } from "./AvoStreamId";
+import { shouldEncrypt, encryptEventProperties } from "./AvoEncryption";
 
 export interface BaseBody {
   apiKey: string;
@@ -13,6 +14,7 @@ export interface BaseBody {
   anonymousId: string;
   createdAt: string;
   samplingRate: number;
+  publicEncryptionKey?: string;
 }
 
 export interface EventSchemaBody extends BaseBody {
@@ -21,6 +23,7 @@ export interface EventSchemaBody extends BaseBody {
   eventProperties: Array<{
     propertyName: string;
     propertyType: string;
+    encryptedPropertyValue?: string;
     children?: any;
   }>;
   avoFunction: boolean;
@@ -34,6 +37,7 @@ export class AvoNetworkCallsHandler {
   private appName: string;
   private appVersion: string;
   private libVersion: string;
+  private publicEncryptionKey?: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
 
@@ -45,12 +49,14 @@ export class AvoNetworkCallsHandler {
     appName: string,
     appVersion: string,
     libVersion: string,
+    publicEncryptionKey?: string,
   ) {
     this.apiKey = apiKey;
     this.envName = envName;
     this.appName = appName;
     this.appVersion = appVersion;
     this.libVersion = libVersion;
+    this.publicEncryptionKey = publicEncryptionKey;
   }
 
   callInspectorWithBatchBody(inEvents: Array<EventSchemaBody>, onCompleted: (error: string | null) => any): void {
@@ -119,13 +125,28 @@ export class AvoNetworkCallsHandler {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    eventProps?: Record<string, any>
   ): Promise<EventSchemaBody> {
     const anonymousId = await AvoStreamId.initialize();
     let eventSchemaBody = this.createBaseCallBody(anonymousId) as EventSchemaBody;
     eventSchemaBody.type = "event";
     eventSchemaBody.eventName = eventName;
-    eventSchemaBody.eventProperties = eventProperties;
+
+    // Encrypt property values when encryption is enabled
+    if (
+      shouldEncrypt(this.envName, this.publicEncryptionKey) &&
+      this.publicEncryptionKey &&
+      eventProps
+    ) {
+      eventSchemaBody.eventProperties = encryptEventProperties(
+        eventProperties,
+        eventProps,
+        this.publicEncryptionKey
+      );
+    } else {
+      eventSchemaBody.eventProperties = eventProperties;
+    }
 
     if (eventId != null) {
       eventSchemaBody.avoFunction = true;
@@ -141,7 +162,7 @@ export class AvoNetworkCallsHandler {
   }
 
   private createBaseCallBody(anonymousId: string): BaseBody {
-    return {
+    const body: BaseBody = {
       apiKey: this.apiKey,
       appName: this.appName,
       appVersion: this.appVersion,
@@ -153,5 +174,13 @@ export class AvoNetworkCallsHandler {
       createdAt: new Date().toISOString(),
       samplingRate: this.samplingRate,
     };
+    if (
+      this.publicEncryptionKey !== null &&
+      this.publicEncryptionKey !== undefined &&
+      this.publicEncryptionKey.trim().length > 0
+    ) {
+      body.publicEncryptionKey = this.publicEncryptionKey;
+    }
+    return body;
   }
 }
