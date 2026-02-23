@@ -1,10 +1,10 @@
 import { AvoInspectorEnv, AvoInspectorEnvValueType } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
-import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoBatcher } from "./AvoBatcher";
 import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
+import { AvoStreamId } from "./AvoStreamId";
 
 import { isValueEmpty } from "./utils";
 
@@ -14,9 +14,9 @@ export class AvoInspector {
   environment: AvoInspectorEnvValueType;
   avoBatcher: AvoBatcher;
   avoDeduplicator: AvoDeduplicator;
-  sessionTracker: AvoSessionTracker;
   apiKey: string;
   version: string;
+  publicEncryptionKey?: string;
 
   static avoStorage: AvoStorage;
 
@@ -45,12 +45,12 @@ export class AvoInspector {
     this._shouldLog = enable;
   }
 
-  // constructor(apiKey: string, env: AvoInspectorEnv, version: string) {
   constructor(options: {
     apiKey: string;
     env: AvoInspectorEnvValueType;
     version: string;
     appName?: string;
+    publicEncryptionKey?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -83,6 +83,10 @@ export class AvoInspector {
       this.version = options.version;
     }
 
+    if (options.publicEncryptionKey) {
+      this.publicEncryptionKey = options.publicEncryptionKey;
+    }
+
     if (this.environment === AvoInspectorEnv.Dev) {
       AvoInspector._batchSize = 1;
       AvoInspector._shouldLog = true;
@@ -102,30 +106,15 @@ export class AvoInspector {
       libVersion
     );
     this.avoBatcher = new AvoBatcher(avoNetworkCallsHandler);
-    this.sessionTracker = new AvoSessionTracker(this.avoBatcher);
     this.avoDeduplicator = new AvoDeduplicator();
 
-    try {
-      if (process.env.BROWSER) {
-        // XXX make node/browser split clearer
-        if (typeof window !== "undefined") {
-          window.addEventListener(
-            "load",
-            () => {
-              this.sessionTracker.startOrProlongSession(Date.now());
-            },
-            false
-          );
-        }
-      } else {
-        this.sessionTracker.startOrProlongSession(Date.now());
-      }
-    } catch (e) {
+    // Fire-and-forget: eagerly initialize the anonymous ID
+    AvoStreamId.initialize().catch((e) => {
       console.error(
-        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        "Avo Inspector: failed to initialize anonymous ID.",
         e
       );
-    }
+    });
   }
 
   trackSchemaFromEvent(
@@ -262,7 +251,6 @@ export class AvoInspector {
     eventHash: string | null
   ): void {
     try {
-      this.sessionTracker.startOrProlongSession(Date.now());
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
@@ -292,8 +280,6 @@ export class AvoInspector {
     children?: any;
   }> {
     try {
-      this.sessionTracker.startOrProlongSession(Date.now());
-
       if (this.avoDeduplicator.hasSeenEventParams(eventProperties, true)) {
         if (shouldLogIfEnabled && AvoInspector.shouldLog) {
           console.warn(

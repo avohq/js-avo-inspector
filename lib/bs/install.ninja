@@ -1,0 +1,12 @@
+rescript = 1
+rule cp
+  command = cp $i $out
+rule touch
+ command = touch $out
+o AvoInspector.cmi : cp ../bs/rescript/AvoInspector.cmi
+o AvoInspector.cmj : cp ../bs/rescript/AvoInspector.cmj
+o AvoInspector.cmt : cp ../bs/rescript/AvoInspector.cmt
+o AvoInspector.res : cp ../../rescript/AvoInspector.res
+o AvoInspector.resi : cp ../../rescript/AvoInspector.resi
+o AvoInspector.cmti : cp ../bs/rescript/AvoInspector.cmti
+build install.stamp : touch AvoInspector.cmi AvoInspector.cmj 

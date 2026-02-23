@@ -1,7 +1,6 @@
 import AvoGuid from "./AvoGuid";
-import { AvoSessionTracker } from "./AvoSessionTracker";
 import { AvoInspector } from "./AvoInspector";
-import { AvoInstallationId } from "./AvoInstallationId";
+import { AvoStreamId } from "./AvoStreamId";
 
 export interface BaseBody {
   apiKey: string;
@@ -9,16 +8,11 @@ export interface BaseBody {
   appVersion: string;
   libVersion: string;
   env: string;
-  libPlatform: "web";
+  libPlatform: "react-native";
   messageId: string;
-  trackingId: string;
+  anonymousId: string;
   createdAt: string;
-  sessionId: string;
   samplingRate: number;
-}
-
-export interface SessionStartedBody extends BaseBody {
-  type: "sessionStarted";
 }
 
 export interface EventSchemaBody extends BaseBody {
@@ -59,15 +53,13 @@ export class AvoNetworkCallsHandler {
     this.libVersion = libVersion;
   }
 
-  callInspectorWithBatchBody(inEvents: Array<SessionStartedBody | EventSchemaBody>, onCompleted: (error: string | null) => any): void {
+  callInspectorWithBatchBody(inEvents: Array<EventSchemaBody>, onCompleted: (error: string | null) => any): void {
     if (this.sending) {
       onCompleted("Batch sending cancelled because another batch sending is in progress. Your events will be sent with next batch.");
       return;
     }
 
     const events = inEvents.filter(x => x != null);
-
-    this.fixSessionAndTrackingIds(events);
 
     if (events.length === 0) {
       return;
@@ -85,9 +77,7 @@ export class AvoNetworkCallsHandler {
 
       events.forEach(
         function (event) {
-          if (event.type === "sessionStarted") {
-            console.log("Avo Inspector: sending session started event.");
-          } else if (event.type === "event") {
+          if (event.type === "event") {
             let schemaEvent: EventSchemaBody = event;
             console.log("Avo Inspector: sending event " + schemaEvent.eventName + " with schema " + JSON.stringify(schemaEvent.eventProperties));
           }
@@ -121,47 +111,7 @@ export class AvoNetworkCallsHandler {
     this.sending = false;
   }
 
-  private fixSessionAndTrackingIds(events: (SessionStartedBody | EventSchemaBody)[]) {
-    let knownSessionId: string | null = null;
-    let knownTrackingId: string | null = null;
-    events.forEach(
-      function (event) {
-        if (event.sessionId !== null && event.sessionId !== undefined && event.sessionId !== "unknown") {
-          knownSessionId = event.sessionId;
-        }
-
-        if (event.trackingId !== null && event.trackingId !== undefined && event.trackingId !== "unknown") {
-          knownTrackingId = event.trackingId;
-        }
-      }
-    );
-    events.forEach(
-      function (event) {
-        if (event.sessionId === "unknown") {
-          if (knownSessionId != null) {
-            event.sessionId = knownSessionId;
-          } else {
-            event.sessionId = AvoSessionTracker.sessionId
-          }
-        }
-        if (event.trackingId === "unknown") {
-          if (knownTrackingId != null) {
-            event.trackingId = knownTrackingId;
-          } else {
-            event.trackingId = AvoInstallationId.getInstallationId();
-          }
-        }
-      }
-    );
-  }
-
-  bodyForSessionStartedCall(): SessionStartedBody {
-    let sessionBody = this.createBaseCallBody() as SessionStartedBody;
-    sessionBody.type = "sessionStarted";
-    return sessionBody;
-  }
-
-  bodyForEventSchemaCall(
+  async bodyForEventSchemaCall(
     eventName: string,
     eventProperties: Array<{
       propertyName: string;
@@ -170,8 +120,9 @@ export class AvoNetworkCallsHandler {
     }>,
     eventId: string | null,
     eventHash: string | null
-  ): EventSchemaBody {
-    let eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
+  ): Promise<EventSchemaBody> {
+    const anonymousId = await AvoStreamId.initialize();
+    let eventSchemaBody = this.createBaseCallBody(anonymousId) as EventSchemaBody;
     eventSchemaBody.type = "event";
     eventSchemaBody.eventName = eventName;
     eventSchemaBody.eventProperties = eventProperties;
@@ -189,18 +140,17 @@ export class AvoNetworkCallsHandler {
     return eventSchemaBody;
   }
 
-  private createBaseCallBody(): BaseBody {
+  private createBaseCallBody(anonymousId: string): BaseBody {
     return {
       apiKey: this.apiKey,
       appName: this.appName,
       appVersion: this.appVersion,
       libVersion: this.libVersion,
       env: this.envName,
-      libPlatform: "web",
+      libPlatform: "react-native",
       messageId: AvoGuid.newGuid(),
-      trackingId: AvoInstallationId.getInstallationId(),
+      anonymousId,
       createdAt: new Date().toISOString(),
-      sessionId: AvoSessionTracker.sessionId,
       samplingRate: this.samplingRate,
     };
   }

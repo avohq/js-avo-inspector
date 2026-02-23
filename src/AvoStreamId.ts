@@ -1,0 +1,50 @@
+import AvoGuid from "./AvoGuid";
+import { AvoInspector } from "./AvoInspector";
+
+export class AvoStreamId {
+  private static _anonymousId: string | null = null;
+  private static _initializationPromise: Promise<string> | null = null;
+
+  /**
+   * Returns the persistent anonymous ID (Model A).
+   * Generates a UUID once and persists it via AsyncStorage.
+   * Never resets based on time.
+   * Concurrent calls before cache is populated all return the same UUID.
+   */
+  static initialize(): Promise<string> {
+    // Return cached value immediately if available
+    if (AvoStreamId._anonymousId !== null) {
+      return Promise.resolve(AvoStreamId._anonymousId);
+    }
+
+    // Return the in-flight promise if initialization is already underway
+    if (AvoStreamId._initializationPromise !== null) {
+      return AvoStreamId._initializationPromise;
+    }
+
+    // Start initialization and cache the promise to handle concurrent calls
+    const storagePromise = AvoInspector.avoStorage.getItemAsync<string>(AvoStreamId.cacheKey);
+    const resolvedPromise = storagePromise && typeof storagePromise.then === "function"
+      ? storagePromise
+      : Promise.resolve(null);
+
+    AvoStreamId._initializationPromise = resolvedPromise.then((maybeId) => {
+      if (maybeId !== null && maybeId !== undefined) {
+        AvoStreamId._anonymousId = maybeId;
+      } else {
+        AvoStreamId._anonymousId = AvoGuid.newGuid();
+        AvoInspector.avoStorage.setItem(
+          AvoStreamId.cacheKey,
+          AvoStreamId._anonymousId
+        );
+      }
+      return AvoStreamId._anonymousId as string;
+    });
+
+    return AvoStreamId._initializationPromise;
+  }
+
+  static get cacheKey(): string {
+    return "AvoInspectorAnonymousId";
+  }
+}

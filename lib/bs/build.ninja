@@ -1,0 +1,19 @@
+rescript = 1
+rule astj
+  command = /Users/alexverein/code/avo/monorepo/node_modules/rescript/darwinarm64/bsc.exe  -w a -bs-v 11.1.4 -bs-jsx 3 -bs-super-errors -absname -bs-ast -o $out $i
+o rescript/AvoInspector.ast : astj ../../rescript/AvoInspector.res
+rule deps
+  command = /Users/alexverein/code/avo/monorepo/node_modules/rescript/darwinarm64/bsb_helper.exe -hash 52eb95fcd2a6aae3105feb015880dd4e $in
+  restat = 1
+o rescript/AvoInspector.d : deps rescript/AvoInspector.ast rescript/AvoInspector.iast
+o rescript/AvoInspector.iast : astj ../../rescript/AvoInspector.resi
+rule mi
+  command = /Users/alexverein/code/avo/monorepo/node_modules/rescript/darwinarm64/bsc.exe -I rescript -bs-super-errors  -w a $i
+  dyndep = 1
+  restat = 1
+o rescript/AvoInspector.cmi : mi rescript/AvoInspector.iast
+rule mj
+  command = /Users/alexverein/code/avo/monorepo/node_modules/rescript/darwinarm64/bsc.exe -bs-read-cmi -I rescript -bs-super-errors  -w a -bs-package-name avo-inspector -bs-package-output esmodule:$in_d:.mjs $i
+  dyndep = 1
+  restat = 1
+o rescript/AvoInspector.cmj ../../rescript/AvoInspector.mjs : mj rescript/AvoInspector.ast rescript/AvoInspector.cmi

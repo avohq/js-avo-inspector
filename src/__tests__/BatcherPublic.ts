@@ -1,13 +1,16 @@
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
 import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
+import { AvoStreamId } from "../AvoStreamId";
 
-import { defaultOptions } from "./constants";
+import { defaultOptions, mockedReturns } from "./constants";
 
 const inspectorVersion = process.env.npm_package_version || "";
 
 jest.mock("../AvoBatcher");
 jest.mock("../AvoStorage");
+
+jest.spyOn(AvoStreamId as any, "initialize").mockResolvedValue(mockedReturns.ANONYMOUS_ID);
 
 describe("Batcher", () => {
   let inspector: AvoInspector;

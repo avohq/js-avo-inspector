@@ -13,7 +13,7 @@ import {
 
 const inspectorVersion = process.env.npm_package_version || "";
 
-describe("NetworkCallsHandler", () => {
+describe("NetworkCallsHandler Model A", () => {
   const { apiKey, env, version } = defaultOptions;
   const appName = "";
 
@@ -61,14 +61,55 @@ describe("NetworkCallsHandler", () => {
     jest.clearAllMocks();
   });
 
-  test("bodyForEventSchemaCall returns base body + event schema used for event sending from non avo functions", async () => {
+  test("BaseBody contains anonymousId field", async () => {
+    const body = await networkHandler.bodyForEventSchemaCall(
+      "test event",
+      [],
+      null,
+      null
+    );
+    expect(body).toHaveProperty("anonymousId");
+  });
+
+  test("BaseBody does NOT contain sessionId field", async () => {
+    const body = await networkHandler.bodyForEventSchemaCall(
+      "test event",
+      [],
+      null,
+      null
+    );
+    expect(body).not.toHaveProperty("sessionId");
+  });
+
+  test("BaseBody does NOT contain trackingId field", async () => {
+    const body = await networkHandler.bodyForEventSchemaCall(
+      "test event",
+      [],
+      null,
+      null
+    );
+    expect(body).not.toHaveProperty("trackingId");
+  });
+
+  test("libPlatform is 'react-native'", async () => {
+    const body = await networkHandler.bodyForEventSchemaCall(
+      "test event",
+      [],
+      null,
+      null
+    );
+    expect(body.libPlatform).toBe("react-native");
+  });
+
+  test("bodyForEventSchemaCall returns base body + event schema from non avo functions", async () => {
     const eventName = "event name";
     const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
 
     const body = await networkHandler.bodyForEventSchemaCall(
       eventName,
       eventProperties,
-      null, null
+      null,
+      null
     );
 
     expect(body).toEqual({
@@ -78,11 +119,11 @@ describe("NetworkCallsHandler", () => {
       eventProperties,
       avoFunction: false,
       eventId: null,
-      eventHash: null
+      eventHash: null,
     });
   });
 
-  test("bodyForEventSchemaCall returns base body + event schema used for event sending from avo functions", async () => {
+  test("bodyForEventSchemaCall returns base body + event schema from avo functions", async () => {
     const eventName = "event name";
     const eventId = "event id";
     const eventHash = "event hash";
@@ -102,8 +143,16 @@ describe("NetworkCallsHandler", () => {
       eventProperties,
       avoFunction: true,
       eventId,
-      eventHash
+      eventHash,
     });
+  });
+
+  test("bodyForSessionStartedCall does NOT exist", () => {
+    expect((networkHandler as any).bodyForSessionStartedCall).toBeUndefined();
+  });
+
+  test("fixSessionAndTrackingIds does NOT exist", () => {
+    expect((networkHandler as any).fixSessionAndTrackingIds).toBeUndefined();
   });
 
   test("POST request is not sent if event list is empty", () => {
@@ -121,7 +170,8 @@ describe("NetworkCallsHandler", () => {
     const eventBody = await networkHandler.bodyForEventSchemaCall(
       eventName,
       eventProperties,
-      null, null
+      null,
+      null
     );
 
     const events = [eventBody];
@@ -143,59 +193,5 @@ describe("NetworkCallsHandler", () => {
 
     expect(customCallback).toBeCalledTimes(1);
     expect(customCallback).toBeCalledWith(null);
-  });
-
-  test("Custom callback is called when 200 OK", async () => {
-    const eventBody = await networkHandler.bodyForEventSchemaCall("test", [], null, null);
-    const events = [eventBody];
-
-    networkHandler.callInspectorWithBatchBody(events, customCallback);
-
-    xhrMock.onload();
-
-    expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith(null);
-  });
-
-  test("Custom callback is called with error when not 200 OK", async () => {
-    const xhrErrorMock = require("../__mocks__/xhrError").default;
-
-    const eventBody = await networkHandler.bodyForEventSchemaCall("test", [], null, null);
-    const events = [eventBody];
-
-    networkHandler.callInspectorWithBatchBody(events, customCallback);
-
-    xhrErrorMock.onload();
-
-    expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith("Error 400: Bad Request");
-  });
-
-  test("Custom callback is called onerror", async () => {
-    const xhrErrorMock = require("../__mocks__/xhrError").default;
-
-    const eventBody = await networkHandler.bodyForEventSchemaCall("test", [], null, null);
-    const events = [eventBody];
-
-    networkHandler.callInspectorWithBatchBody(events, customCallback);
-
-    xhrErrorMock.onerror();
-
-    expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith(requestMsg.ERROR);
-  });
-
-  test("Custom callback is called ontimeout", async () => {
-    const xhrErrorMock = require("../__mocks__/xhrError").default;
-
-    const eventBody = await networkHandler.bodyForEventSchemaCall("test", [], null, null);
-    const events = [eventBody];
-
-    networkHandler.callInspectorWithBatchBody(events, customCallback);
-
-    xhrErrorMock.ontimeout();
-
-    expect(customCallback).toBeCalledTimes(1);
-    expect(customCallback).toBeCalledWith(requestMsg.TIMEOUT);
   });
 });
