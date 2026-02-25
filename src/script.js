@@ -22,7 +22,7 @@
     const t = document.createElement("script");
     t.type = "text/javascript";
     t.async = !0;
-    t.src = "https://cdn.avo.app/inspector/inspector-v1.min.js";
+    t.src = "https://cdn.avo.app/inspector/inspector-v2.min.js";
     const n = document.getElementsByTagName("script")[0];
     n.parentNode.insertBefore(t, n);
   };

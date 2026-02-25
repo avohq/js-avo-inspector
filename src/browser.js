@@ -9,12 +9,16 @@ if (typeof window !== "undefined") {
   }
 
   const callQueue = window.inspector;
-  window.inspector = new AvoInspector({
+  const options = {
     apiKey: window.inspector.__API_KEY__,
     env: window.inspector.__ENV__,
     version: window.inspector.__VERSION__,
     appName: window.inspector.__APP_NAME__
-  });
+  };
+  if (window.inspector.__PUBLIC_ENCRYPTION_KEY__) {
+    options.publicEncryptionKey = window.inspector.__PUBLIC_ENCRYPTION_KEY__;
+  }
+  window.inspector = new AvoInspector(options);
 
   callQueue.forEach((call) => {
     const method = call[0];
