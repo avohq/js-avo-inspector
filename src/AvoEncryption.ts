@@ -72,6 +72,16 @@ export function shouldEncrypt(
  * @returns Base64-encoded ciphertext in Avo ECIES wire format
  */
 export function encryptValue(value: string, publicKeyHex: string): string {
+  // Fail fast with a helpful message if crypto.getRandomValues is missing (React Native)
+  if (typeof globalThis.crypto === "undefined" || typeof globalThis.crypto.getRandomValues !== "function") {
+    throw new Error(
+      "crypto.getRandomValues is not available. " +
+      "If you are using React Native, add 'react-native-get-random-values' to your project " +
+      "and import it at the top of your entry file (index.js) before any other imports: " +
+      "import 'react-native-get-random-values';"
+    );
+  }
+
   // 1. Parse recipient public key from hex
   const recipientPublicKeyBytes = hexToBytes(publicKeyHex);
 
