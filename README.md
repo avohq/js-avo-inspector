@@ -11,13 +11,13 @@ For more information about the Inspector project please read [Avo documentation]
 
 The library is distributed with npm
 
-```
+```sh
 npm i react-native-avo-inspector
 ```
 
 or
 
-```
+```sh
 yarn add react-native-avo-inspector
 ```
 
@@ -27,7 +27,7 @@ The SDK requires the following peer dependencies, depending on your platform and
 
 ### Storage (required for Android)
 
-```
+```sh
 npm i @react-native-async-storage/async-storage
 ```
 
@@ -35,7 +35,7 @@ Used to persist the anonymous stream ID on Android. iOS uses native `Settings` i
 
 ### Encryption support (required if using `publicEncryptionKey`)
 
-```
+```sh
 npm i react-native-get-random-values
 ```
 
@@ -55,7 +55,7 @@ AppRegistry.registerComponent(appName, () => App);
 
 After installing dependencies, run:
 
-```
+```sh
 cd ios && pod install
 ```
 
@@ -74,7 +74,7 @@ let inspector = new AvoInspector({
 });
 ```
 
-### With encryption
+## With encryption
 
 ```javascript
 let inspector = new AvoInspector({
