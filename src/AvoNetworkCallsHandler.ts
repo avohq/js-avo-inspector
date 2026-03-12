@@ -2,6 +2,7 @@ import AvoGuid from "./AvoGuid";
 import { AvoInspector } from "./AvoInspector";
 import { AvoStreamId } from "./AvoStreamId";
 import { shouldEncrypt, encryptEventProperties } from "./AvoEncryption";
+import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
 
 export interface BaseBody {
   apiKey: string;
@@ -11,6 +12,8 @@ export interface BaseBody {
   env: string;
   libPlatform: "react-native";
   messageId: string;
+  trackingId: string;
+  sessionId: string;
   anonymousId: string;
   createdAt: string;
   samplingRate: number;
@@ -25,10 +28,19 @@ export interface EventSchemaBody extends BaseBody {
     propertyType: string;
     encryptedPropertyValue?: string;
     children?: any;
+    failedEventIds?: string[];
+    passedEventIds?: string[];
   }>;
   avoFunction: boolean;
   eventId: string | null;
   eventHash: string | null;
+  streamId?: string;
+  eventSpecMetadata?: {
+    schemaId?: string;
+    branchId?: string;
+    latestActionId?: string;
+    sourceId?: string;
+  };
 }
 
 export class AvoNetworkCallsHandler {
@@ -94,9 +106,11 @@ export class AvoNetworkCallsHandler {
     this.sending = true;
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
-    xmlhttp.setRequestHeader("Content-Type", "text/plain");
-    xmlhttp.send(JSON.stringify(events));
+    xmlhttp.setRequestHeader("Content-Type", "application/json");
+    xmlhttp.setRequestHeader("Accept", "application/json");
+    xmlhttp.timeout = 10000;
     xmlhttp.onload = () => {
+      this.sending = false;
       if (xmlhttp.status != 200) {
         onCompleted(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`);
       } else {
@@ -109,12 +123,14 @@ export class AvoNetworkCallsHandler {
       }
     };
     xmlhttp.onerror = () => {
+      this.sending = false;
       onCompleted("Request failed");
     };
     xmlhttp.ontimeout = () => {
+      this.sending = false;
       onCompleted("Request timed out");
     }
-    this.sending = false;
+    xmlhttp.send(JSON.stringify(events));
   }
 
   async bodyForEventSchemaCall(
@@ -123,10 +139,13 @@ export class AvoNetworkCallsHandler {
       propertyName: string;
       propertyType: string;
       children?: any;
+      failedEventIds?: string[];
+      passedEventIds?: string[];
     }>,
     eventId: string | null,
     eventHash: string | null,
-    eventProps?: Record<string, any>
+    eventProps?: Record<string, any>,
+    metadata?: EventSpecMetadata | null
   ): Promise<EventSchemaBody> {
     const anonymousId = await AvoStreamId.initialize();
     let eventSchemaBody = this.createBaseCallBody(anonymousId) as EventSchemaBody;
@@ -158,7 +177,64 @@ export class AvoNetworkCallsHandler {
       eventSchemaBody.eventHash = null;
     }
 
+    // Add streamId and event spec metadata for validated events
+    if (metadata) {
+      eventSchemaBody.streamId = anonymousId;
+      eventSchemaBody.eventSpecMetadata = {};
+      if (metadata.schemaId) {
+        eventSchemaBody.eventSpecMetadata.schemaId = metadata.schemaId;
+      }
+      if (metadata.branchId) {
+        eventSchemaBody.eventSpecMetadata.branchId = metadata.branchId;
+      }
+      if (metadata.latestActionId) {
+        eventSchemaBody.eventSpecMetadata.latestActionId = metadata.latestActionId;
+      }
+      if (metadata.sourceId) {
+        eventSchemaBody.eventSpecMetadata.sourceId = metadata.sourceId;
+      }
+    }
+
     return eventSchemaBody;
+  }
+
+  /**
+   * Sends a validated event immediately, bypassing the batcher.
+   * Matches Android SDK's reportValidatedEvent behavior.
+   */
+  reportValidatedEvent(eventBody: EventSchemaBody): void {
+    if (Math.random() > this.samplingRate) {
+      if (AvoInspector.shouldLog) {
+        console.log("Avo Inspector: validated event dropped due to sampling rate.");
+      }
+      return;
+    }
+
+    if (AvoInspector.shouldLog) {
+      console.log(
+        "Avo Inspector: sending validated event " +
+          eventBody.eventName +
+          " with schema " +
+          JSON.stringify(eventBody.eventProperties)
+      );
+    }
+
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
+    xmlhttp.setRequestHeader("Content-Type", "application/json");
+    xmlhttp.setRequestHeader("Accept", "application/json");
+    xmlhttp.timeout = 10000;
+    xmlhttp.send(JSON.stringify([eventBody]));
+    xmlhttp.onerror = () => {
+      if (AvoInspector.shouldLog) {
+        console.warn("Avo Inspector: failed to send validated event");
+      }
+    };
+    xmlhttp.ontimeout = () => {
+      if (AvoInspector.shouldLog) {
+        console.warn("Avo Inspector: validated event report timed out");
+      }
+    };
   }
 
   private createBaseCallBody(anonymousId: string): BaseBody {
@@ -170,6 +246,8 @@ export class AvoNetworkCallsHandler {
       env: this.envName,
       libPlatform: "react-native",
       messageId: AvoGuid.newGuid(),
+      trackingId: "",
+      sessionId: "",
       anonymousId,
       createdAt: new Date().toISOString(),
       samplingRate: this.samplingRate,

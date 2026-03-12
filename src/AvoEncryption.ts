@@ -25,8 +25,12 @@ import { randomBytes } from "@noble/ciphers/webcrypto";
 
 /**
  * Converts a hex string to a Uint8Array.
+ * Strips optional 0x/0X prefix (matching Android SDK behavior).
  */
 function hexToBytes(hex: string): Uint8Array {
+  if (hex.startsWith("0x") || hex.startsWith("0X")) {
+    hex = hex.substring(2);
+  }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substr(i, 2), 16);

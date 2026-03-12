@@ -51,6 +51,8 @@ describe("NetworkCallsHandler Model A", () => {
       env,
       libPlatform: "react-native",
       messageId: mockedReturns.GUID,
+      trackingId: "",
+      sessionId: "",
       anonymousId: mockedReturns.ANONYMOUS_ID,
       createdAt: new Date().toISOString(),
       samplingRate: 1.0,
@@ -71,24 +73,24 @@ describe("NetworkCallsHandler Model A", () => {
     expect(body).toHaveProperty("anonymousId");
   });
 
-  test("BaseBody does NOT contain sessionId field", async () => {
+  test("BaseBody contains empty sessionId field", async () => {
     const body = await networkHandler.bodyForEventSchemaCall(
       "test event",
       [],
       null,
       null
     );
-    expect(body).not.toHaveProperty("sessionId");
+    expect(body).toHaveProperty("sessionId", "");
   });
 
-  test("BaseBody does NOT contain trackingId field", async () => {
+  test("BaseBody contains empty trackingId field", async () => {
     const body = await networkHandler.bodyForEventSchemaCall(
       "test event",
       [],
       null,
       null
     );
-    expect(body).not.toHaveProperty("trackingId");
+    expect(body).toHaveProperty("trackingId", "");
   });
 
   test("libPlatform is 'react-native'", async () => {
@@ -183,7 +185,7 @@ describe("NetworkCallsHandler Model A", () => {
 
     expect(xhrMock.setRequestHeader).toBeCalledWith(
       "Content-Type",
-      "text/plain",
+      "application/json",
     );
 
     expect(xhrMock.send).toBeCalledTimes(1);

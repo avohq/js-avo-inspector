@@ -51,6 +51,8 @@ describe("NetworkCallsHandler", () => {
       env,
       libPlatform: "react-native",
       messageId: mockedReturns.GUID,
+      trackingId: "",
+      sessionId: "",
       anonymousId: mockedReturns.ANONYMOUS_ID,
       createdAt: new Date().toISOString(),
       samplingRate: 1.0,
@@ -133,7 +135,7 @@ describe("NetworkCallsHandler", () => {
 
     expect(xhrMock.setRequestHeader).toBeCalledWith(
       "Content-Type",
-      "text/plain",
+      "application/json",
     );
 
     expect(xhrMock.send).toBeCalledTimes(1);

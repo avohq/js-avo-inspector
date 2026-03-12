@@ -43,7 +43,7 @@ export class AvoEventSpecFetcher {
 
   /** Generates a unique key for tracking in-flight requests. */
   private generateRequestKey(params: FetchEventSpecParams): string {
-    return `${params.streamId}:${params.eventName}`;
+    return `${params.apiKey}:${params.streamId}:${params.eventName}`;
   }
 
   /**

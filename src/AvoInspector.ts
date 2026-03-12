@@ -123,7 +123,7 @@ export class AvoInspector {
     if (this.environment !== AvoInspectorEnv.Prod) {
       this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
       this.eventSpecFetcher = new AvoEventSpecFetcher(
-        2000,
+        5000,
         AvoInspector._shouldLog,
         this.environment
       );
@@ -184,9 +184,13 @@ export class AvoInspector {
             eventSchema,
             validationResult
           );
-          this.trackSchemaInternal(eventName, schemaWithValidation, null, null);
+          // Send validated events immediately, bypassing the batcher
+          this.sendEventWithValidation(
+            eventName, schemaWithValidation, null, null,
+            validationResult, eventProperties
+          );
         } else {
-          this.trackSchemaInternal(eventName, eventSchema, null, null);
+          this.trackSchemaInternal(eventName, eventSchema, null, null, eventProperties);
         }
 
         return eventSchema;
@@ -244,9 +248,13 @@ export class AvoInspector {
             eventSchema,
             validationResult
           );
-          this.trackSchemaInternal(eventName, schemaWithValidation, eventId, eventHash);
+          // Send validated events immediately, bypassing the batcher
+          this.sendEventWithValidation(
+            eventName, schemaWithValidation, eventId, eventHash,
+            validationResult, eventProperties
+          );
         } else {
-          this.trackSchemaInternal(eventName, eventSchema, eventId, eventHash);
+          this.trackSchemaInternal(eventName, eventSchema, eventId, eventHash, eventProperties);
         }
 
         return eventSchema;
@@ -310,14 +318,16 @@ export class AvoInspector {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    eventProperties?: Record<string, any>
   ): void {
     try {
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
         eventId,
-        eventHash
+        eventHash,
+        eventProperties
       );
     } catch (e) {
       console.error(
@@ -549,5 +559,41 @@ export class AvoInspector {
     }
 
     return result;
+  }
+
+  /**
+   * Sends a validated event immediately, bypassing the batcher.
+   * Matches Android SDK's sendEventWithValidation behavior.
+   */
+  private sendEventWithValidation(
+    eventName: string,
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      children?: any;
+      failedEventIds?: string[];
+      passedEventIds?: string[];
+    }>,
+    eventId: string | null,
+    eventHash: string | null,
+    validationResult: ValidationResult,
+    eventProperties?: Record<string, any>
+  ): void {
+    const networkHandler = this.avoBatcher.networkCallsHandler;
+    networkHandler.bodyForEventSchemaCall(
+      eventName,
+      eventSchema,
+      eventId,
+      eventHash,
+      eventProperties,
+      validationResult.metadata
+    ).then((eventBody) => {
+      networkHandler.reportValidatedEvent(eventBody);
+    }).catch((e) => {
+      console.error(
+        "Avo Inspector: failed to send validated event.",
+        e
+      );
+    });
   }
 }

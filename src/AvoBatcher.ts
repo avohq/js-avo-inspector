@@ -13,7 +13,8 @@ export interface AvoBatcherType {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    eventProps?: Record<string, any>
   ): void;
 }
 
@@ -22,7 +23,7 @@ export class AvoBatcher implements AvoBatcherType {
 
   private batchFlushAttemptTimestamp: number;
 
-  private networkCallsHandler: AvoNetworkCallsHandler;
+  networkCallsHandler: AvoNetworkCallsHandler;
 
   constructor(networkCallsHandler: AvoNetworkCallsHandler) {
     this.networkCallsHandler = networkCallsHandler;
@@ -54,13 +55,15 @@ export class AvoBatcher implements AvoBatcherType {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    eventProps?: Record<string, any>
   ): void {
     this.networkCallsHandler.bodyForEventSchemaCall(
       eventName,
       schema,
       eventId,
-      eventHash
+      eventHash,
+      eventProps
     ).then((eventBody) => {
       this.events.push(eventBody);
       this.saveEvents();

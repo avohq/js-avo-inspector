@@ -44,6 +44,23 @@ export class AvoStreamId {
     return AvoStreamId._initializationPromise;
   }
 
+  /**
+   * Sets a custom anonymous ID. Persists to storage.
+   */
+  static setAnonymousId(id: string): void {
+    AvoStreamId._anonymousId = id;
+    AvoStreamId._initializationPromise = null;
+    AvoInspector.avoStorage.setItem(AvoStreamId.cacheKey, id);
+  }
+
+  /**
+   * Clears the cached anonymous ID. The next access will reload from storage.
+   */
+  static clearCache(): void {
+    AvoStreamId._anonymousId = null;
+    AvoStreamId._initializationPromise = null;
+  }
+
   static get cacheKey(): string {
     return "AvoInspectorAnonymousId";
   }
