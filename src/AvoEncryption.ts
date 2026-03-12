@@ -72,8 +72,13 @@ export function shouldEncrypt(
  * @returns Base64-encoded ciphertext in Avo ECIES wire format
  */
 export function encryptValue(value: string, publicKeyHex: string): string {
-  // Fail fast with a helpful message if crypto.getRandomValues is missing (React Native)
-  if (typeof globalThis.crypto === "undefined" || typeof globalThis.crypto.getRandomValues !== "function") {
+  // Fail fast with a helpful message when running in React Native without the polyfill.
+  // Node.js and browsers provide crypto natively; only Hermes (RN) lacks it.
+  if (
+    !process.env.BROWSER &&
+    typeof navigator !== "undefined" && navigator.product === "ReactNative" &&
+    (typeof globalThis.crypto === "undefined" || typeof globalThis.crypto.getRandomValues !== "function")
+  ) {
     throw new Error(
       "crypto.getRandomValues is not available. " +
       "If you are using React Native, add 'react-native-get-random-values' to your project " +
