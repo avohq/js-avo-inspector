@@ -1,6 +1,6 @@
 {
   "name": "react-native-avo-inspector",
-  "version": "1.4.0-alpha.1",
+  "version": "1.4.0-alpha.2",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
@@ -78,7 +78,7 @@
     "safe-regex2": "^5.0.0"
   },
   "peerDependencies": {
-    "@react-native-async-storage/async-storage": "^1.24.0",
+    "@react-native-async-storage/async-storage": ">=1.24.0",
     "react-native-get-random-values": "^1.1.0",
     "react-native": "*"
   },
