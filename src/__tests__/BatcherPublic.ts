@@ -60,7 +60,8 @@ describe("Batcher", () => {
       eventName,
       schema,
       null,
-      null
+      null,
+      undefined
     );
   });
 
@@ -83,7 +84,8 @@ describe("Batcher", () => {
       eventName,
       schema,
       null,
-      null
+      null,
+      properties
     );
   });
 
@@ -108,7 +110,8 @@ describe("Batcher", () => {
       eventName,
       schema,
       eventId,
-      eventHash
+      eventHash,
+      properties
     );
   });
 
