@@ -45,6 +45,11 @@ export class AvoBatcher implements AvoBatcherType {
           );
           this.checkIfBatchNeedsToBeSent();
         }
+      })
+      .catch((error) => {
+        if (AvoInspector.shouldLog) {
+          console.error("Avo Inspector: failed to load cached events.", error);
+        }
       });
   }
 

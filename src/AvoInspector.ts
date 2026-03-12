@@ -106,7 +106,15 @@ export class AvoInspector {
       AvoInspector._shouldLog = false;
     }
 
-    AvoInspector.avoStorage = new AvoStorage(AvoInspector._shouldLog);
+    try {
+      AvoInspector.avoStorage = new AvoStorage(AvoInspector._shouldLog);
+    } catch (e) {
+      console.error(
+        "[Avo Inspector] Failed to initialize storage. " +
+        "If you are using React Native, make sure @react-native-async-storage/async-storage is installed.",
+        e
+      );
+    }
 
     let avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
@@ -121,16 +129,23 @@ export class AvoInspector {
 
     // Initialize event spec validation infrastructure for dev/staging
     if (this.environment !== AvoInspectorEnv.Prod) {
-      this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
-      this.eventSpecFetcher = new AvoEventSpecFetcher(
-        5000,
-        AvoInspector._shouldLog,
-        this.environment
-      );
+      try {
+        this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
+        this.eventSpecFetcher = new AvoEventSpecFetcher(
+          5000,
+          AvoInspector._shouldLog,
+          this.environment
+        );
 
-      if (AvoInspector._shouldLog) {
-        console.log(
-          "[Avo Inspector] Event spec fetching and validation enabled"
+        if (AvoInspector._shouldLog) {
+          console.log(
+            "[Avo Inspector] Event spec fetching and validation enabled"
+          );
+        }
+      } catch (e) {
+        console.error(
+          "[Avo Inspector] Failed to initialize event spec validation.",
+          e
         );
       }
     }

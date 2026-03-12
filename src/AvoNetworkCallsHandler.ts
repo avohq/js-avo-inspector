@@ -114,9 +114,13 @@ export class AvoNetworkCallsHandler {
       if (xmlhttp.status != 200) {
         onCompleted(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`);
       } else {
-        const samplingRate = JSON.parse(xmlhttp.response).samplingRate;
-        if (samplingRate !== undefined) {
-          this.samplingRate = samplingRate;
+        try {
+          const samplingRate = JSON.parse(xmlhttp.response).samplingRate;
+          if (samplingRate !== undefined) {
+            this.samplingRate = samplingRate;
+          }
+        } catch (_) {
+          // Ignore malformed response — sampling rate stays unchanged
         }
 
         onCompleted(null);
