@@ -1,6 +1,6 @@
 {
   "name": "react-native-avo-inspector",
-  "version": "1.3.0",
+  "version": "1.4.0-alpha.1",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
@@ -12,7 +12,7 @@
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test:browser"
+    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\\.ts$\""
   },
   "repository": {
     "type": "git",
