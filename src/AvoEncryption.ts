@@ -186,9 +186,17 @@ export function encryptEventProperties(
     passedEventIds?: string[];
   }> = [];
 
+  let encryptionFailed = false;
+
   for (const prop of properties) {
     // Omit list-type properties entirely
     if (prop.propertyType === "list") {
+      continue;
+    }
+
+    // If encryption already failed for this batch, skip remaining properties
+    // to avoid spamming the console with the same error
+    if (encryptionFailed) {
       continue;
     }
 
@@ -217,12 +225,12 @@ export function encryptEventProperties(
 
       result.push(entry);
     } catch (e) {
+      encryptionFailed = true;
       console.warn(
-        `[Avo Inspector] Warning: Failed to encrypt property "${prop.propertyName}". ${
+        `[Avo Inspector] Encryption failed: ${
           e instanceof Error ? e.message : String(e)
-        }`
+        }. Event properties will be sent without encryption.`
       );
-      // Omit the property and continue
     }
   }
 

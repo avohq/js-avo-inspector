@@ -303,11 +303,11 @@ describe("AvoEncryption (React Native - @noble/ciphers)", () => {
 
       // Both should fail with invalid key, so both should be omitted
       expect(result).toHaveLength(0);
-      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
       // Check that warning message matches expected format
       const calls = warnSpy.mock.calls;
       expect(calls.some((call) =>
-        String(call[0]).includes("[Avo Inspector] Warning:")
+        String(call[0]).includes("[Avo Inspector] Encryption failed:")
       )).toBe(true);
 
       warnSpy.mockRestore();
