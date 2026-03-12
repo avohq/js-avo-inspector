@@ -223,7 +223,13 @@ export class AvoNetworkCallsHandler {
     xmlhttp.setRequestHeader("Content-Type", "application/json");
     xmlhttp.setRequestHeader("Accept", "application/json");
     xmlhttp.timeout = 10000;
-    xmlhttp.send(JSON.stringify([eventBody]));
+    xmlhttp.onload = () => {
+      if (xmlhttp.status !== 200 && AvoInspector.shouldLog) {
+        console.warn(
+          `Avo Inspector: validated event response status ${xmlhttp.status}`
+        );
+      }
+    };
     xmlhttp.onerror = () => {
       if (AvoInspector.shouldLog) {
         console.warn("Avo Inspector: failed to send validated event");
@@ -234,6 +240,7 @@ export class AvoNetworkCallsHandler {
         console.warn("Avo Inspector: validated event report timed out");
       }
     };
+    xmlhttp.send(JSON.stringify([eventBody]));
   }
 
   private createBaseCallBody(anonymousId: string): BaseBody {

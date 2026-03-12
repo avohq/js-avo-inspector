@@ -23,6 +23,7 @@ export class AvoBatcher implements AvoBatcherType {
 
   private batchFlushAttemptTimestamp: number;
 
+  /** Exposed for AvoInspector.sendEventWithValidation to send validated events directly. */
   networkCallsHandler: AvoNetworkCallsHandler;
 
   constructor(networkCallsHandler: AvoNetworkCallsHandler) {

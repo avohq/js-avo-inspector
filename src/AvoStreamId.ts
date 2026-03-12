@@ -64,7 +64,9 @@ export class AvoStreamId {
   static setAnonymousId(id: string): void {
     AvoStreamId._anonymousId = id;
     AvoStreamId._initializationPromise = null;
-    AvoInspector.avoStorage.setItem(AvoStreamId.cacheKey, id);
+    if (AvoInspector.avoStorage) {
+      AvoInspector.avoStorage.setItem(AvoStreamId.cacheKey, id);
+    }
   }
 
   /**
