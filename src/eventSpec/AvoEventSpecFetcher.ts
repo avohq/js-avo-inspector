@@ -220,7 +220,8 @@ export class AvoEventSpecFetcher {
   /** Parses a single event spec entry from wire format. */
   private static parseEventSpecEntry(wire: EventSpecEntryWire): EventSpecEntry {
     const props: Record<string, PropertyConstraints> = {};
-    for (const entry of Object.entries(wire.p)) {
+    const wireProps = wire.p || {};
+    for (const entry of Object.entries(wireProps)) {
       const propName: string = entry[0];
       const propWire: PropertyConstraintsWire = entry[1];
       props[propName] = AvoEventSpecFetcher.parsePropertyConstraints(propWire);

@@ -78,6 +78,11 @@ export class AvoBatcher implements AvoBatcherType {
       }
 
       this.checkIfBatchNeedsToBeSent();
+    }).catch((error) => {
+      console.error(
+        "Avo Inspector: failed to prepare event body for " + eventName + ".",
+        error
+      );
     });
   }
 

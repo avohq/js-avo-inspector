@@ -33,7 +33,7 @@ function hexToBytes(hex: string): Uint8Array {
   }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
   }
   return bytes;
 }
@@ -128,8 +128,12 @@ export function encryptValue(value: string, publicKeyHex: string): string {
 
   result.set(ciphertext, offset);
 
-  // 8. Base64 encode
-  return Buffer.from(result).toString("base64");
+  // 8. Base64 encode (platform-safe: avoids Buffer which is unavailable in Hermes/React Native)
+  let binary = "";
+  for (let i = 0; i < result.length; i++) {
+    binary += String.fromCharCode(result[i]);
+  }
+  return btoa(binary);
 }
 
 /**

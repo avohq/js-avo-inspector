@@ -22,6 +22,13 @@ export class AvoStreamId {
       return AvoStreamId._initializationPromise;
     }
 
+    // Guard: if storage isn't initialized yet, fall back to a fresh GUID
+    if (!AvoInspector.avoStorage) {
+      const fallbackId = AvoGuid.newGuid();
+      AvoStreamId._anonymousId = fallbackId;
+      return Promise.resolve(fallbackId);
+    }
+
     // Start initialization and cache the promise to handle concurrent calls
     const storagePromise = AvoInspector.avoStorage.getItemAsync<string>(AvoStreamId.cacheKey);
     const resolvedPromise = storagePromise && typeof storagePromise.then === "function"
@@ -39,6 +46,13 @@ export class AvoStreamId {
         );
       }
       return AvoStreamId._anonymousId as string;
+    }).catch((error) => {
+      // Reset so callers can retry on next call
+      AvoStreamId._initializationPromise = null;
+      // Fall back to a fresh GUID
+      const fallbackId = AvoGuid.newGuid();
+      AvoStreamId._anonymousId = fallbackId;
+      return fallbackId;
     });
 
     return AvoStreamId._initializationPromise;

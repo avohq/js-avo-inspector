@@ -436,14 +436,12 @@ export class AvoInspector {
 
     try {
       // Check cache first
-      let specResponse: EventSpecResponse | null | undefined = undefined;
-      if (this.eventSpecCache) {
-        specResponse = this.eventSpecCache.get(
+      let specResponse: EventSpecResponse | null | undefined =
+        this.eventSpecCache.get(
           this.apiKey,
           this.streamId,
           eventName
         );
-      }
 
       // Cache miss - fetch from API
       if (specResponse === undefined) {
@@ -458,14 +456,12 @@ export class AvoInspector {
           specResponse = fetched;
         } else {
           // Cache null response to prevent re-fetching
-          if (this.eventSpecCache && this.streamId) {
-            this.eventSpecCache.set(
-              this.apiKey,
-              this.streamId,
-              eventName,
-              null
-            );
-          }
+          this.eventSpecCache.set(
+            this.apiKey,
+            this.streamId,
+            eventName,
+            null
+          );
           specResponse = null;
         }
       }

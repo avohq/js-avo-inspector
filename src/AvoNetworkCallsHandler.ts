@@ -155,13 +155,12 @@ export class AvoNetworkCallsHandler {
     // Encrypt property values when encryption is enabled
     if (
       shouldEncrypt(this.envName, this.publicEncryptionKey) &&
-      this.publicEncryptionKey &&
       eventProps
     ) {
       eventSchemaBody.eventProperties = encryptEventProperties(
         eventProperties,
         eventProps,
-        this.publicEncryptionKey
+        this.publicEncryptionKey!
       );
     } else {
       eventSchemaBody.eventProperties = eventProperties;
