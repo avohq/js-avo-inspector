@@ -1,7 +1,0 @@
-# ninja log v6
-0	9	1765367504129912666	rescript/AvoInspector.ast	6beefdbf7fd6aa8a
-1	9	1765367504129899749	rescript/AvoInspector.iast	9716d2437d9f2e27
-9	13	1765367504134661495	rescript/AvoInspector.d	9cd4acec867d860f
-13	23	1765367504143065872	rescript/AvoInspector.cmi	fa29eb632143a199
-23	33	1765367504154661593	rescript/AvoInspector.cmj	88fe3a3d391c715d
-23	33	1765367504154661593	../../rescript/AvoInspector.mjs	88fe3a3d391c715d

@@ -23,6 +23,8 @@ yarn-error.log*
 
 *.bs.js
 
+/lib
+/rescript
 
 .vscode
 .cache
