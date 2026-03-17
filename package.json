@@ -3,13 +3,35 @@
   "version": "3.0.1",
   "description": "",
   "main": "dist/index.js",
+  "module": "dist/esm/index.js",
   "browser": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/esm/**/*.js",
+    "!dist/__tests__",
+    "!dist/__mocks__",
+    "!dist/browser.js",
+    "!dist/script.js",
+    "!dist/*.LICENSE.txt",
+    "bin/",
+    "bsconfig.json",
+    "rescript/"
+  ],
   "bin": {
     "avo-inspector": "bin/avo-inspector.js"
   },
   "scripts": {
-    "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js",
+    "build": "rm -rf dist && tsc && tsc -p tsconfig.esm.json",
     "build-for-script-tag": "tsc --outDir dist-browser --emitDeclarationOnly && webpack --config webpack.browserConfig.js",
     "lint": "eslint ./src --ext .js,.ts",
     "test": "jest",
