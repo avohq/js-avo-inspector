@@ -4,13 +4,12 @@ import { AvoBatcher } from "./AvoBatcher";
 import { AvoNetworkCallsHandler, type EventProperty } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
-import { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
-import { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
 import { AvoStreamId } from "./AvoStreamId";
-import { validateEvent } from "./eventSpec/EventValidator";
 
 import { isValueEmpty } from "./utils";
 import type { ValidationResult, PropertyValidationResult, EventSpecResponse } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
+import type { AvoEventSpecFetcher } from "./eventSpec/AvoEventSpecFetcher";
 
 const libVersion = require("../package.json").version;
 
@@ -28,8 +27,10 @@ export class AvoInspector {
   // publicEncryptionKey: RSA public key for encrypting property values - client keeps private key for decryption
   private publicEncryptionKey?: string;
   private streamId?: string;
-  private eventSpecCache?: EventSpecCache;
-  private eventSpecFetcher?: AvoEventSpecFetcher;
+  private eventSpecCache?: InstanceType<typeof EventSpecCache>;
+  private eventSpecFetcher?: InstanceType<typeof AvoEventSpecFetcher>;
+  private _validateEvent?: (properties: Record<string, any>, specResponse: EventSpecResponse) => ValidationResult;
+  private _eventSpecReady?: Promise<void>;
   private currentBranchId: string | null = null;
 
   static avoStorage: AvoStorage;
@@ -137,14 +138,34 @@ export class AvoInspector {
     this.avoDeduplicator = new AvoDeduplicator();
     this.streamId = AvoStreamId.streamId;
 
-    // Enable event spec fetching if streamId is present (and not "unknown")
-    if (this.streamId) {
+    // Enable event spec fetching if streamId is present (note: "unknown" is truthy and will trigger initEventSpecModules; see streamId edge case in spec)
+    if (this.streamId && this.environment !== AvoInspectorEnv.Prod) {
+      this._eventSpecReady = this.initEventSpecModules();
+    }
+  }
+
+  private async initEventSpecModules(): Promise<void> {
+    // ORDERING CONSTRAINT: All instance field assignments (this.eventSpecCache,
+    // this.eventSpecFetcher, this._validateEvent) MUST occur inside the try block,
+    // before the finally block clears this._eventSpecReady. The finally block sets
+    // this._eventSpecReady = undefined to signal completion. Concurrent callers that
+    // await this._eventSpecReady (via ensureEventSpecReady) will resume after the
+    // finally block executes. If any field assignment were moved to or after the
+    // finally block, those concurrent callers would find fields unpopulated, creating
+    // a race condition where they incorrectly proceed as if no event spec is available.
+    try {
+      const [{ EventSpecCache }, { AvoEventSpecFetcher }, { validateEvent }] = await Promise.all([
+        import("./eventSpec/AvoEventSpecCache"),
+        import("./eventSpec/AvoEventSpecFetcher"),
+        import("./eventSpec/EventValidator")
+      ]);
       this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
       this.eventSpecFetcher = new AvoEventSpecFetcher(
         AvoInspector._networkTimeout,
         AvoInspector._shouldLog,
         this.environment
       );
+      this._validateEvent = validateEvent;
 
       if (AvoInspector._shouldLog) {
         console.log(
@@ -154,7 +175,30 @@ export class AvoInspector {
           console.log("[Avo Inspector] Property value encryption enabled");
         }
       }
+    } catch (error) {
+      if (AvoInspector._shouldLog) {
+        console.error("[Avo Inspector] Failed to load event spec modules:", error);
+      }
+    } finally {
+      this._eventSpecReady = undefined;
     }
+  }
+
+  private async ensureEventSpecReady(): Promise<{
+    cache: InstanceType<typeof EventSpecCache>;
+    fetcher: InstanceType<typeof AvoEventSpecFetcher>;
+    validate: (properties: Record<string, any>, specResponse: EventSpecResponse) => ValidationResult;
+    streamId: string;
+  } | null> {
+    if (this.environment === AvoInspectorEnv.Prod) return null;
+    if (this._eventSpecReady) await this._eventSpecReady;
+    if (!this.eventSpecCache || !this.eventSpecFetcher || !this.streamId || !this._validateEvent) return null;
+    return {
+      cache: this.eventSpecCache,
+      fetcher: this.eventSpecFetcher,
+      validate: this._validateEvent,
+      streamId: this.streamId,
+    };
   }
 
   async trackSchemaFromEvent(
@@ -437,22 +481,15 @@ export class AvoInspector {
    * Note: EventSpec fetching only happens in dev/staging environments.
    */
   private async fetchEventSpecIfNeeded(eventName: string): Promise<void> {
-    // Only fetch specs in dev/staging environments (NOT in production)
-    if (this.environment === AvoInspectorEnv.Prod) {
-      return;
-    }
-
-    // Only fetch if we have the required infrastructure
-    if (!this.eventSpecCache || !this.eventSpecFetcher || !this.streamId) {
-      return;
-    }
+    const spec = await this.ensureEventSpecReady();
+    if (!spec) return;
 
     try {
       // Check cache first (includes cached empty responses)
-      if (this.eventSpecCache.contains(this.apiKey, this.streamId, eventName)) {
-        const cached = this.eventSpecCache.get(
+      if (spec.cache.contains(this.apiKey, spec.streamId, eventName)) {
+        const cached = spec.cache.get(
           this.apiKey,
-          this.streamId,
+          spec.streamId,
           eventName
         );
         if (!cached) {
@@ -467,9 +504,9 @@ export class AvoInspector {
       }
 
       // Cache miss - fetch from API (blocking)
-      const specResponse = await this.eventSpecFetcher.fetch({
+      const specResponse = await spec.fetcher.fetch({
         apiKey: this.apiKey,
-        streamId: this.streamId,
+        streamId: spec.streamId,
         eventName
       });
 
@@ -477,7 +514,7 @@ export class AvoInspector {
         this.handleBranchChangeAndCache(specResponse, eventName);
       } else {
         // Cache the empty response so we don't re-fetch
-        this.eventSpecCache.set(this.apiKey, this.streamId, eventName, null);
+        spec.cache.set(this.apiKey, spec.streamId, eventName, null);
         if (AvoInspector.shouldLog) {
           console.log(
             `[Avo Inspector] Event spec fetch returned null for event: ${eventName}. Cached empty response.`
@@ -504,22 +541,15 @@ export class AvoInspector {
     eventName: string,
     eventProperties: Record<string, any>
   ): Promise<ValidationResult | null> {
-    // Only fetch specs in dev/staging environments (NOT in production)
-    if (this.environment === AvoInspectorEnv.Prod) {
-      return null;
-    }
-
-    // Only fetch if we have the required infrastructure
-    if (!this.eventSpecCache || !this.eventSpecFetcher || !this.streamId) {
-      return null;
-    }
+    const spec = await this.ensureEventSpecReady();
+    if (!spec) return null;
 
     try {
       // Check cache first (includes cached empty responses)
-      if (this.eventSpecCache.contains(this.apiKey, this.streamId, eventName)) {
-        const cached = this.eventSpecCache.get(
+      if (spec.cache.contains(this.apiKey, spec.streamId, eventName)) {
+        const cached = spec.cache.get(
           this.apiKey,
-          this.streamId,
+          spec.streamId,
           eventName
         );
         if (cached) {
@@ -528,7 +558,7 @@ export class AvoInspector {
               `[Avo Inspector] Cache hit for event: ${eventName}`
             );
           }
-          return validateEvent(eventProperties, cached);
+          return spec.validate(eventProperties, cached);
         } else {
           // Cached empty response — no spec exists for this event
           if (AvoInspector.shouldLog) {
@@ -541,18 +571,18 @@ export class AvoInspector {
       }
 
       // Cache miss - fetch from API (blocking)
-      const specResponse = await this.eventSpecFetcher.fetch({
+      const specResponse = await spec.fetcher.fetch({
         apiKey: this.apiKey,
-        streamId: this.streamId,
+        streamId: spec.streamId,
         eventName
       });
 
       if (specResponse) {
         this.handleBranchChangeAndCache(specResponse, eventName);
-        return validateEvent(eventProperties, specResponse);
+        return spec.validate(eventProperties, specResponse);
       } else {
         // Cache the empty response so we don't re-fetch
-        this.eventSpecCache.set(this.apiKey, this.streamId, eventName, null);
+        spec.cache.set(this.apiKey, spec.streamId, eventName, null);
         if (AvoInspector.shouldLog) {
           console.log(
             `[Avo Inspector] Event spec fetch returned null for event: ${eventName}. Cached empty response.`
