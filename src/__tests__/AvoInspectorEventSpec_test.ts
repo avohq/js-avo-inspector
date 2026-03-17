@@ -88,7 +88,7 @@ describe("AvoInspector Event Spec Integration", () => {
       expect(inspector.apiKey).toBe("test-key");
     });
 
-    test("should initialize with spec fetching disabled when no encryption key", () => {
+    test("should initialize with spec fetching disabled when no encryption key", async () => {
       (console.log as jest.Mock).mockClear();
 
       const inspector = new AvoInspector({
@@ -97,13 +97,16 @@ describe("AvoInspector Event Spec Integration", () => {
         version: "1.0.0"
       });
 
+      // Wait for async module initialization to complete
+      await (inspector as any)._eventSpecReady;
+
       expect(inspector).toBeDefined();
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining("Event spec fetching and validation enabled")
       );
     });
 
-    test("should initialize with encryption key (spec fetching with encryption)", () => {
+    test("should initialize with encryption key (spec fetching with encryption)", async () => {
       (console.log as jest.Mock).mockClear();
 
       const inspector = new AvoInspector({
@@ -112,6 +115,9 @@ describe("AvoInspector Event Spec Integration", () => {
         version: "1.0.0",
         publicEncryptionKey: "encryption-key-123"
       });
+
+      // Wait for async module initialization to complete
+      await (inspector as any)._eventSpecReady;
 
       expect(inspector).toBeDefined();
       expect(console.log).toHaveBeenCalledWith(
@@ -122,7 +128,7 @@ describe("AvoInspector Event Spec Integration", () => {
       );
     });
 
-    test("should log spec status when streamId is present", () => {
+    test("should log spec status when streamId is present", async () => {
       (console.log as jest.Mock).mockClear();
 
       const inspector = new AvoInspector({
@@ -130,6 +136,9 @@ describe("AvoInspector Event Spec Integration", () => {
         env: AvoInspectorEnv.Dev,
         version: "1.0.0"
       });
+
+      // Wait for async module initialization to complete
+      await (inspector as any)._eventSpecReady;
 
       expect(inspector).toBeDefined();
       // Should log spec fetching status message since streamId comes from AvoAnonymousId
@@ -331,6 +340,17 @@ describe("AvoInspector Event Spec Integration", () => {
       });
 
       expect(inspector).toBeDefined();
+    });
+
+    test("prod env: eventSpecCache and eventSpecFetcher are undefined after construction", () => {
+      const inspector = new AvoInspector({
+        apiKey: "test-key",
+        env: AvoInspectorEnv.Prod,
+        version: "1.0.0"
+      });
+
+      expect((inspector as any).eventSpecCache).toBeUndefined();
+      expect((inspector as any).eventSpecFetcher).toBeUndefined();
     });
   });
 });

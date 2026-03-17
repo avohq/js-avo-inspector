@@ -1,9 +1,10 @@
-import { encryptValue } from "./AvoEncryption";
 import type { EventProperty, SchemaChild } from "./AvoNetworkCallsHandler";
 
 const isArray = (obj: any): boolean => {
   return Object.prototype.toString.call(obj) === "[object Array]";
 };
+
+let _encryptValueFn: typeof import("./AvoEncryption").encryptValue | undefined;
 
 export class AvoSchemaParser {
   /**
@@ -32,7 +33,11 @@ export class AvoSchemaParser {
       return undefined; // No encryption key: do not send any property values
     }
     try {
-      return await encryptValue(propertyValue, publicEncryptionKey); // Only send encrypted values
+      if (!_encryptValueFn) {
+        const { encryptValue } = await import("./AvoEncryption");
+        _encryptValueFn = encryptValue;
+      }
+      return await _encryptValueFn(propertyValue, publicEncryptionKey); // Only send encrypted values
     } catch (error) {
       // If encryption fails, log the error but don't fail the entire schema extraction
       console.error(
