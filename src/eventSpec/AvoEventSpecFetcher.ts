@@ -86,6 +86,8 @@ export class AvoEventSpecFetcher {
   private async fetchInternal(
     params: FetchEventSpecParams
   ): Promise<EventSpecResponse | null> {
+    // Defensive: AvoEventSpecFetcher is only constructed for dev/staging in AvoInspector,
+    // so this guard should never be reached in practice.
     if (!(this.env === "dev" || this.env === "staging")) {
       return null;
     }

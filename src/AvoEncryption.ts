@@ -229,7 +229,7 @@ export function encryptEventProperties(
       console.warn(
         `[Avo Inspector] Encryption failed: ${
           e instanceof Error ? e.message : String(e)
-        }. Event properties will be sent without encryption.`
+        }. Remaining event properties will be omitted from the encrypted payload.`
       );
     }
   }

@@ -39,8 +39,8 @@ export interface EventSpecEntryWire {
   id: string;
   /** Variant IDs (baseEventId + variantIds = complete set) */
   vids: Array<string>;
-  /** Property constraints keyed by property name */
-  p: Record<string, PropertyConstraintsWire>;
+  /** Property constraints keyed by property name (may be absent for events with no properties) */
+  p?: Record<string, PropertyConstraintsWire>;
 }
 
 /**

@@ -12,8 +12,8 @@ export interface BaseBody {
   env: string;
   libPlatform: "react-native";
   messageId: string;
-  trackingId: string;
-  sessionId: string;
+  trackingId: string; // always "": retained for server API backward compatibility
+  sessionId: string; // always "": retained for server API backward compatibility
   anonymousId: string;
   createdAt: string;
   samplingRate: number;
