@@ -299,7 +299,7 @@ export class AvoInspectorLite {
   }
 
   setBatchSize(newBatchSize: number): void {
-    AvoInspectorLite._batchSize = newBatchSize;
+    AvoInspectorLite.batchSize = newBatchSize;
   }
 
   setBatchFlushSeconds(newBatchFlushSeconds: number): void {
