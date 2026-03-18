@@ -7,9 +7,7 @@ const isArray = (obj: any): boolean => {
 
 export class AvoSchemaParserLite {
   static async extractSchema (
-    eventProperties: Record<string, any>,
-    publicEncryptionKey?: string,
-    env?: string
+    eventProperties: Record<string, any>
   ): Promise<EventProperty[]> {
     if (eventProperties === null || eventProperties === undefined) {
       return [];
@@ -24,7 +22,7 @@ export class AvoSchemaParserLite {
       } else if (typeof object === "object") {
         const mappedResult: EventProperty[] = [];
         for (const key in object) {
-          if (object.hasOwnProperty(key)) {
+          if (Object.prototype.hasOwnProperty.call(object, key)) {
             const val = object[key];
 
             const mappedEntry: EventProperty = {

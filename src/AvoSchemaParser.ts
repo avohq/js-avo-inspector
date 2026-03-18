@@ -63,7 +63,7 @@ export class AvoSchemaParser {
       } else if (typeof object === "object") {
         const mappedResult: EventProperty[] = [];
         for (const key in object) {
-          if (object.hasOwnProperty(key)) {
+          if (Object.prototype.hasOwnProperty.call(object, key)) {
             const val = object[key];
 
             const mappedEntry: EventProperty = {

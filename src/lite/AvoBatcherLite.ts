@@ -91,6 +91,7 @@ export class AvoBatcher implements AvoBatcherType {
 
   private checkIfBatchNeedsToBeSent() {
     const batchSize = this.events.length;
+    if (batchSize === 0) return;
     const now = Date.now();
     const timeSinceLastFlushAttempt = now - this.batchFlushAttemptTimestamp;
 

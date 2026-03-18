@@ -57,11 +57,9 @@ describe("AvoSchemaParserLite - property types", () => {
 });
 
 describe("AvoSchemaParserLite - no encryptedPropertyValue", () => {
-  test("never sets encryptedPropertyValue even when called with extra args", async () => {
+  test("never sets encryptedPropertyValue", async () => {
     const schema = await AvoSchemaParser.extractSchema(
-      { prop: "value" },
-      "some-public-key",
-      "prod"
+      { prop: "value" }
     );
 
     expect(schema.length).toBeGreaterThan(0);

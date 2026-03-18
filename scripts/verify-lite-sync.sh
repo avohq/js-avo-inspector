@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -e
 
 echo "=== Lite Copy Drift Detection ==="
 
@@ -13,12 +13,12 @@ PAIRS=(
   "src/AvoStreamId.ts:src/lite/AvoStreamIdLite.ts"
 )
 
-THRESHOLD=15  # max allowed diff lines (import path changes, class rename, alias export)
+THRESHOLD=25  # max allowed diff lines (import path changes, class rename, alias export, publicEncryptionKey removal)
 FAILED=0
 
 for pair in "${PAIRS[@]}"; do
   IFS=: read -r original lite <<< "$pair"
-  DIFF_LINES=$(diff <(sed '1,2d' "$original") <(sed '1,2d' "$lite") | grep '^[<>]' | wc -l | tr -d ' ')
+  DIFF_LINES=$(diff "$original" <(sed '1,2d' "$lite") | grep -c '^[<>]' || true)
   echo "  $lite: $DIFF_LINES diff lines (threshold: $THRESHOLD)"
   if [ "$DIFF_LINES" -gt "$THRESHOLD" ]; then
     echo "    FAIL: drift exceeds threshold"

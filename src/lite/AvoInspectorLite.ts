@@ -113,8 +113,7 @@ export class AvoInspectorLite {
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion,
-      undefined
+      libVersion
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
     this.avoDeduplicator = new AvoDeduplicator();
