@@ -81,7 +81,7 @@ describe("AvoInspectorLite - trackSchema", () => {
       inspector.trackSchema("Test Event", [
         { propertyName: "a", propertyType: "int" },
       ])
-    ).resolves.not.toThrow();
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -109,6 +109,7 @@ describe("AvoInspectorLite - setters", () => {
   afterEach(() => {
     // Restore defaults
     AvoInspectorLite.batchSize = 30;
+    (AvoInspectorLite as any)._batchFlushSeconds = 30;
     AvoInspectorLite.shouldLog = false;
     AvoInspectorLite.networkTimeout = 2000;
   });

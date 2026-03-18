@@ -33,7 +33,7 @@
     "typecheck": "tsc --noEmit",
     "check:lite-size": "node scripts/check-lite-size.js",
     "verify:lite-sync": "bash scripts/verify-lite-sync.sh",
-    "prepublishOnly": "yarn build && yarn test:browser && rm -rf examples/ts-avo-inspector-example/node_modules/ && cd examples/ts-avo-inspector-example/ && yarn && yarn test --watchAll=false"
+    "prepublishOnly": "yarn build && yarn verify:lite-sync && yarn check:lite-size && yarn test:browser && rm -rf examples/ts-avo-inspector-example/node_modules/ && cd examples/ts-avo-inspector-example/ && yarn && yarn test --watchAll=false"
   },
   "repository": {
     "type": "git",
@@ -74,6 +74,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "ts-jest": "^29.2.4",
+    "terser": "^5.31.0",
     "ts-loader": "^9.5.1",
     "typescript": "*",
     "webpack": "^5.93.0",
