@@ -55,14 +55,14 @@ describe("Deduplicator", () => {
 		expect(shouldRegisterSchemaManual).toBe(false);
     });
 
-    test(`Inspector deduplicates only one event when track manually, in avo and then manually again`, () => {
+    test(`Inspector deduplicates only one event when track manually, in avo and then manually again`, async () => {
         const inspector = new AvoInspector(defaultOptions);
         inspector.enableLogging(false);
 
-        const manuallyTrackedSchema = inspector.trackSchemaFromEvent("test", testObject);
+        const manuallyTrackedSchema = await inspector.trackSchemaFromEvent("test", testObject);
         // @ts-ignore
-        const avoTrackedSchema = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
-        const manuallyTrackedSchemaAgain = inspector.trackSchemaFromEvent("test", testObject);
+        const avoTrackedSchema = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+        const manuallyTrackedSchemaAgain = await inspector.trackSchemaFromEvent("test", testObject);
 
         expect(manuallyTrackedSchema.length).toBe(4);
         expect(avoTrackedSchema.length).toBe(0);
@@ -70,40 +70,40 @@ describe("Deduplicator", () => {
     });
 
 
-    test(`Inspector deduplicates only one event when track in avo, manually and then in avo again`, () => {
+    test(`Inspector deduplicates only one event when track in avo, manually and then in avo again`, async () => {
         const inspector = new AvoInspector(defaultOptions);
         inspector.enableLogging(false);
 
         // @ts-ignore
-        const avoTrackedSchema = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
-        const manuallyTrackedSchema = inspector.trackSchemaFromEvent("test", testObject);
+        const avoTrackedSchema = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+        const manuallyTrackedSchema = await inspector.trackSchemaFromEvent("test", testObject);
         // @ts-ignore
-        const avoTrackedSchemaAgain = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+        const avoTrackedSchemaAgain = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
 
         expect(avoTrackedSchema.length).toBe(4);
         expect(manuallyTrackedSchema.length).toBe(0);
 		expect(avoTrackedSchemaAgain.length).toBe(4);
     });
 
-    test(`Allows two same manual events in a row`, () => {
+    test(`Allows two same manual events in a row`, async () => {
         const inspector = new AvoInspector(defaultOptions);
         inspector.enableLogging(false);
 
-        const manuallyTrackedSchema = inspector.trackSchemaFromEvent("test", testObject);
-        const manuallyTrackedSchemaAgain = inspector.trackSchemaFromEvent("test", testObject);
+        const manuallyTrackedSchema = await inspector.trackSchemaFromEvent("test", testObject);
+        const manuallyTrackedSchemaAgain = await inspector.trackSchemaFromEvent("test", testObject);
 
         expect(manuallyTrackedSchema.length).toBe(4);
 		expect(manuallyTrackedSchemaAgain.length).toBe(4);
     });
 
-    test(`Allows two same avo events in a row`, () => {
+    test(`Allows two same avo events in a row`, async () => {
         const inspector = new AvoInspector(defaultOptions);
         inspector.enableLogging(false);
 
         // @ts-ignore
-        const avoTrackedSchema = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+        const avoTrackedSchema = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
         // @ts-ignore
-        const avoTrackedSchemaAgain = inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
+        const avoTrackedSchemaAgain = await inspector._avoFunctionTrackSchemaFromEvent("test", testObject, "eventId", "eventhash");
 
         expect(avoTrackedSchema.length).toBe(4);
 		expect(avoTrackedSchemaAgain.length).toBe(4);

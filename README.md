@@ -9,18 +9,54 @@ For more information about the Inspector project please read [Avo documentation]
 
 # Installation
 
-> If you are looking for React Native library please switch to [this branch](https://github.com/avohq/js-avo-inspector/tree/react-native-node-package) and use `react-native-avo-inspector` npm package.
-
 The library is distributed with npm
 
-```
-    npm i react-native-avo-inspector
+```sh
+npm i react-native-avo-inspector
 ```
 
 or
 
+```sh
+yarn add react-native-avo-inspector
 ```
-    yarn add react-native-avo-inspector
+
+## Required peer dependencies
+
+The SDK requires the following peer dependencies, depending on your platform and features:
+
+### Storage (required for Android)
+
+```sh
+npm i @react-native-async-storage/async-storage
+```
+
+Used to persist the anonymous stream ID on Android. iOS uses native `Settings` instead.
+
+### Encryption support (required if using `publicEncryptionKey`)
+
+```sh
+npm i react-native-get-random-values
+```
+
+React Native's Hermes engine does not include `crypto.getRandomValues`, which the encryption module needs. You **must** import this polyfill at the very top of your entry file (`index.js`), before any other imports:
+
+```javascript
+// index.js
+import 'react-native-get-random-values'; // Must be first!
+import { AppRegistry } from 'react-native';
+import App from './App';
+import { name as appName } from './app.json';
+
+AppRegistry.registerComponent(appName, () => App);
+```
+
+### iOS
+
+After installing dependencies, run:
+
+```sh
+cd ios && pod install
 ```
 
 # Initialization
@@ -28,13 +64,25 @@ or
 Obtain the API key at [Avo.app](https://www.avo.app/welcome)
 
 ```javascript
-import * as Inspector from "react-native-avo-inspector/dist-native";
+import { AvoInspector, AvoInspectorEnv } from "react-native-avo-inspector";
 
-let inspector = new Inspector.AvoInspector({
+let inspector = new AvoInspector({
   apiKey: "your api key",
-  env: Inspector.AvoInspectorEnv.Dev,
+  env: AvoInspectorEnv.Dev,
   version: "1.0.0",
   appName: "My app",
+});
+```
+
+## With encryption
+
+```javascript
+let inspector = new AvoInspector({
+  apiKey: "your api key",
+  env: AvoInspectorEnv.Dev,
+  version: "1.0.0",
+  appName: "My app",
+  publicEncryptionKey: "your public encryption key",
 });
 ```
 

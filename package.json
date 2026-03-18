@@ -1,16 +1,18 @@
 {
   "name": "react-native-avo-inspector",
-  "version": "1.3.1",
+  "version": "1.4.0-alpha.4",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
   "react-native": "dist-native/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc && tsc --outDir dist-native",
     "build-native": "tsc --outDir dist-native",
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\\.ts$\""
   },
   "repository": {
     "type": "git",
@@ -70,6 +72,25 @@
     "react-native"
   ],
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^1.24.0"
+    "@noble/ciphers": "~0.6.0",
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0",
+    "safe-regex2": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": ">=1.24.0",
+    "react-native-get-random-values": "^1.1.0",
+    "react-native": "*"
+  },
+  "peerDependenciesMeta": {
+    "@react-native-async-storage/async-storage": {
+      "optional": true
+    },
+    "react-native-get-random-values": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    }
   }
 }

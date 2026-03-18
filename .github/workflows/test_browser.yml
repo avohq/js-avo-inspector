@@ -13,33 +13,22 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x, 12.x]
+        node-version: [18.x, 20.x]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Node version
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-      - name: Set up Node cache for Avo Inspector
-        uses: actions/cache@v1
-        id: yarn-cache-avo-inspector
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-inspector-node-modules-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-inspector-node-modules-${{ hashFiles('yarn.lock') }}
-
-      - name: Install yarn dependencies
-        if: steps.yarn-cache-avo-inspector.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile --network-timeout 1000000
-
-      - name: Build Avo Inspector package
-        run: yarn build
+      - name: Install dependencies
+        run: npm ci
 
       - name: Test Source
-        run: |
-          yarn test:browser src/ --silent
+        run: >-
+          npm run test:browser -- --silent
+          --testPathPattern="src/__tests__/(AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\.ts$"

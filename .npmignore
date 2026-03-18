@@ -1,8 +1,27 @@
+# Source & config
 tsconfig.json
 src
 examples
-*.bs.js
+
+# Editor / CI / local config
+.claude
+.github
+.vscode
+
+# Old ReScript/Reason artifacts
+lib
+reason
+rescript
+bsconfig.json
+
+# Test artifacts in all dist folders
 dist/__tests__
 dist/__mocks__
 dist-native/__tests__
 dist-native/__mocks__
+dist-browser
+
+# Webpack browser bundle (consumers use dist/index.js)
+dist/browser.js
+dist/browser.js.LICENSE.txt
+dist/index.js.LICENSE.txt
