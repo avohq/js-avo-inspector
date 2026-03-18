@@ -31,6 +31,8 @@
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
     "typecheck": "tsc --noEmit",
+    "check:lite-size": "node scripts/check-lite-size.js",
+    "verify:lite-sync": "bash scripts/verify-lite-sync.sh",
     "prepublishOnly": "yarn build && yarn test:browser && rm -rf examples/ts-avo-inspector-example/node_modules/ && cd examples/ts-avo-inspector-example/ && yarn && yarn test --watchAll=false"
   },
   "repository": {

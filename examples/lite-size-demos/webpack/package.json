@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "dependencies": {
+    "avo-inspector": "file:../../.."
+  },
+  "devDependencies": {
+    "webpack": "^5.93.0",
+    "webpack-cli": "^5.1.4"
+  }
+}
