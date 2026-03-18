@@ -5,11 +5,27 @@
   "main": "dist/index.js",
   "browser": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./lite": {
+      "types": "./dist/lite/index.d.ts",
+      "default": "./dist/lite/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/lite/**/*.js",
+    "dist/lite/**/*.d.ts"
+  ],
   "bin": {
     "avo-inspector": "bin/avo-inspector.js"
   },
   "scripts": {
-    "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js",
+    "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js && tsc --project tsconfig.lite.json",
     "build-for-script-tag": "tsc --outDir dist-browser --emitDeclarationOnly && webpack --config webpack.browserConfig.js",
     "lint": "eslint ./src --ext .js,.ts",
     "test": "jest",

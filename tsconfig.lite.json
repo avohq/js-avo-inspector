@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist"
+  },
+  "include": [
+    "src/lite/**/*",
+    "src/AvoInspectorEnv.ts",
+    "src/AvoStorage.ts",
+    "src/AvoGuid.ts",
+    "src/utils.ts",
+    "src/eventSpec/AvoEventSpecFetchTypes.ts"
+  ]
+}
