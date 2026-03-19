@@ -9,7 +9,6 @@ echo "=== Lite Copy Drift Detection ==="
 PAIRS=(
   "src/AvoNetworkCallsHandler.ts:src/lite/AvoNetworkCallsHandlerLite.ts"
   "src/AvoBatcher.ts:src/lite/AvoBatcherLite.ts"
-  "src/AvoDeduplicator.ts:src/lite/AvoDeduplicatorLite.ts"
 )
 
 THRESHOLD=55  # max allowed diff lines (import changes, class rename, alias export, publicEncryptionKey + streamId removal)

@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Lite entry point** (`avo-inspector/lite`): A production-optimized build that physically excludes encryption, event spec validation, `@noble/curves`, and `safe-regex2`. Reduces gzipped bundle size from ~37 KB to ~7.5 KB (79% smaller). Works universally with any bundler or minifier — no flags or configuration needed.
+- **Lite entry point** (`avo-inspector/lite`): A production-optimized build that physically excludes dev/staging-only code. Reduces gzipped bundle size from ~37 KB to ~5.2 KB (86% smaller). Works universally with any bundler or minifier — no flags or configuration needed.
   - Import: `import { AvoInspector, AvoInspectorEnv } from "avo-inspector/lite"`
-  - Same async API as the full version (`trackSchemaFromEvent`, `trackSchema`, `extractSchema`)
+  - Same tracking API as the full version (`trackSchemaFromEvent`, `trackSchema`, `extractSchema`)
   - `publicEncryptionKey` constructor option removed from lite types (TypeScript will error if passed)
+  - Excluded from lite: encryption (`@noble/curves`), event spec validation (`safe-regex2`), stream ID generation, event deduplication
   - Ideal for GTM, script tags, and size-sensitive production deployments
 - **Drift detection script** (`yarn verify:lite-sync`): Detects when lite copies diverge from originals
 - **Automated size check** (`yarn check:lite-size`): Verifies lite bundle stays under size limit

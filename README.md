@@ -39,11 +39,13 @@ let inspector = new AvoInspector({
 });
 ```
 
-The lite build has the same API as the full version — `trackSchemaFromEvent`, `trackSchema`, and `extractSchema` all work identically. The only differences:
+The lite build has the same tracking API as the full version — `trackSchemaFromEvent`, `trackSchema`, and `extractSchema` all work identically. The differences:
 
 - No `publicEncryptionKey` constructor option (TypeScript will error if passed)
 - No event spec validation (dev/staging feature)
 - No property value encryption (dev/staging feature)
+- No stream ID generation/persistence (dev/staging debugger feature)
+- No event deduplication (dev/staging feature for Avo Codegen integration)
 - Works universally with any bundler or minifier — no flags or configuration needed
 
 **Size comparison:**
@@ -51,7 +53,7 @@ The lite build has the same API as the full version — `trackSchemaFromEvent`, 
 | | Minified | Gzipped |
 |---|---|---|
 | Full (`avo-inspector`) | 129 KB | 37 KB |
-| Lite (`avo-inspector/lite`) | 32 KB | 7.5 KB |
+| Lite (`avo-inspector/lite`) | 20 KB | 5.2 KB |
 
 See `examples/lite-size-demos/` for working examples with terser, webpack, and rollup.
 
