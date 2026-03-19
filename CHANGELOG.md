@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-03-19
+
+### Added
+
+- **Lite entry point** (`avo-inspector/lite`): A production-optimized build that physically excludes encryption, event spec validation, `@noble/curves`, and `safe-regex2`. Reduces gzipped bundle size from ~37 KB to ~7.5 KB (79% smaller). Works universally with any bundler or minifier — no flags or configuration needed.
+  - Import: `import { AvoInspector, AvoInspectorEnv } from "avo-inspector/lite"`
+  - Same async API as the full version (`trackSchemaFromEvent`, `trackSchema`, `extractSchema`)
+  - `publicEncryptionKey` constructor option removed from lite types (TypeScript will error if passed)
+  - Ideal for GTM, script tags, and size-sensitive production deployments
+- **Drift detection script** (`yarn verify:lite-sync`): Detects when lite copies diverge from originals
+- **Automated size check** (`yarn check:lite-size`): Verifies lite bundle stays under size limit
+- **Example apps** in `examples/lite-size-demos/` demonstrating lite bundle size with terser, webpack, and rollup
+
+### Fixed
+
+- **AvoBatcher**: Skip flush when event queue is empty (prevented unnecessary empty HTTP requests on startup)
+- **AvoDeduplicator**: Use unique IDs per event registration instead of event name as key, preventing same-name events from overwriting each other within the 300ms deduplication window
+- **AvoSchemaParser**: Use `Object.prototype.hasOwnProperty.call()` instead of `object.hasOwnProperty()` for safe property enumeration on `Object.create(null)` objects
+
+### Changed
+
+- `prepublishOnly` now runs `verify:lite-sync` and `check:lite-size` before publishing
+- Added `terser` as devDependency for deterministic size checks
+- Package `exports` map now includes `"./lite"` subpath
+
 ## [3.0.1] - 2025-12-11
 
 ### Fixed

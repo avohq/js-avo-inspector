@@ -25,6 +25,36 @@ or
     yarn add avo-inspector
 ```
 
+# Lite Build (Production-Optimized)
+
+For size-sensitive deployments (GTM, script tags, etc.), use the lite entry point which excludes encryption and event spec validation — reducing the gzipped bundle from ~37 KB to ~7.5 KB:
+
+```javascript
+import { AvoInspector, AvoInspectorEnv } from "avo-inspector/lite";
+
+let inspector = new AvoInspector({
+  apiKey: "your api key",
+  env: AvoInspectorEnv.Prod,
+  version: "1.0.0",
+});
+```
+
+The lite build has the same API as the full version — `trackSchemaFromEvent`, `trackSchema`, and `extractSchema` all work identically. The only differences:
+
+- No `publicEncryptionKey` constructor option (TypeScript will error if passed)
+- No event spec validation (dev/staging feature)
+- No property value encryption (dev/staging feature)
+- Works universally with any bundler or minifier — no flags or configuration needed
+
+**Size comparison:**
+
+| | Minified | Gzipped |
+|---|---|---|
+| Full (`avo-inspector`) | 129 KB | 37 KB |
+| Lite (`avo-inspector/lite`) | 32 KB | 7.5 KB |
+
+See `examples/lite-size-demos/` for working examples with terser, webpack, and rollup.
+
 # Initialization
 
 Obtain the API key at [Avo.app](https://www.avo.app/welcome)
