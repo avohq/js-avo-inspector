@@ -19,7 +19,11 @@
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "dist/lite/**/*.js",
-    "dist/lite/**/*.d.ts"
+    "dist/lite/**/*.d.ts",
+    "bin/",
+    "bsconfig.json",
+    "rescript.json",
+    "rescript/"
   ],
   "bin": {
     "avo-inspector": "bin/avo-inspector.js"
