@@ -45,7 +45,7 @@ The lite build has the same tracking API as the full version — `trackSchemaFro
 - No event spec validation (dev/staging feature)
 - No property value encryption (dev/staging feature)
 - No stream ID generation/persistence (dev/staging debugger feature)
-- No event deduplication (dev/staging feature for Avo Codegen integration)
+- No event deduplication — **if you use both Avo Codegen and manual `trackSchemaFromEvent` calls for the same events, use the full build instead** to avoid sending duplicate schemas
 - Works universally with any bundler or minifier — no flags or configuration needed
 
 **Size comparison:**
