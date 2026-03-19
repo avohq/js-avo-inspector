@@ -1,6 +1,6 @@
 {
   "name": "avo-inspector",
-  "version": "3.1.0",
+  "version": "3.1.0-alpha.1",
   "description": "",
   "main": "dist/index.js",
   "browser": "dist/index.js",
@@ -29,7 +29,7 @@
     "avo-inspector": "bin/avo-inspector.js"
   },
   "scripts": {
-    "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js && tsc --project tsconfig.lite.json",
+    "build": "tsc --emitDeclarationOnly && webpack --config webpack.config.js && rm -rf dist/lite && tsc --project tsconfig.lite.json",
     "build-for-script-tag": "tsc --outDir dist-browser --emitDeclarationOnly && webpack --config webpack.browserConfig.js",
     "lint": "eslint ./src --ext .js,.ts",
     "test": "jest",
