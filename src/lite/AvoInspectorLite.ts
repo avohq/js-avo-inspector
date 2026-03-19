@@ -4,7 +4,6 @@ import { AvoBatcher } from "./AvoBatcherLite";
 import { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler, type EventProperty } from "./AvoNetworkCallsHandlerLite";
 import { AvoStorage } from "../AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicatorLite";
-import { AvoStreamId } from "./AvoStreamIdLite";
 import { isValueEmpty } from "../utils";
 
 const libVersion = require("../../package.json").version;

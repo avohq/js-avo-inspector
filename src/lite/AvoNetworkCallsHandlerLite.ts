@@ -1,7 +1,6 @@
 // LITE COPY of src/AvoNetworkCallsHandler.ts — Sync: review src/AvoNetworkCallsHandler.ts changes for applicability here
 import AvoGuid from "../AvoGuid";
 import { AvoInspector } from "./AvoInspectorLite";
-import { AvoStreamId } from "./AvoStreamIdLite";
 import type { EventSpecMetadata } from "../eventSpec/AvoEventSpecFetchTypes";
 
 /**
@@ -145,27 +144,9 @@ export class AvoNetworkCallsHandlerLite {
   }
 
   private fixStreamIds(
-    events: Array<SessionStartedBody | EventSchemaBody>
+    _events: Array<SessionStartedBody | EventSchemaBody>
   ): void {
-    let knownStreamId: string | null = null;
-    events.forEach(function (event) {
-      if (
-        event.streamId !== null &&
-        event.streamId !== undefined &&
-        event.streamId !== "unknown"
-      ) {
-        knownStreamId = event.streamId;
-      }
-    });
-    events.forEach(function (event) {
-      if (event.streamId === "unknown") {
-        if (knownStreamId != null) {
-          event.streamId = knownStreamId;
-        } else {
-          event.streamId = AvoStreamId.streamId;
-        }
-      }
-    });
+    // No-op in lite build: streamId is a dev/staging debugger feature
   }
 
   bodyForSessionStartedCall(): SessionStartedBody {
@@ -222,7 +203,7 @@ export class AvoNetworkCallsHandlerLite {
       trackingId: "",
       createdAt: new Date().toISOString(),
       sessionId: "",
-      streamId: AvoStreamId.streamId,
+      streamId: "",
       samplingRate: this.samplingRate
     };
     return body;
@@ -237,11 +218,6 @@ export class AvoNetworkCallsHandlerLite {
     eventBody: EventSchemaBody,
     onCompleted: (error: Error | null) => any
   ): void {
-    // Fix stream ID if needed
-    if (eventBody.streamId === "unknown") {
-      eventBody.streamId = AvoStreamId.streamId;
-    }
-
     if (AvoInspector.shouldLog) {
       console.log(
         "Avo Inspector: calling inspector immediately (with validation)",

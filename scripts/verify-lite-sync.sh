@@ -10,10 +10,9 @@ PAIRS=(
   "src/AvoNetworkCallsHandler.ts:src/lite/AvoNetworkCallsHandlerLite.ts"
   "src/AvoBatcher.ts:src/lite/AvoBatcherLite.ts"
   "src/AvoDeduplicator.ts:src/lite/AvoDeduplicatorLite.ts"
-  "src/AvoStreamId.ts:src/lite/AvoStreamIdLite.ts"
 )
 
-THRESHOLD=25  # max allowed diff lines (import path changes, class rename, alias export, publicEncryptionKey removal)
+THRESHOLD=55  # max allowed diff lines (import changes, class rename, alias export, publicEncryptionKey + streamId removal)
 FAILED=0
 
 for pair in "${PAIRS[@]}"; do
