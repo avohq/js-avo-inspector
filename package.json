@@ -28,7 +28,8 @@
       "examples",
       "node_modules",
       "dist",
-      "dist-native"
+      "dist-native",
+      "\\.claude/"
     ],
     "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
     "moduleFileExtensions": [
