@@ -25,9 +25,9 @@ or
     yarn add avo-inspector
 ```
 
-# Lite Build (Production-Optimized)
+# Lite Build (Production Only)
 
-For size-sensitive deployments (GTM, script tags, etc.), use the lite entry point which excludes encryption and event spec validation — reducing the gzipped bundle from ~37 KB to ~7.5 KB:
+For production environments where bundle size matters (GTM, script tags, etc.), use the lite entry point which excludes encryption and event spec validation — reducing the gzipped bundle from ~37 KB to ~7.5 KB. Use the full build in dev/staging environments for the complete development experience:
 
 ```javascript
 import { AvoInspector, AvoInspectorEnv } from "avo-inspector/lite";
@@ -41,11 +41,9 @@ let inspector = new AvoInspector({
 
 The lite build has the same tracking API as the full version — `trackSchemaFromEvent`, `trackSchema`, and `extractSchema` all work identically. The differences:
 
-- No `publicEncryptionKey` constructor option (TypeScript will error if passed)
-- No event spec validation (dev/staging feature)
-- No property value encryption (dev/staging feature)
-- No stream ID generation/persistence (dev/staging debugger feature)
-- No event deduplication — **if you use both Avo Codegen and manual `trackSchemaFromEvent` calls for the same events, use the full build instead** to avoid sending duplicate schemas
+- Does not support [property value validation](https://www.avo.app/docs/inspector/inspector-debugger#enabling-advanced-debugger-features) in the [Inspector Debugger](https://www.avo.app/docs/inspector/inspector-debugger) (no `publicEncryptionKey` constructor option — TypeScript will error if passed)
+- Does not support [session filtering](https://www.avo.app/docs/inspector/inspector-debugger) in the Inspector Debugger (no stream ID generation/persistence)
+- Does not support event deduplication — **if you use both Avo Codegen and manual `trackSchemaFromEvent` calls for the same events, use the full build instead** to avoid sending duplicate schemas
 - Works universally with any bundler or minifier — no flags or configuration needed
 
 **Size comparison:**

@@ -1,3 +1,4 @@
+// NOTE: A lite copy of this file exists at src/lite/AvoSchemaParserLite.ts — if you change this file, review the lite copy for applicability
 import { encryptValue } from "./AvoEncryption";
 import type { EventProperty, SchemaChild } from "./AvoNetworkCallsHandler";
 

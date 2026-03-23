@@ -1,3 +1,4 @@
+// NOTE: A lite copy of this file exists at src/lite/AvoNetworkCallsHandlerLite.ts — if you change this file, review the lite copy for applicability
 import AvoGuid from "./AvoGuid";
 import { AvoInspector } from "./AvoInspector";
 import { AvoStreamId } from "./AvoStreamId";
