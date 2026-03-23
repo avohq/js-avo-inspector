@@ -27,7 +27,7 @@ or
 
 # Lite Build (Production Only)
 
-For production environments where bundle size matters (GTM, script tags, etc.), use the lite entry point which excludes encryption and event spec validation — reducing the gzipped bundle from ~37 KB to ~7.5 KB. Use the full build in dev/staging environments for the complete development experience:
+Available since version `3.1.0`. For production environments where bundle size matters (GTM, script tags, etc.), use the lite entry point which excludes encryption and event spec validation. Use the full build in dev/staging environments for the complete development experience:
 
 ```javascript
 import { AvoInspector, AvoInspectorEnv } from "avo-inspector/lite";
@@ -46,12 +46,7 @@ The lite build has the same tracking API as the full version — `trackSchemaFro
 - Does not support event deduplication — **if you use both Avo Codegen and manual `trackSchemaFromEvent` calls for the same events, use the full build instead** to avoid sending duplicate schemas
 - Works universally with any bundler or minifier — no flags or configuration needed
 
-**Size comparison:**
-
-| | Minified | Gzipped |
-|---|---|---|
-| Full (`avo-inspector`) | 129 KB | 37 KB |
-| Lite (`avo-inspector/lite`) | 20 KB | 5.2 KB |
+**Lite build size:** ~20 KB minified, ~5.2 KB gzipped.
 
 See `examples/lite-size-demos/` for working examples with terser, webpack, and rollup.
 
