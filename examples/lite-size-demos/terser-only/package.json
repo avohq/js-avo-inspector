@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "dependencies": {
+    "avo-inspector": "file:../../.."
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "terser": "^5.31.0"
+  }
+}

@@ -1,12 +1,12 @@
-// NOTE: A lite copy of this file exists at src/lite/AvoBatcherLite.ts — if you change this file, review the lite copy for applicability
+// LITE COPY of src/AvoBatcher.ts — Sync: review src/AvoBatcher.ts changes for applicability here
 import {
   type SessionStartedBody,
   type EventSchemaBody,
   type AvoNetworkCallsHandler,
   type EventProperty
-} from "./AvoNetworkCallsHandler";
-import { AvoInspector } from "./AvoInspector";
-import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
+} from "./AvoNetworkCallsHandlerLite";
+import { AvoInspector } from "./AvoInspectorLite";
+import type { EventSpecMetadata } from "../eventSpec/AvoEventSpecFetchTypes";
 
 export interface AvoBatcherType {
   handleSessionStarted: () => void;

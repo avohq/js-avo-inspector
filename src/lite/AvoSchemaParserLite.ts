@@ -1,59 +1,17 @@
-// NOTE: A lite copy of this file exists at src/lite/AvoSchemaParserLite.ts — if you change this file, review the lite copy for applicability
-import { encryptValue } from "./AvoEncryption";
-import type { EventProperty, SchemaChild } from "./AvoNetworkCallsHandler";
+// LITE COPY of src/AvoSchemaParser.ts — Sync: review src/AvoSchemaParser.ts changes for applicability here
+import type { EventProperty, SchemaChild } from "./AvoNetworkCallsHandlerLite";
 
 const isArray = (obj: any): boolean => {
   return Object.prototype.toString.call(obj) === "[object Array]";
 };
 
-export class AvoSchemaParser {
-  /**
-   * Returns true only if we have a valid encryption key and can send encrypted values.
-   * If no key is present, returns false and no property values will be sent.
-   */
-  private static canSendEncryptedValues(
-    publicEncryptionKey: string | undefined,
-    env: string | undefined
-  ): boolean {
-    const hasEncryptionKey = publicEncryptionKey != null && publicEncryptionKey !== "";
-    const isDevOrStaging = env === "dev" || env === "staging";
-    return hasEncryptionKey && isDevOrStaging;
-  }
-
-  /**
-   * Returns the encrypted property value if encryption is enabled, otherwise undefined.
-   * Never returns unencrypted values - only encrypted or nothing.
-   */
-  private static async getEncryptedPropertyValueIfEnabled(
-    propertyValue: any,
-    canEncrypt: boolean,
-    publicEncryptionKey: string | undefined
-  ): Promise<string | undefined> {
-    if (!canEncrypt || !publicEncryptionKey) {
-      return undefined; // No encryption key: do not send any property values
-    }
-    try {
-      return await encryptValue(propertyValue, publicEncryptionKey); // Only send encrypted values
-    } catch (error) {
-      // If encryption fails, log the error but don't fail the entire schema extraction
-      console.error(
-        "[Avo Inspector] Failed to encrypt property value:",
-        error instanceof Error ? error.message : String(error)
-      );
-      return undefined;
-    }
-  }
-
+export class AvoSchemaParserLite {
   static async extractSchema (
-    eventProperties: Record<string, any>,
-    publicEncryptionKey?: string,
-    env?: string
+    eventProperties: Record<string, any>
   ): Promise<EventProperty[]> {
     if (eventProperties === null || eventProperties === undefined) {
       return [];
     }
-
-    const canSendEncryptedValues = this.canSendEncryptedValues(publicEncryptionKey, env);
 
     const mapping = async (object: any): Promise<SchemaChild> => {
       if (isArray(object)) {
@@ -73,19 +31,8 @@ export class AvoSchemaParser {
             };
 
             if (typeof val === "object" && val != null) {
-              // Object/array properties: children are encrypted individually, no need to encrypt parent
+              // Object/array properties: children are mapped individually
               mappedEntry.children = (await mapping(val)) as SchemaChild[];
-            } else if (val !== undefined) {
-              // Primitive properties: encrypt the value if encryption is enabled
-              // Skip undefined values - they can't be encrypted and shouldn't be sent
-              const encryptedValue = await this.getEncryptedPropertyValueIfEnabled(
-                val,
-                canSendEncryptedValues,
-                publicEncryptionKey
-              );
-              if (encryptedValue !== undefined) {
-                mappedEntry.encryptedPropertyValue = encryptedValue;
-              }
             }
 
             mappedResult.push(mappedEntry);
@@ -145,3 +92,6 @@ export class AvoSchemaParser {
     }
   }
 }
+
+// Alias export so sibling lite modules can import { AvoSchemaParser } from "./AvoSchemaParserLite"
+export { AvoSchemaParserLite as AvoSchemaParser };

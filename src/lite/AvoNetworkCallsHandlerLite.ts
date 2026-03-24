@@ -1,8 +1,7 @@
-// NOTE: A lite copy of this file exists at src/lite/AvoNetworkCallsHandlerLite.ts — if you change this file, review the lite copy for applicability
-import AvoGuid from "./AvoGuid";
-import { AvoInspector } from "./AvoInspector";
-import { AvoStreamId } from "./AvoStreamId";
-import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
+// LITE COPY of src/AvoNetworkCallsHandler.ts — Sync: review src/AvoNetworkCallsHandler.ts changes for applicability here
+import AvoGuid from "../AvoGuid";
+import { AvoInspector } from "./AvoInspectorLite";
+import type { EventSpecMetadata } from "../eventSpec/AvoEventSpecFetchTypes";
 
 /**
  * Recursive type for schema children.
@@ -40,8 +39,6 @@ export interface BaseBody {
   samplingRate: number;
   /** Event spec metadata from EventSpecResponse (moved from EventSchemaBody) */
   eventSpecMetadata?: EventSpecMetadata;
-  /** RSA public encryption key - allows Inspector to validate encrypted values against tracking plan */
-  publicEncryptionKey?: string;
 }
 
 export interface SessionStartedBody extends BaseBody {
@@ -68,13 +65,12 @@ export interface EventSchemaBody extends BaseBody {
   validatedBranchId?: string;
 }
 
-export class AvoNetworkCallsHandler {
+export class AvoNetworkCallsHandlerLite {
   private readonly apiKey: string;
   private readonly envName: string;
   private readonly appName: string;
   private readonly appVersion: string;
   private readonly libVersion: string;
-  private readonly publicEncryptionKey?: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
 
@@ -86,15 +82,13 @@ export class AvoNetworkCallsHandler {
     envName: string,
     appName: string,
     appVersion: string,
-    libVersion: string,
-    publicEncryptionKey?: string
+    libVersion: string
   ) {
     this.apiKey = apiKey;
     this.envName = envName;
     this.appName = appName;
     this.appVersion = appVersion;
     this.libVersion = libVersion;
-    this.publicEncryptionKey = publicEncryptionKey;
   }
 
   callInspectorWithBatchBody(
@@ -150,27 +144,9 @@ export class AvoNetworkCallsHandler {
   }
 
   private fixStreamIds(
-    events: Array<SessionStartedBody | EventSchemaBody>
+    _events: Array<SessionStartedBody | EventSchemaBody>
   ): void {
-    let knownStreamId: string | null = null;
-    events.forEach(function (event) {
-      if (
-        event.streamId !== null &&
-        event.streamId !== undefined &&
-        event.streamId !== "unknown"
-      ) {
-        knownStreamId = event.streamId;
-      }
-    });
-    events.forEach(function (event) {
-      if (event.streamId === "unknown") {
-        if (knownStreamId != null) {
-          event.streamId = knownStreamId;
-        } else {
-          event.streamId = AvoStreamId.streamId;
-        }
-      }
-    });
+    // No-op in lite build: streamId is a dev/staging debugger feature
   }
 
   bodyForSessionStartedCall(): SessionStartedBody {
@@ -227,12 +203,9 @@ export class AvoNetworkCallsHandler {
       trackingId: "",
       createdAt: new Date().toISOString(),
       sessionId: "",
-      streamId: AvoStreamId.streamId,
+      streamId: "",
       samplingRate: this.samplingRate
     };
-    if (this.publicEncryptionKey) {
-      body.publicEncryptionKey = this.publicEncryptionKey;
-    }
     return body;
   }
 
@@ -245,11 +218,6 @@ export class AvoNetworkCallsHandler {
     eventBody: EventSchemaBody,
     onCompleted: (error: Error | null) => any
   ): void {
-    // Fix stream ID if needed
-    if (eventBody.streamId === "unknown") {
-      eventBody.streamId = AvoStreamId.streamId;
-    }
-
     if (AvoInspector.shouldLog) {
       console.log(
         "Avo Inspector: calling inspector immediately (with validation)",
@@ -276,7 +244,7 @@ export class AvoNetworkCallsHandler {
     onCompleted: (error: Error | null) => any
   ): void {
     const xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
+    xmlhttp.open("POST", AvoNetworkCallsHandlerLite.trackingEndpoint, true);
     xmlhttp.setRequestHeader("Content-Type", "text/plain");
     xmlhttp.timeout = AvoInspector.networkTimeout;
     xmlhttp.send(JSON.stringify(events));
@@ -317,3 +285,6 @@ export class AvoNetworkCallsHandler {
     };
   }
 }
+
+// Alias export so sibling lite modules can import { AvoNetworkCallsHandler } from "./AvoNetworkCallsHandlerLite"
+export { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler };

@@ -2,11 +2,13 @@ import { AvoSchemaParser } from "./AvoSchemaParser";
 import { deepEquals } from "./utils";
 
 export class AvoDeduplicator {
-  avoFunctionsEvents: Record<number, string> = {};
-  manualEvents: Record<number, string> = {};
+  private _nextId = 0;
 
-  avoFunctionsEventsParams: Record<string, Record<string, any>> = {};
-  manualEventsParams: Record<string, Record<string, any>> = {};
+  avoFunctionsEvents: Record<string, string> = {};
+  manualEvents: Record<string, string> = {};
+
+  avoFunctionsEventsParams: Record<string, { eventName: string; params: Record<string, any> }> = {};
+  manualEventsParams: Record<string, { eventName: string; params: Record<string, any> }> = {};
 
   shouldRegisterEvent (
     eventName: string,
@@ -15,12 +17,14 @@ export class AvoDeduplicator {
   ): boolean {
     this.clearOldEvents();
 
+    const ts = String(Date.now());
+    const id = ts + '-' + String(this._nextId++);
     if (fromAvoFunction) {
-      this.avoFunctionsEvents[Date.now()] = eventName;
-      this.avoFunctionsEventsParams[eventName] = params;
+      this.avoFunctionsEvents[ts] = eventName;
+      this.avoFunctionsEventsParams[id] = { eventName, params };
     } else {
-      this.manualEvents[Date.now()] = eventName;
-      this.manualEventsParams[eventName] = params;
+      this.manualEvents[ts] = eventName;
+      this.manualEventsParams[id] = { eventName, params };
     }
 
     const checkInAvoFunctions = !fromAvoFunction;
@@ -46,24 +50,35 @@ export class AvoDeduplicator {
     }
 
     if (result) {
-      delete this.avoFunctionsEventsParams[eventName];
-      delete this.manualEventsParams[eventName];
+      // Clean matching entries from both storages to prevent stale matches
+      this.removeEntriesByName(eventName, this.avoFunctionsEventsParams);
+      this.removeEntriesByName(eventName, this.manualEventsParams);
     }
 
     return result;
   }
 
+  private removeEntriesByName(
+    eventName: string,
+    storage: Record<string, { eventName: string; params: Record<string, any> }>
+  ): void {
+    for (const key in storage) {
+      if (Object.prototype.hasOwnProperty.call(storage, key) && storage[key].eventName === eventName) {
+        delete storage[key];
+      }
+    }
+  }
+
   private lookForEventIn (
     eventName: string,
     params: Record<string, any>,
-    eventsStorage: Record<string, Record<string, any>>): boolean {
-    for (const otherEventName in eventsStorage) {
-      if (eventsStorage.hasOwnProperty(otherEventName)) {
-        if (otherEventName === eventName) {
-          const otherParams = eventsStorage[eventName];
-          if (otherParams && deepEquals(params, otherParams)) {
-            return true;
-          }
+    eventsStorage: Record<string, { eventName: string; params: Record<string, any> }>): boolean {
+    for (const ts in eventsStorage) {
+      if (Object.prototype.hasOwnProperty.call(eventsStorage, ts)) {
+        const entry = eventsStorage[ts];
+        if (entry.eventName === eventName && deepEquals(params, entry.params)) {
+          delete eventsStorage[ts];
+          return true;
         }
       }
     }
@@ -91,11 +106,11 @@ export class AvoDeduplicator {
 
   private lookForEventParamsIn (
     params: Record<string, any>,
-    eventsStorage: Record<string, Record<string, any>>): boolean {
-    for (const otherEventName in eventsStorage) {
-      if (eventsStorage.hasOwnProperty(otherEventName)) {
-        const otherParams = eventsStorage[otherEventName];
-        if (otherParams && deepEquals(params, otherParams)) {
+    eventsStorage: Record<string, { eventName: string; params: Record<string, any> }>): boolean {
+    for (const ts in eventsStorage) {
+      if (Object.prototype.hasOwnProperty.call(eventsStorage, ts)) {
+        const entry = eventsStorage[ts];
+        if (deepEquals(params, entry.params)) {
           return true;
         }
       }
@@ -130,10 +145,6 @@ export class AvoDeduplicator {
       result = true;
     }
 
-    if (result) {
-      delete this.avoFunctionsEventsParams[eventName];
-    }
-
     return result;
   }
 
@@ -144,14 +155,14 @@ export class AvoDeduplicator {
       propertyType: string
       children?: any
     }>,
-    eventsStorage: Record<string, Record<string, any>>): Promise<boolean> {
-    for (const otherEventName in eventsStorage) {
-      if (eventsStorage.hasOwnProperty(otherEventName)) {
-        if (otherEventName === eventName) {
-          const otherSchema = await AvoSchemaParser.extractSchema(
-            eventsStorage[eventName]
-          );
+    eventsStorage: Record<string, { eventName: string; params: Record<string, any> }>): Promise<boolean> {
+    for (const ts in eventsStorage) {
+      if (Object.prototype.hasOwnProperty.call(eventsStorage, ts)) {
+        const entry = eventsStorage[ts];
+        if (entry.eventName === eventName) {
+          const otherSchema = await AvoSchemaParser.extractSchema(entry.params);
           if (otherSchema && deepEquals(eventSchema, otherSchema)) {
+            delete eventsStorage[ts];
             return true;
           }
         }
@@ -166,23 +177,30 @@ export class AvoDeduplicator {
     const msToConsiderOld = 300;
 
     for (const time in this.avoFunctionsEvents) {
-      if (this.avoFunctionsEvents.hasOwnProperty(time)) {
+      if (Object.prototype.hasOwnProperty.call(this.avoFunctionsEvents, time)) {
         const timestamp = Number(time) || 0;
         if (now - timestamp > msToConsiderOld) {
-          const eventName = this.avoFunctionsEvents[time];
           delete this.avoFunctionsEvents[time];
-          delete this.avoFunctionsEventsParams[eventName];
+          // Clear params entries with this timestamp prefix
+          for (const id in this.avoFunctionsEventsParams) {
+            if (id.startsWith(time + '-')) {
+              delete this.avoFunctionsEventsParams[id];
+            }
+          }
         }
       }
     }
 
     for (const time in this.manualEvents) {
-      if (this.manualEvents.hasOwnProperty(time)) {
+      if (Object.prototype.hasOwnProperty.call(this.manualEvents, time)) {
         const timestamp = Number(time) || 0;
         if (now - timestamp > msToConsiderOld) {
-          const eventName = this.manualEvents[time];
           delete this.manualEvents[time];
-          delete this.manualEventsParams[eventName];
+          for (const id in this.manualEventsParams) {
+            if (id.startsWith(time + '-')) {
+              delete this.manualEventsParams[id];
+            }
+          }
         }
       }
     }

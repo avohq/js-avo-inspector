@@ -25,6 +25,31 @@ or
     yarn add avo-inspector
 ```
 
+# Lite Build (Production Only)
+
+Available since version `3.1.0`. For production environments where bundle size matters (GTM, script tags, etc.), use the lite entry point which excludes encryption and event spec validation. Use the full build in dev/staging environments for the complete development experience:
+
+```javascript
+import { AvoInspector, AvoInspectorEnv } from "avo-inspector/lite";
+
+let inspector = new AvoInspector({
+  apiKey: "your api key",
+  env: AvoInspectorEnv.Prod,
+  version: "1.0.0",
+});
+```
+
+The lite build has the same tracking API as the full version — `trackSchemaFromEvent`, `trackSchema`, and `extractSchema` all work identically. The differences:
+
+- Does not support [property value validation](https://www.avo.app/docs/inspector/inspector-debugger#enabling-advanced-debugger-features) in the [Inspector Debugger](https://www.avo.app/docs/inspector/inspector-debugger) (no `publicEncryptionKey` constructor option — TypeScript will error if passed)
+- Does not support [session filtering](https://www.avo.app/docs/inspector/inspector-debugger) in the Inspector Debugger (no stream ID generation/persistence)
+- Does not support event deduplication — **if you use both Avo Codegen and manual `trackSchemaFromEvent` calls for the same events, use the full build instead** to avoid sending duplicate schemas
+- Works universally with any bundler or minifier — no flags or configuration needed
+
+**Lite build size:** ~20 KB minified, ~5.2 KB gzipped.
+
+See `examples/lite-size-demos/` for working examples with terser, webpack, and rollup.
+
 # Initialization
 
 Obtain the API key at [Avo.app](https://www.avo.app/welcome)
