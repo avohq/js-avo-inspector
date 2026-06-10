@@ -18,10 +18,16 @@ const inspectorVersion = process.env.npm_package_version || "";
 
 const { apiKey, env, version } = defaultOptions;
 
+let streamIdSpy: jest.SpyInstance;
+
 beforeAll(() => {
-  jest
+  streamIdSpy = jest
     .spyOn(AvoStreamId as any, "streamId", "get")
     .mockImplementation(() => "stream-id");
+});
+
+afterAll(() => {
+  streamIdSpy.mockRestore();
 });
 
 function newHandler(): AvoNetworkCallsHandler {
