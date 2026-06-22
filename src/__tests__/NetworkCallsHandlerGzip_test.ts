@@ -178,6 +178,93 @@ describe("NetworkCallsHandler gzip compression", () => {
       xhrMock.onload();
       expect(customCallback).toHaveBeenCalledWith(null);
     });
+
+    test("gzipped sends happen asynchronously (not synchronously)", async () => {
+      const handler = newHandler();
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), customCallback);
+
+      // The gzip branch awaits CompressionStream, so nothing is sent on the
+      // synchronous tick — the mirror of the unavailable-branch sync send.
+      expect(xhrMock.send).not.toHaveBeenCalled();
+
+      // Drain the pending async send so it can't leak into the next test.
+      await waitFor(() => xhrMock.send.mock.calls.length > 0);
+    });
+
+    test("callInspectorImmediately gzips a large event body", async () => {
+      const handler = newHandler();
+      const eventBody = handler.bodyForEventSchemaCall(
+        "big immediate event",
+        Array.from({ length: 40 }, (_, i) => ({
+          propertyName: `property number ${i}`,
+          propertyType: "string"
+        })),
+        null,
+        null
+      );
+      const expectedJson = JSON.stringify([eventBody]);
+      expect(expectedJson.length).toBeGreaterThan(1024);
+
+      handler.callInspectorImmediately(eventBody, customCallback);
+
+      await waitFor(() => xhrMock.send.mock.calls.length > 0);
+
+      expect(sentHeaders()["Content-Encoding"]).toBe("gzip");
+      expect(gunzipToString(sentBody())).toBe(expectedJson);
+
+      xhrMock.onload();
+      expect(customCallback).toHaveBeenCalledWith(null);
+    });
+
+    test("adopts samplingRate from the response after a gzipped send", async () => {
+      const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.5);
+      const originalResponse = xhrMock.response;
+      try {
+        const handler = newHandler();
+
+        // samplingRate starts at 1.0, so 0.5 > 1.0 is false — first batch sends.
+        handler.callInspectorWithBatchBody(largeEvents(handler), customCallback);
+        await waitFor(() => xhrMock.send.mock.calls.length > 0);
+
+        xhrMock.response = JSON.stringify({ samplingRate: 0 });
+        xhrMock.onload();
+        expect(customCallback).toHaveBeenCalledWith(null);
+
+        // samplingRate is now 0, so 0.5 > 0 is true — the next batch is dropped
+        // before reaching the network (synchronous drop, no new send).
+        const sendsBefore = xhrMock.send.mock.calls.length;
+        handler.callInspectorWithBatchBody(largeEvents(handler), customCallback);
+        expect(xhrMock.send.mock.calls.length).toBe(sendsBefore);
+      } finally {
+        xhrMock.response = originalResponse;
+        randomSpy.mockRestore();
+      }
+    });
+
+    test("invokes the callback with an error on network error after a gzipped send", async () => {
+      const handler = newHandler();
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), customCallback);
+      await waitFor(() => xhrMock.send.mock.calls.length > 0);
+
+      xhrMock.onerror();
+
+      expect(customCallback).toHaveBeenCalledTimes(1);
+      expect(customCallback).toHaveBeenCalledWith(new Error("Request failed"));
+    });
+
+    test("invokes the callback with an error on timeout after a gzipped send", async () => {
+      const handler = newHandler();
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), customCallback);
+      await waitFor(() => xhrMock.send.mock.calls.length > 0);
+
+      xhrMock.ontimeout();
+
+      expect(customCallback).toHaveBeenCalledTimes(1);
+      expect(customCallback).toHaveBeenCalledWith(new Error("Request timed out"));
+    });
   });
 
   describe("when CompressionStream is unavailable", () => {
