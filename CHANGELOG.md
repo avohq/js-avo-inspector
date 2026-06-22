@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - Unreleased
+
+### Added
+
+- **Gzip compression of track payloads**: Track request bodies of at least 1 KB are now compressed with the browser-native `CompressionStream` API and sent with the `Content-Encoding: gzip` header, cutting ingestion network volume by roughly 10x.
+  - Smaller bodies (< 1 KB) are sent uncompressed, since gzip overhead would outweigh the gain.
+  - When `CompressionStream` is unavailable (pre-2023 browsers) or compression fails, the body is sent uncompressed exactly as before — synchronously in the unavailable case — so legacy behavior is preserved and no CORS preflight is triggered for old browsers.
+  - Applied to both the full build (`AvoNetworkCallsHandler`) and the lite build (`AvoNetworkCallsHandlerLite`).
+
 ## [3.1.0] - 2026-03-19
 
 ### Added
