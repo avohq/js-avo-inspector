@@ -75,7 +75,7 @@ const gzipMinBodyLength = 1024;
  * Gzips a string body using the browser-native CompressionStream API.
  * Returns null if compression fails for any reason.
  */
-async function gzip(body: string): Promise<Uint8Array<ArrayBuffer> | null> {
+async function gzip(body: string): Promise<Uint8Array | null> {
   try {
     const stream = new CompressionStream("gzip");
     const writer = stream.writable.getWriter();
@@ -338,7 +338,7 @@ export class AvoNetworkCallsHandler {
   }
 
   private sendTrackingRequest(
-    body: string | Uint8Array<ArrayBuffer>,
+    body: string | Uint8Array,
     isGzipped: boolean,
     onCompleted: (error: Error | null) => any
   ): void {
@@ -349,7 +349,7 @@ export class AvoNetworkCallsHandler {
       xmlhttp.setRequestHeader("Content-Encoding", "gzip");
     }
     xmlhttp.timeout = AvoInspector.networkTimeout;
-    xmlhttp.send(body);
+    xmlhttp.send(body as XMLHttpRequestBodyInit);
 
     xmlhttp.onload = () => {
       if (xmlhttp.status !== 200) {
