@@ -65,6 +65,44 @@ export interface EventSchemaBody extends BaseBody {
   validatedBranchId?: string;
 }
 
+/** Bodies smaller than this are sent uncompressed — gzip overhead outweighs the gain. */
+const gzipMinBodyLength = 1024;
+
+/**
+ * Gzips a string body using the browser-native CompressionStream API.
+ * Returns null if compression fails for any reason.
+ */
+async function gzip(body: string): Promise<Uint8Array | null> {
+  try {
+    const stream = new CompressionStream("gzip");
+    const writer = stream.writable.getWriter();
+    writer.write(new TextEncoder().encode(body)).catch(() => {});
+    writer.close().catch(() => {});
+
+    const reader = stream.readable.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalLength = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      chunks.push(value);
+      totalLength += value.length;
+    }
+
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    chunks.forEach((chunk) => {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    });
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 export class AvoNetworkCallsHandlerLite {
   private readonly apiKey: string;
   private readonly envName: string;
@@ -238,16 +276,48 @@ export class AvoNetworkCallsHandlerLite {
 
   /**
    * Core Inspector API call logic shared by batch and immediate calls.
+   *
+   * Bodies large enough to be worth it are gzipped (with Content-Encoding: gzip)
+   * to cut network volume ~10x. When CompressionStream is unavailable or
+   * compression fails, the body is sent uncompressed exactly as before —
+   * synchronously in the unavailable case, so legacy timing is preserved.
    */
   private callInspectorApi(
     events: Array<SessionStartedBody | EventSchemaBody>,
     onCompleted: (error: Error | null) => any
   ): void {
+    const body = JSON.stringify(events);
+
+    if (
+      typeof CompressionStream === "undefined" ||
+      body.length < gzipMinBodyLength
+    ) {
+      this.sendTrackingRequest(body, false, onCompleted);
+      return;
+    }
+
+    gzip(body).then((compressed) => {
+      if (compressed !== null) {
+        this.sendTrackingRequest(compressed, true, onCompleted);
+      } else {
+        this.sendTrackingRequest(body, false, onCompleted);
+      }
+    });
+  }
+
+  private sendTrackingRequest(
+    body: string | Uint8Array,
+    isGzipped: boolean,
+    onCompleted: (error: Error | null) => any
+  ): void {
     const xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoNetworkCallsHandlerLite.trackingEndpoint, true);
     xmlhttp.setRequestHeader("Content-Type", "text/plain");
+    if (isGzipped) {
+      xmlhttp.setRequestHeader("Content-Encoding", "gzip");
+    }
     xmlhttp.timeout = AvoInspector.networkTimeout;
-    xmlhttp.send(JSON.stringify(events));
+    xmlhttp.send(body as XMLHttpRequestBodyInit);
 
     xmlhttp.onload = () => {
       if (xmlhttp.status !== 200) {

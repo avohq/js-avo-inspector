@@ -80,7 +80,7 @@
     "ts-jest": "^29.2.4",
     "terser": "^5.31.0",
     "ts-loader": "^9.5.1",
-    "typescript": "*",
+    "typescript": ">=5.7 <6",
     "webpack": "^5.93.0",
     "webpack-cli": "^5.1.4"
   }
