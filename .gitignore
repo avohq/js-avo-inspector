@@ -43,3 +43,6 @@ fester/
 planning/
 test-bundle-size/
 *.tgz
+
+# CI/release uses yarn — package-lock.json intentionally not tracked (see AVO-3254)
+package-lock.json

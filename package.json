@@ -64,6 +64,16 @@
     "@noble/curves": "^1.4.0",
     "safe-regex2": "^5.0.0"
   },
+  "resolutions": {
+    "handlebars": "4.7.9",
+    "form-data": "4.0.6",
+    "serialize-javascript": "7.0.3",
+    "fast-uri": "3.1.2",
+    "flatted": "3.4.2",
+    "@babel/plugin-transform-modules-systemjs": "7.29.4",
+    "minimatch": "3.1.4",
+    "@typescript-eslint/typescript-estree/minimatch": "9.0.7"
+  },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
