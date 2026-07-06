@@ -60,7 +60,13 @@ jobs:
         # execute that package. Scope --ignore-engines to the 18 leg only so genuine
         # engine conflicts still surface on 20.x. Remove this workaround when Node 18
         # is dropped from the matrix (see AVO-3254 follow-up).
-        run: yarn install --frozen-lockfile ${{ startsWith(matrix.node-version, '18') && '--ignore-engines' || '' }}
+        #
+        # The expression is routed through an env var rather than interpolated
+        # directly into `run:` (GitHub's recommended pattern for any ${{ }} used in a
+        # shell command; clears the zizmor template-injection warning).
+        env:
+          IGNORE_ENGINES: ${{ startsWith(matrix.node-version, '18') && '--ignore-engines' || '' }}
+        run: yarn install --frozen-lockfile $IGNORE_ENGINES
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
