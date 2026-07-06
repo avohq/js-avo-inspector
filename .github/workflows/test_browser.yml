@@ -19,7 +19,12 @@ jobs:
           node-version: ${{ matrix.node-version }}
           
       - name: Install yarn dependencies
-        run: yarn install --frozen-lockfile
+        # serialize-javascript@7.0.3 (build-time-only security fix, GHSA-5c6j-r48x-rmvq) declares
+        # engines.node>=20. It's a webpack→terser dev tool that never ships in the published SDK
+        # bundle and runs fine on Node 18, but yarn 1 hard-fails the install on the Node 18 leg.
+        # Scope --ignore-engines to that leg only so genuine engine conflicts still surface on 20.x.
+        # Remove this workaround when Node 18 is dropped from the matrix (see AVO-3254).
+        run: yarn install --frozen-lockfile ${{ startsWith(matrix.node-version, '18') && '--ignore-engines' || '' }}
 
       - name: Build Avo Inspector package
         run: yarn build
