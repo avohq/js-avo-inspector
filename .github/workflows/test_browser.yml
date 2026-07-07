@@ -33,10 +33,11 @@ jobs:
           path: dist/
           retention-days: 1
 
-  # Test twice: run the suite on Node 18 and Node 20 against the artifact built above
-  # (build once, test twice). Tests run via ts-jest against src/ and never load
-  # serialize-javascript, so they pass on Node 18 even though the build cannot. This
-  # keeps engines.node>=18 both declared and actually tested for SDK consumers.
+  # Test on Node 18 and Node 20. Tests run via ts-jest against src/ (jest ignores
+  # dist/) and never load serialize-javascript, so they pass on Node 18 even though
+  # the build cannot run there. `needs: build` keeps the Node 20 build as a hard
+  # gate for green CI. This keeps engines.node>=18 both declared and actually
+  # tested for SDK consumers.
   test:
     name: Test (Node ${{ matrix.node-version }})
     needs: build
@@ -67,12 +68,6 @@ jobs:
         env:
           IGNORE_ENGINES: ${{ startsWith(matrix.node-version, '18') && '--ignore-engines' || '' }}
         run: yarn install --frozen-lockfile $IGNORE_ENGINES
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
 
       - name: Test Source
         run: |
