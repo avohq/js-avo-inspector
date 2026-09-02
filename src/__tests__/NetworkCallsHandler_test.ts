@@ -515,5 +515,122 @@ describe("NetworkCallsHandler", () => {
       expect(body.outputReference).toBe("meta-x7k2q");
       expect(body.originHint).toBe("android");
     });
+
+    test("bodyForEventSchemaCall sets only originHint when only originHint is provided (outputReference stays absent)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "android" }
+      );
+
+      expect(body.originHint).toBe("android");
+      expect(body.hasOwnProperty("outputReference")).toBe(false);
+    });
+
+    test("bodyForEventSchemaCall with options omitted and options = {} produce bodies with identical key sets (no new keys)", () => {
+      const bodyWithoutOptions = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null
+      );
+      const bodyWithEmptyOptions = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        {}
+      );
+
+      expect(Object.keys(bodyWithEmptyOptions).sort()).toEqual(
+        Object.keys(bodyWithoutOptions).sort()
+      );
+    });
+
+    test("bodyForEventSchemaCall preserves an originHint of 200+ characters untouched, no length limit", () => {
+      const longHint = "a".repeat(210);
+
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: longHint }
+      );
+
+      expect(body.originHint).toBe(longHint);
+      expect(body.originHint!.length).toBe(210);
+    });
+
+    const invalidHintValues: Array<[string, unknown]> = [
+      ["empty string", ""],
+      ["whitespace-only string", "   "],
+      ["null", null],
+      ["number", 42],
+      ["boolean", true],
+      ["empty object", {}],
+      ["empty array", []],
+      ["undefined", undefined]
+    ];
+
+    test.each(invalidHintValues)(
+      "bodyForEventSchemaCall omits outputReference when options.outputReference is %s",
+      (_description, value) => {
+        const body = networkHandler.bodyForEventSchemaCall(
+          eventName,
+          eventProperties,
+          null,
+          null,
+          undefined,
+          undefined,
+          { outputReference: value as any }
+        );
+
+        expect(body.hasOwnProperty("outputReference")).toBe(false);
+      }
+    );
+
+    test.each(invalidHintValues)(
+      "bodyForEventSchemaCall omits originHint when options.originHint is %s",
+      (_description, value) => {
+        const body = networkHandler.bodyForEventSchemaCall(
+          eventName,
+          eventProperties,
+          null,
+          null,
+          undefined,
+          undefined,
+          { originHint: value as any }
+        );
+
+        expect(body.hasOwnProperty("originHint")).toBe(false);
+      }
+    );
+
+    test("body with hints survives JSON.stringify -> JSON.parse with keys intact and no undefined-valued keys for the omitted field", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { outputReference: "meta-x7k2q" }
+      );
+
+      const parsed = JSON.parse(JSON.stringify(body));
+
+      expect(parsed.outputReference).toBe("meta-x7k2q");
+      expect(parsed.hasOwnProperty("originHint")).toBe(false);
+      expect(Object.keys(parsed)).not.toContain("originHint");
+    });
   });
 });

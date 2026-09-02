@@ -157,6 +157,52 @@ describe("Batcher", () => {
     bodyForEventSchemaCallSpy.mockRestore();
   });
 
+  test("handleTrackSchema forwards options to storage with only originHint set (outputReference stays absent)", () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "android" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).originHint).toEqual("android");
+      expect(events[0].hasOwnProperty("outputReference")).toEqual(false);
+    }
+  });
+
+  test("trackSchema entered through the public AvoInspector method threads options through to the storage round trip", async () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    await inspector.trackSchema(
+      "event name",
+      [{ propertyName: "prop0", propertyType: "string" }],
+      { outputReference: "meta-x7k2q" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).outputReference).toEqual("meta-x7k2q");
+    }
+  });
+
   test("checkIfBatchNeedsToBeSent is called on handleTrackSchema", () => {
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);

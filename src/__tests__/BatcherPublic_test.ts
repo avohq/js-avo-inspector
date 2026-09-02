@@ -120,6 +120,33 @@ describe("Batcher", () => {
     );
   });
 
+  test("handleTrackSchema is called on trackSchema with options", async () => {
+    const eventName = "event name";
+    const schema = [
+      {
+        propertyName: "prop0",
+        propertyType: "string"
+      },
+      {
+        propertyName: "prop1",
+        propertyType: "string"
+      }
+    ];
+    const options = { outputReference: "meta-x7k2q" };
+
+    await inspector.trackSchema(eventName, schema, options);
+
+    expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
+    expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
+      eventName,
+      schema,
+      null,
+      null,
+      undefined,
+      options
+    );
+  });
+
   test("handleTrackSchema is called on _avoFunctionTrackSchemaFromEvent when no spec available", async () => {
     const eventName = "event name";
     const properties = {
