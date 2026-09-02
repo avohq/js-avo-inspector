@@ -70,6 +70,26 @@ describe("AvoInspectorLite - trackSchemaFromEvent", () => {
     expect(schema2).toBeDefined();
     expect(Array.isArray(schema2)).toBe(true);
   });
+
+  test("threads options through to avoBatcher.handleTrackSchema", async () => {
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    const handleTrackSchemaSpy = jest
+      .spyOn(inspector.avoBatcher, "handleTrackSchema")
+      .mockImplementation(() => {});
+
+    const schema = await inspector.trackSchemaFromEvent("Ev", { a: 1 }, { originHint: "web" });
+
+    expect(handleTrackSchemaSpy).toHaveBeenCalledWith(
+      "Ev",
+      schema,
+      null,
+      null,
+      undefined,
+      { originHint: "web" }
+    );
+  });
 });
 
 describe("AvoInspectorLite - trackSchema", () => {

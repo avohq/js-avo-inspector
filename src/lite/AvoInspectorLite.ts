@@ -1,7 +1,7 @@
 import { AvoInspectorEnv, type AvoInspectorEnvValueType } from "../AvoInspectorEnv";
 import { AvoSchemaParserLite as AvoSchemaParser } from "./AvoSchemaParserLite";
 import { AvoBatcher } from "./AvoBatcherLite";
-import { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler, type EventProperty } from "./AvoNetworkCallsHandlerLite";
+import { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler, type EventProperty, type TrackOptions } from "./AvoNetworkCallsHandlerLite";
 import { AvoStorage } from "../AvoStorage";
 import { isValueEmpty } from "../utils";
 
@@ -116,7 +116,8 @@ export class AvoInspectorLite {
 
   async trackSchemaFromEvent(
     eventName: string,
-    eventProperties: Record<string, any>
+    eventProperties: Record<string, any>,
+    options?: TrackOptions
   ): Promise<EventProperty[]> {
     try {
       if (AvoInspectorLite.shouldLog) {
@@ -129,7 +130,7 @@ export class AvoInspectorLite {
       }
 
       const eventSchema = await this.extractSchema(eventProperties, false);
-      this.trackSchemaInternal(eventName, eventSchema, null, null);
+      this.trackSchemaInternal(eventName, eventSchema, null, null, options);
       return eventSchema;
     } catch (e) {
       console.error(
@@ -175,7 +176,8 @@ export class AvoInspectorLite {
       propertyType: string;
       encryptedPropertyValue?: string;
       children?: any;
-    }>
+    }>,
+    options?: TrackOptions
   ): Promise<void> {
     try {
       if (AvoInspectorLite.shouldLog) {
@@ -187,7 +189,7 @@ export class AvoInspectorLite {
         );
       }
 
-      this.trackSchemaInternal(eventName, eventSchema, null, null);
+      this.trackSchemaInternal(eventName, eventSchema, null, null, options);
     } catch (e) {
       console.error(
         "Avo Inspector: something went wrong. Please report to support@avo.app.",
@@ -205,14 +207,17 @@ export class AvoInspectorLite {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    options?: TrackOptions
   ): void {
     try {
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
         eventId,
-        eventHash
+        eventHash,
+        undefined,
+        options
       );
     } catch (e) {
       console.error(
