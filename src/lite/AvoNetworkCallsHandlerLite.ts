@@ -45,6 +45,23 @@ export interface SessionStartedBody extends BaseBody {
   type: "sessionStarted";
 }
 
+// Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
+// AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
+export interface TrackOptions {
+  outputReference?: string;
+  originHint?: string;
+}
+
+/**
+ * Normalizes a hint value: strings are trimmed; anything else (numbers,
+ * booleans, null, undefined, objects, arrays) is treated as absent.
+ */
+function normalizeHint(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
 export interface EventSchemaBody extends BaseBody {
   type: "event";
 
@@ -63,6 +80,11 @@ export interface EventSchemaBody extends BaseBody {
 
   /** Branch ID from getEventSpec response when value validation was performed */
   validatedBranchId?: string;
+
+  /** Gateway output this observation was bound for; absent = gateway checkpoint. */
+  outputReference?: string;
+  /** Low-cardinality hint identifying the event's upstream source. */
+  originHint?: string;
 }
 
 /** Bodies smaller than this are sent uncompressed — gzip overhead outweighs the gain. */
@@ -199,7 +221,8 @@ export class AvoNetworkCallsHandlerLite {
     eventId: string | null,
     eventHash: string | null,
     eventSpecMetadata?: EventSpecMetadata,
-    validatedBranchId?: string
+    validatedBranchId?: string,
+    options?: TrackOptions
   ): EventSchemaBody {
     const eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
@@ -224,6 +247,16 @@ export class AvoNetworkCallsHandlerLite {
     // Set validated branch ID if value validation was performed
     if (validatedBranchId) {
       eventSchemaBody.validatedBranchId = validatedBranchId;
+    }
+
+    // Set gateway hints if provided and non-empty after normalization
+    const outputReference = normalizeHint(options?.outputReference);
+    if (outputReference !== undefined) {
+      eventSchemaBody.outputReference = outputReference;
+    }
+    const originHint = normalizeHint(options?.originHint);
+    if (originHint !== undefined) {
+      eventSchemaBody.originHint = originHint;
     }
 
     return eventSchemaBody;

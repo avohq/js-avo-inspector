@@ -416,4 +416,104 @@ describe("NetworkCallsHandler", () => {
       expect(parsed[0].publicEncryptionKey).toBe(testEncryptionKey);
     });
   });
+
+  describe("TrackOptions (outputReference, originHint)", () => {
+    const eventName = "event name";
+    const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
+
+    test("bodyForEventSchemaCall without options produces body identical to pre-change baseline (regression)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null
+      );
+
+      expect(body).toEqual({
+        ...baseBody,
+        type: "event",
+        eventName,
+        eventProperties,
+        avoFunction: false,
+        eventId: null,
+        eventHash: null
+      });
+      expect(body.hasOwnProperty("outputReference")).toBe(false);
+      expect(body.hasOwnProperty("originHint")).toBe(false);
+    });
+
+    test("bodyForEventSchemaCall with options = {} produces body with no outputReference/originHint keys", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        {}
+      );
+
+      expect(body.hasOwnProperty("outputReference")).toBe(false);
+      expect(body.hasOwnProperty("originHint")).toBe(false);
+    });
+
+    test("bodyForEventSchemaCall trims outputReference and omits originHint when absent", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { outputReference: "  meta-x7k2q  " }
+      );
+
+      expect(body.outputReference).toBe("meta-x7k2q");
+      expect(body.hasOwnProperty("originHint")).toBe(false);
+    });
+
+    test("bodyForEventSchemaCall omits originHint when it is an empty string", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "" }
+      );
+
+      expect(body.hasOwnProperty("originHint")).toBe(false);
+    });
+
+    test("bodyForEventSchemaCall omits outputReference/originHint for non-string values", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { outputReference: 42 as any, originHint: null as any }
+      );
+
+      expect(body.hasOwnProperty("outputReference")).toBe(false);
+      expect(body.hasOwnProperty("originHint")).toBe(false);
+    });
+
+    test("bodyForEventSchemaCall sets both outputReference and originHint when both provided", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { outputReference: "meta-x7k2q", originHint: "android" }
+      );
+
+      expect(body.outputReference).toBe("meta-x7k2q");
+      expect(body.originHint).toBe("android");
+    });
+  });
 });
