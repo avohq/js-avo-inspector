@@ -633,4 +633,186 @@ describe("NetworkCallsHandler", () => {
       expect(Object.keys(parsed)).not.toContain("originHint");
     });
   });
+
+  describe("TrackOptions.appVersion with originHint", () => {
+    const eventName = "event name";
+    const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
+
+    test("originHint present, appVersion present -> body.appVersion is options.appVersion", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "ios", appVersion: "5.1.0" }
+      );
+
+      expect(body.appVersion).toBe("5.1.0");
+    });
+
+    test("originHint present, appVersion absent -> body.appVersion is null (root version ignored)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "ios" }
+      );
+
+      expect(body.appVersion).toBeNull();
+      expect(body.hasOwnProperty("appVersion")).toBe(true);
+    });
+
+    test("originHint absent, appVersion present -> body.appVersion is options.appVersion", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { appVersion: "5.1.0" }
+      );
+
+      expect(body.appVersion).toBe("5.1.0");
+    });
+
+    test("originHint absent, appVersion absent -> body.appVersion is the root version (unchanged behaviour)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null
+      );
+
+      expect(body.appVersion).toBe(version);
+    });
+
+    test("appVersion is trimmed", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "ios", appVersion: "  2.0.0 " }
+      );
+
+      expect(body.appVersion).toBe("2.0.0");
+    });
+
+    test("appVersion of '' is treated as absent (originHint present -> null)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "ios", appVersion: "" }
+      );
+
+      expect(body.appVersion).toBeNull();
+    });
+
+    test("appVersion of '   ' (whitespace-only) is treated as absent (originHint present -> null)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "ios", appVersion: "   " }
+      );
+
+      expect(body.appVersion).toBeNull();
+    });
+
+    test("appVersion of 42 (non-string) is treated as absent (originHint present -> null)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "ios", appVersion: 42 as any }
+      );
+
+      expect(body.appVersion).toBeNull();
+    });
+
+    test("appVersion of '' is treated as absent (originHint absent -> root version)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { appVersion: "" }
+      );
+
+      expect(body.appVersion).toBe(version);
+    });
+
+    test("appVersion of '   ' (whitespace-only) is treated as absent (originHint absent -> root version)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { appVersion: "   " }
+      );
+
+      expect(body.appVersion).toBe(version);
+    });
+
+    test("appVersion of 42 (non-string) is treated as absent (originHint absent -> root version)", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { appVersion: 42 as any }
+      );
+
+      expect(body.appVersion).toBe(version);
+    });
+
+    test("sessionStarted body still carries the root version, unaffected by appVersion rule", () => {
+      const body = networkHandler.bodyForSessionStartedCall();
+
+      expect(body.appVersion).toBe(version);
+    });
+
+    test("body with originHint and no appVersion survives JSON round trip preserving literal null", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { originHint: "ios" }
+      );
+
+      const jsonString = JSON.stringify(body);
+      expect(jsonString).toContain('"appVersion":null');
+
+      const parsed = JSON.parse(jsonString);
+      expect(parsed.appVersion).toBeNull();
+      expect(parsed.hasOwnProperty("appVersion")).toBe(true);
+    });
+  });
 });

@@ -119,6 +119,7 @@ Available since version `3.3.0`. Both `trackSchemaFromEvent` and `trackSchema` a
 interface TrackOptions {
   outputReference?: string;
   originHint?: string;
+  appVersion?: string;
 }
 ```
 
@@ -134,10 +135,23 @@ inspector.trackSchema(
 );
 ```
 
+```javascript
+inspector.trackSchemaFromEvent("Event name", { "String Prop": "Prop Value" }, { originHint: "ios", appVersion: "5.1.0" });
+```
+
 - **`outputReference`**: which gateway output (destination checkpoint) this observation was bound for. Set it when you're observing a specific output; leave it out for a gateway-level observation that isn't tied to one output.
 - **`originHint`**: identifies the event's upstream source. Keep it low-cardinality (e.g. `"web"`, `"ios"`) — never a user identifier or other high-cardinality value.
-- Both fields are optional and independent — you can set one, both, or neither.
-- Values are trimmed, and empty strings, whitespace-only strings, and non-string values are omitted rather than sent as `null` or `""`.
+- **`appVersion`**: the app version of the source that produced the event. Because an `originHint` marks an event as coming from a different source than the app this SDK instance was configured for, the two fields interact:
+
+  | `originHint` | `appVersion` | Event body's `appVersion` |
+  |---|---|---|
+  | present | present | `appVersion` |
+  | present | absent | `null` (the SDK's configured version is not applied) |
+  | absent | present | `appVersion` |
+  | absent | absent | the SDK's configured version (unchanged behaviour) |
+
+- All three fields are optional and independent — you can set any combination of them.
+- Values are trimmed, and empty strings, whitespace-only strings, and non-string values are omitted rather than sent as `null` or `""` — except `appVersion`, which is sent as a literal `null` (not omitted) when `originHint` is present but `appVersion` is not, per the table above.
 - Events tracked automatically through Avo Codegen (Avo Functions) never carry these fields — `TrackOptions` only applies to `trackSchemaFromEvent`/`trackSchema` calls you make directly.
 
 # Extracting event schema manually

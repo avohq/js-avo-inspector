@@ -28,7 +28,7 @@ export interface EventProperty {
 export interface BaseBody {
   apiKey: string;
   appName: string;
-  appVersion: string;
+  appVersion: string | null;
   libVersion: string;
   env: string;
   libPlatform: "web";
@@ -55,6 +55,8 @@ export interface TrackOptions {
   outputReference?: string;
   /** Low-cardinality hint identifying the event's upstream source (e.g. "web", "ios"). Never a user identifier. */
   originHint?: string;
+  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (null when omitted); without originHint, overrides it only when provided. */
+  appVersion?: string;
 }
 
 /**
@@ -277,12 +279,18 @@ export class AvoNetworkCallsHandler {
 
     // Set gateway hints if provided and non-empty after normalization
     const outputReference = normalizeHint(options?.outputReference);
+    const originHint = normalizeHint(options?.originHint);
+    const appVersion = normalizeHint(options?.appVersion);
     if (outputReference !== undefined) {
       eventSchemaBody.outputReference = outputReference;
     }
-    const originHint = normalizeHint(options?.originHint);
     if (originHint !== undefined) {
       eventSchemaBody.originHint = originHint;
+      // An origin hint marks an event from another source, whose app version is
+      // unrelated to this SDK instance's configured version.
+      eventSchemaBody.appVersion = appVersion !== undefined ? appVersion : null;
+    } else if (appVersion !== undefined) {
+      eventSchemaBody.appVersion = appVersion;
     }
 
     return eventSchemaBody;

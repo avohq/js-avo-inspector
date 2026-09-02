@@ -152,6 +152,30 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
       expect(events[0].hasOwnProperty("outputReference")).toEqual(false);
     }
   });
+
+  test("trackSchemaFromEvent with originHint set and no appVersion stores body appVersion as null", async () => {
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
+
+    await inspector.trackSchemaFromEvent(
+      "Ev",
+      { a: 1 },
+      { originHint: "ios" }
+    );
+
+    const events = AvoInspectorLite.avoStorage.getItem<any[]>(
+      AvoBatcherLite.cacheKey
+    );
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect(events[0].appVersion).toBeNull();
+      expect(events[0].hasOwnProperty("appVersion")).toEqual(true);
+    }
+  });
 });
 
 describe("AvoInspectorLite - extractSchema", () => {

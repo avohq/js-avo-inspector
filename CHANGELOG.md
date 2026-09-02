@@ -10,13 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`options` parameter for gateway hints on `trackSchemaFromEvent` and `trackSchema`**: Both track methods now accept an optional third argument, `options: TrackOptions`, on the full build (`AvoInspector`) and the lite build (`AvoInspectorLite`).
-  - `TrackOptions` is `{ outputReference?: string; originHint?: string }`, exported as a type from the package root (`avo-inspector`) and from the lite entry (`avo-inspector/lite`).
+  - `TrackOptions` is `{ outputReference?: string; originHint?: string; appVersion?: string }`, exported as a type from the package root (`avo-inspector`) and from the lite entry (`avo-inspector/lite`).
   - `outputReference` identifies which gateway output (destination checkpoint) an observation was bound for; omit it for a gateway-level observation.
   - `originHint` identifies the event's upstream source (e.g. `"web"`, `"ios"`) and should be a low-cardinality value, never a user identifier.
-  - Both fields are sent as top-level siblings of `eventProperties` on the track request body, never nested inside the schema.
-  - **Normalization**: string values are trimmed; empty strings, whitespace-only strings, and non-string values (numbers, booleans, `null`, objects, arrays) are omitted entirely. Omitted fields are never sent as `null` or `""`.
+  - `appVersion` sets the app version of the source that produced the event. When `originHint` is set, the event came from a different source than the app this SDK instance was configured for, so `appVersion` replaces the SDK's configured version on that event's body — sent as `null` when `originHint` is set but `appVersion` is omitted, rather than falling back to the SDK's root version. When `originHint` is not set, `appVersion` overrides the SDK's configured version only when provided; omitting both leaves the root version unchanged.
+  - All three fields are sent as top-level siblings of `eventProperties` on the track request body, never nested inside the schema.
+  - **Normalization**: string values are trimmed; empty strings, whitespace-only strings, and non-string values (numbers, booleans, `null`, objects, arrays) are omitted entirely. Omitted `outputReference`/`originHint` are never sent as `null` or `""`. `appVersion` is the one field in `TrackOptions` that can legitimately be sent as a literal `null` on the wire (with `originHint` set and `appVersion` omitted) — see rule above.
   - **Backward compatible**: calling either method without the `options` argument produces a request body identical to previous versions — no new keys are added.
-  - Events tracked through Avo Codegen (Avo Functions) never carry `outputReference`/`originHint`, since Codegen-generated calls have no per-call gateway configuration to pass.
+  - Events tracked through Avo Codegen (Avo Functions) never carry `outputReference`/`originHint`/`appVersion`, since Codegen-generated calls have no per-call gateway configuration to pass.
 
 ## [3.2.0] - 2026-06-22
 

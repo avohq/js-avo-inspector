@@ -363,6 +363,55 @@ describe("Batcher", () => {
     streamIdSpy.mockRestore();
   });
 
+  test("handleTrackSchema storage round trip: originHint + appVersion set -> stored event appVersion is the given appVersion", () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios", appVersion: "5.1.0" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toEqual("5.1.0");
+    }
+  });
+
+  test("handleTrackSchema storage round trip: originHint set, appVersion absent -> stored event appVersion is null (JSON storage keeps null)", () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toBeNull();
+      expect(events[0].hasOwnProperty("appVersion")).toEqual(true);
+    }
+  });
+
   test("Only latest 1000 events are stored in the storage", (done) => {
     // Mock streamId to avoid extra storage writes from streamId activity tracking
     const streamIdSpy = jest
