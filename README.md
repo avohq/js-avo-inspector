@@ -111,6 +111,35 @@ inspector.trackSchema("Event name", [
 ]);
 ```
 
+# TrackOptions: outputReference and originHint
+
+Available since version `3.3.0`. Both `trackSchemaFromEvent` and `trackSchema` accept an optional third argument, `options: TrackOptions`, for customers running Inspector behind a gateway with one Inspector API key shared across multiple destinations:
+
+```typescript
+interface TrackOptions {
+  outputReference?: string;
+  originHint?: string;
+}
+```
+
+```javascript
+inspector.trackSchemaFromEvent("Event name", { "String Prop": "Prop Value" }, { outputReference: "meta-x7k2q", originHint: "web" });
+```
+
+```javascript
+inspector.trackSchema(
+  "Event name",
+  [{ propertyName: "String prop", propertyType: "string" }],
+  { outputReference: "meta-x7k2q", originHint: "web" }
+);
+```
+
+- **`outputReference`**: which gateway output (destination checkpoint) this observation was bound for. Set it when you're observing a specific output; leave it out for a gateway-level observation that isn't tied to one output.
+- **`originHint`**: identifies the event's upstream source. Keep it low-cardinality (e.g. `"web"`, `"ios"`) — never a user identifier or other high-cardinality value.
+- Both fields are optional and independent — you can set one, both, or neither.
+- Values are trimmed, and empty strings, whitespace-only strings, and non-string values are omitted rather than sent as `null` or `""`.
+- Events tracked automatically through Avo Codegen (Avo Functions) never carry these fields — `TrackOptions` only applies to `trackSchemaFromEvent`/`trackSchema` calls you make directly.
+
 # Extracting event schema manually
 
 ```javascript

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-09-02
+
+### Added
+
+- **`options` parameter for gateway hints on `trackSchemaFromEvent` and `trackSchema`**: Both track methods now accept an optional third argument, `options: TrackOptions`, on the full build (`AvoInspector`) and the lite build (`AvoInspectorLite`).
+  - `TrackOptions` is `{ outputReference?: string; originHint?: string }`, exported as a type from the package root (`avo-inspector`) and from the lite entry (`avo-inspector/lite`).
+  - `outputReference` identifies which gateway output (destination checkpoint) an observation was bound for; omit it for a gateway-level observation.
+  - `originHint` identifies the event's upstream source (e.g. `"web"`, `"ios"`) and should be a low-cardinality value, never a user identifier.
+  - Both fields are sent as top-level siblings of `eventProperties` on the track request body, never nested inside the schema.
+  - **Normalization**: string values are trimmed; empty strings, whitespace-only strings, and non-string values (numbers, booleans, `null`, objects, arrays) are omitted entirely. Omitted fields are never sent as `null` or `""`.
+  - **Backward compatible**: calling either method without the `options` argument produces a request body identical to previous versions — no new keys are added.
+  - Events tracked through Avo Codegen (Avo Functions) never carry `outputReference`/`originHint`, since Codegen-generated calls have no per-call gateway configuration to pass.
+
 ## [3.2.0] - 2026-06-22
 
 ### Added
