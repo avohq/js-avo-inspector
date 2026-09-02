@@ -2,6 +2,7 @@ import { AvoInspectorLite } from "../lite/AvoInspectorLite";
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoInspector as AvoInspectorFromIndex, AvoInspectorEnv as AvoInspectorEnvFromIndex } from "../lite/index";
+import { AvoBatcher as AvoBatcherLite } from "../lite/AvoBatcherLite";
 
 const xhrMock: Partial<XMLHttpRequest> = {
   open: jest.fn(),
@@ -102,6 +103,54 @@ describe("AvoInspectorLite - trackSchema", () => {
         { propertyName: "a", propertyType: "int" },
       ])
     ).resolves.toBeUndefined();
+  });
+
+  test("threads options through to avoBatcher.handleTrackSchema", async () => {
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    const handleTrackSchemaSpy = jest
+      .spyOn(inspector.avoBatcher, "handleTrackSchema")
+      .mockImplementation(() => {});
+
+    const schema = [{ propertyName: "a", propertyType: "int" }];
+
+    await inspector.trackSchema("Ev", schema, { originHint: "web" });
+
+    expect(handleTrackSchemaSpy).toHaveBeenCalledWith(
+      "Ev",
+      schema,
+      null,
+      null,
+      undefined,
+      { originHint: "web" }
+    );
+  });
+});
+
+describe("AvoInspectorLite - hint omission end-to-end", () => {
+  test("trackSchemaFromEvent with whitespace-only outputReference and originHint 'web' stores originHint only", async () => {
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
+
+    await inspector.trackSchemaFromEvent(
+      "Ev",
+      { a: 1 },
+      { outputReference: "  ", originHint: "web" }
+    );
+
+    const events = AvoInspectorLite.avoStorage.getItem<any[]>(
+      AvoBatcherLite.cacheKey
+    );
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect(events[0].originHint).toEqual("web");
+      expect(events[0].hasOwnProperty("outputReference")).toEqual(false);
+    }
   });
 });
 
