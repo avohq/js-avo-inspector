@@ -65,7 +65,9 @@ describe("Batcher", () => {
       eventName,
       schema,
       null,
-      null
+      null,
+      undefined,
+      undefined
     );
   });
 
@@ -87,7 +89,34 @@ describe("Batcher", () => {
       eventName,
       schema,
       null,
-      null
+      null,
+      undefined,
+      undefined
+    );
+  });
+
+  test("handleTrackSchema is called on trackSchemaFromEvent with options when no spec available", async () => {
+    const eventName = "event name";
+    const properties = {
+      prop0: "",
+      prop2: false,
+      prop3: 0,
+      prop4: 0.0
+    };
+    const options = { outputReference: "meta-x7k2q" };
+
+    const schema = await inspector.extractSchema(properties);
+
+    await inspector.trackSchemaFromEvent(eventName, properties, options);
+
+    expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
+    expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
+      eventName,
+      schema,
+      null,
+      null,
+      undefined,
+      options
     );
   });
 
@@ -112,7 +141,9 @@ describe("Batcher", () => {
       eventName,
       schema,
       eventId,
-      eventHash
+      eventHash,
+      undefined,
+      undefined
     );
   });
 

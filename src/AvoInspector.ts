@@ -1,7 +1,7 @@
 import { AvoInspectorEnv, type AvoInspectorEnvValueType } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
 import { AvoBatcher } from "./AvoBatcher";
-import { AvoNetworkCallsHandler, type EventProperty } from "./AvoNetworkCallsHandler";
+import { AvoNetworkCallsHandler, type EventProperty, type TrackOptions } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
 import { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
@@ -159,7 +159,8 @@ export class AvoInspector {
 
   async trackSchemaFromEvent(
     eventName: string,
-    eventProperties: Record<string, any>
+    eventProperties: Record<string, any>,
+    options?: TrackOptions
   ): Promise<EventProperty[]> {
     try {
       if (
@@ -194,11 +195,12 @@ export class AvoInspector {
             schemaWithValidation,
             null,
             null,
-            validationResult
+            validationResult,
+            options
           );
         } else {
           // No spec: fall back to batched flow
-          this.trackSchemaInternal(eventName, eventSchema, null, null);
+          this.trackSchemaInternal(eventName, eventSchema, null, null, options);
         }
 
         return eventSchema;
@@ -285,7 +287,8 @@ export class AvoInspector {
       propertyType: string;
       encryptedPropertyValue?: string;
       children?: any;
-    }>
+    }>,
+    options?: TrackOptions
   ): Promise<void> {
     try {
       if (
@@ -306,7 +309,7 @@ export class AvoInspector {
         // For trackSchema we don't have raw properties, so we can't validate
         // Just fetch/cache spec for future use and use batched flow
         await this.fetchEventSpecIfNeeded(eventName);
-        this.trackSchemaInternal(eventName, eventSchema, null, null);
+        this.trackSchemaInternal(eventName, eventSchema, null, null, options);
       } else {
         if (AvoInspector.shouldLog) {
           console.log("Avo Inspector: Deduplicated event: " + eventName);
@@ -329,14 +332,17 @@ export class AvoInspector {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    options?: TrackOptions
   ): void {
     try {
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
         eventId,
-        eventHash
+        eventHash,
+        undefined, // eventSpecMetadata: always undefined here (only exists on the sendEventWithValidation path)
+        options
       );
     } catch (e) {
       console.error(
@@ -651,7 +657,8 @@ export class AvoInspector {
     eventSchema: EventProperty[],
     eventId: string | null,
     eventHash: string | null,
-    validationResult: ValidationResult
+    validationResult: ValidationResult,
+    options?: TrackOptions
   ): void {
     // Log validation info if shouldLog is enabled
     if (AvoInspector.shouldLog) {
@@ -678,7 +685,8 @@ export class AvoInspector {
       eventId,
       eventHash,
       validationResult.metadata ?? undefined,
-      validationResult.metadata?.branchId
+      validationResult.metadata?.branchId,
+      options
     );
 
     // Send immediately (bypass batching)
@@ -690,12 +698,18 @@ export class AvoInspector {
             error
           );
         }
-        // Fallback: add to batch on failure (without validation data)
+        // Fallback: add to batch on failure (without validation data).
+        // Explicit undefined for eventSpecMetadata (unchanged pre-existing
+        // behavior -- this fallback already dropped it before this change),
+        // options threaded as the 6th arg so a failed immediate send doesn't
+        // silently drop the hints when it re-queues onto the batch.
         this.avoBatcher.handleTrackSchema(
           eventName,
           eventSchema,
           eventId,
-          eventHash
+          eventHash,
+          undefined,
+          options
         );
       } else {
         if (AvoInspector.shouldLog) {
