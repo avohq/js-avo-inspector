@@ -115,6 +115,48 @@ describe("Batcher", () => {
     expect(checkBatchSpy).toHaveBeenCalledTimes(1);
   });
 
+  test("handleTrackSchema forwards options to bodyForEventSchemaCall with validatedBranchId explicitly undefined", () => {
+    const bodyForEventSchemaCallSpy = jest.spyOn(
+      AvoNetworkCallsHandler.prototype as any,
+      "bodyForEventSchemaCall"
+    );
+
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { outputReference: "meta-x7k2q" }
+    );
+
+    expect(bodyForEventSchemaCallSpy).toHaveBeenCalledWith(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      undefined,
+      { outputReference: "meta-x7k2q" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).outputReference).toEqual("meta-x7k2q");
+      expect(events[0].hasOwnProperty("originHint")).toEqual(false);
+    }
+
+    bodyForEventSchemaCallSpy.mockRestore();
+  });
+
   test("checkIfBatchNeedsToBeSent is called on handleTrackSchema", () => {
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
