@@ -48,7 +48,9 @@ export interface SessionStartedBody extends BaseBody {
 // Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
 // AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
 export interface TrackOptions {
+  /** Reference of the gateway output this observation was bound for. Omit for a gateway-level observation. */
   outputReference?: string;
+  /** Low-cardinality hint identifying the event's upstream source (e.g. "web", "ios"). Never a user identifier. */
   originHint?: string;
 }
 
