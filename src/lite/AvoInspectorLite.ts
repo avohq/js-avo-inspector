@@ -86,14 +86,24 @@ export class AvoInspectorLite {
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
-      // Trimmed once, here, so only the trimmed value is ever stored. On v2 the
-      // api key is a request header, and a key pasted out of a config file or
-      // read from an env var keeps its trailing newline — which setRequestHeader
-      // refuses, turning every send into a caught, silent failure for the life of
-      // the page. Trimming cannot invalidate a real token, and doing it at the
-      // single source means the header and the body copy carry the same string.
-      // It is not a substitute for the send path's try/catch: an embedded control
-      // character survives trim and is still caught there.
+      // Trimmed once, here, so only the trimmed value is ever stored. A key
+      // pasted out of a config file or read from an env var keeps its trailing
+      // newline, which on v2 has to survive being a request header.
+      //
+      // This is deliberately not a duplicate of what the platform already does.
+      // XMLHttpRequest strips surrounding whitespace from a header value before
+      // validating it, so a trailing-newline key reaches the server trimmed with
+      // no error — verified against a real server, not read off the spec. But it
+      // does that to the header only. The same key also travels in the request
+      // body, which nothing trims, so leaning on the platform is what would
+      // CREATE a divergence rather than avoid one: the header would carry "key"
+      // while the body carried the raw value. v2 reads the header and ignores
+      // the body copy, but that copy exists precisely so one body shape also
+      // serves v1 — and v1 reads its api key from the body.
+      //
+      // Trimming at the single source keeps the two identical, for 3 bytes
+      // gzipped. It is not a substitute for the send path's try/catch: an
+      // embedded control character survives trim and is still caught there.
       this.apiKey = options.apiKey.trim();
     }
 
