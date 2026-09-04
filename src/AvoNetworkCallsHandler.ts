@@ -437,15 +437,22 @@ export class AvoNetworkCallsHandler {
     isGzipped: boolean,
     onCompleted: (error: Error | null) => any
   ): void {
-    const xmlhttp = new XMLHttpRequest();
-    // Everything up to and including send() runs synchronously, and any of it can
-    // throw: a header value the browser rejects, or a send() the environment
-    // refuses. callInspectorWithBatchBody clears its `sending` re-entrancy guard
-    // only from onCompleted, so an exception escaping this method would latch the
-    // guard and silently cancel every later batch for the lifetime of the page.
-    // Reporting through onCompleted keeps that path recoverable — the batcher puts
-    // the events back and retries with the next batch.
+    // Everything from construction up to and including send() runs synchronously,
+    // and any of it can throw: a header value the browser rejects, or a send() the
+    // environment refuses. callInspectorWithBatchBody clears its `sending`
+    // re-entrancy guard only from onCompleted, so an exception escaping this method
+    // would latch the guard and silently cancel every later batch for the lifetime
+    // of the page. Reporting through onCompleted keeps that path recoverable — the
+    // batcher puts the events back and retries with the next batch.
+    //
+    // The XMLHttpRequest construction is inside the try for the same reason. That
+    // makes this method total: because it cannot throw at all, the gzip promise
+    // chain in callInspectorApi cannot reject either, so the async send path has no
+    // uncaught route out of it. The event handlers below are assigned after the try
+    // deliberately — they run in a later task, which no try/catch here could cover.
+    let xmlhttp: XMLHttpRequest;
     try {
+      xmlhttp = new XMLHttpRequest();
       xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
       // v2 reads the api key and env from headers (the body keeps carrying both,
       // so one body shape serves every endpoint version) and attributes traffic by

@@ -229,6 +229,37 @@ describe.each([
     expect(xhrMock.send).toHaveBeenCalledTimes(1);
     expect(secondBatch).not.toHaveBeenCalled();
   });
+
+  test("a failed XMLHttpRequest construction does not latch the guard either", () => {
+    // The construction sits inside the same try, which is what makes
+    // sendTrackingRequest total — and therefore makes the gzip promise chain in
+    // callInspectorApi unable to reject.
+    const handler = newHandler();
+    const onCompleted = jest.fn();
+
+    jest.clearAllMocks();
+    (window.XMLHttpRequest as unknown as jest.Mock).mockImplementationOnce(
+      () => {
+        throw new Error("XMLHttpRequest is not available");
+      }
+    );
+
+    expect(() => {
+      handler.callInspectorWithBatchBody(
+        [handler.bodyForSessionStartedCall()],
+        onCompleted
+      );
+    }).not.toThrow();
+    expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+
+    const secondBatch = jest.fn();
+    handler.callInspectorWithBatchBody(
+      [handler.bodyForSessionStartedCall()],
+      secondBatch
+    );
+
+    expect(xhrMock.send).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("client option wiring", () => {
