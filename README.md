@@ -206,9 +206,10 @@ applies to that event. That changes how `appVersion` resolves on the wire:
 > without an `appVersion` causes the event to be **silently dropped** — the HTTP response is
 > still `200`, but the event never reaches the Inspector dashboard. So always pair
 > `originHint` with an `appVersion` for now. When logging is enabled
-> (`inspector.enableLogging(true)`), the SDK emits one `console.warn` per page the first time
-> it builds such a body. The SDK already sends the correct wire shape, so these calls start
-> working unchanged the moment the backend catches up.
+> (`inspector.enableLogging(true)`), the SDK emits one `console.warn` the first time it
+> builds such a body — once per build per page, since the full and lite builds are separate
+> modules that latch independently. The SDK already sends the correct wire shape, so these
+> calls start working unchanged the moment the backend catches up.
 
 # Extracting event schema manually
 

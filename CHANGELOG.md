@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Normalization**: string values are trimmed; empty strings, whitespace-only strings, and non-string values (numbers, booleans, `null`, objects, arrays) are omitted entirely. Omitted `outputReference`/`originHint` are never sent as `null` or `""`. `appVersion` is the one field in `TrackOptions` that can legitimately be sent as a literal `null` on the wire (with `originHint` set and `appVersion` omitted) — see rule above.
   - **Backward compatible**: calling either method without the `options` argument (or with an empty `{}`) adds no new keys to the request body. The body is byte-for-byte what 3.2.0 sent apart from the `libVersion` value, which carries the release number and therefore changes in every release.
   - Events tracked through Avo Codegen (Avo Functions) never carry `outputReference`/`originHint`/`appVersion`, since Codegen-generated calls have no per-call gateway configuration to pass.
-  - **One-shot warning**: when logging is enabled (`inspector.enableLogging(true)`), the first event body built with an `originHint` and no usable `appVersion` logs a single `console.warn` per page/process, naming no option values. See "Known limitations" below for why.
+  - **One-shot warning**: when logging is enabled (`inspector.enableLogging(true)`), the first event body built with an `originHint` and no usable `appVersion` logs a single `console.warn`, naming no option values. The latch is per build, not global: the full and lite handlers are separate modules with separate latches, so an app that loads both can see one warning from each. See "Known limitations" below for why.
 
 ### Known limitations
 

@@ -2,9 +2,10 @@
  * The nullable-appVersion warning.
  *
  * `/inspector/v1/track` currently drops any event whose `appVersion` is null and
- * still answers 200, so the SDK warns once per page/process when it builds such a
- * body. The latch is module-level, so every test here loads a fresh copy of the
- * handler module via `jest.isolateModules`.
+ * still answers 200, so the SDK warns once when it builds such a body. The latch
+ * is module-level, which is also why the full and lite builds warn independently
+ * — the `describe.each` below runs the whole matrix against each of them — and
+ * why every test loads a fresh copy of its handler via `jest.isolateModules`.
  */
 
 const WARNING =
@@ -200,9 +201,11 @@ describe.each([
 
 describe("null appVersion warning - latch scope", () => {
   beforeEach(() => {
-    (console.warn as jest.Mock).mockClear();
+    warnMock.mockClear();
   });
 
+  // This is why the guarantee is worded "one warning per build", not "one per
+  // page": an app that loads both entry points holds two independent latches.
   test("the full and lite builds latch independently (separate bundles)", () => {
     const full = loadFullHandler();
     const lite = loadLiteHandler();
@@ -213,6 +216,6 @@ describe("null appVersion warning - latch scope", () => {
     full.bodyWith({ originHint: "ios" });
     lite.bodyWith({ originHint: "ios" });
 
-    expect(console.warn as jest.Mock).toHaveBeenCalledTimes(2);
+    expect(warnMock).toHaveBeenCalledTimes(2);
   });
 });

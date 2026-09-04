@@ -83,8 +83,10 @@ function normalizeHint(value: unknown): string | undefined {
 /**
  * KNOWN BACKEND GAP: the Inspector ingestion endpoint (/inspector/v1/track)
  * silently drops events whose appVersion is null — it still answers 200, so the
- * drop is invisible from here. Latched module-level so one page/process emits at
- * most one warning no matter how many such events are tracked.
+ * drop is invisible from here. The latch is per module, so each build emits at
+ * most one warning per page/process no matter how many such events are tracked.
+ * The full and lite builds latch independently, so an app that loads both can
+ * see one warning from each.
  */
 let warnedAboutNullAppVersion = false;
 

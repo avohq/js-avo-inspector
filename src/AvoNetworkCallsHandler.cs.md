@@ -25,7 +25,7 @@ Builds Inspector tracking request bodies (session-started and event-schema paylo
 
 `gzipMinBodyLength = 1024` — bodies shorter than this (in JS string length) are sent uncompressed.
 
-`warnedAboutNullAppVersion` — module-level boolean latch, so a page/process emits at most one null-`appVersion` warning (see below).
+`warnedAboutNullAppVersion` — module-level boolean latch, so a page/process emits at most one null-`appVersion` warning *from this module* (see below). The lite handler carries its own copy of the latch, so the guarantee is one warning per build, not one per page.
 
 ## Functional requirements
 
@@ -48,7 +48,7 @@ Builds Inspector tracking request bodies (session-started and event-schema paylo
   | absent | absent | the configured version (untouched pre-3.3.0 behavior) |
 
 - Omitting `options`, or passing `{}`, yields exactly the pre-3.3.0 key set and values — only `libVersion` differs across versions.
-- IMPORTANT (backend gap, as of 3.3.0): `/inspector/v1/track`'s fast parser discards `outputReference`/`originHint` and **drops events whose `appVersion` is `null`**, while still answering `200`. The handler therefore emits **one** `console.warn` per page/process — fixed text, no option values — the first time it resolves `appVersion` to `null`, gated on `AvoInspector.shouldLog`. `shouldLog` is checked *before* the latch is set, so a call made with logging off does not consume the single warning owed to a later logging-on call. The wire shape is final; the warning and this note are the only things to remove once the parser is fixed.
+- IMPORTANT (backend gap, as of 3.3.0): `/inspector/v1/track`'s fast parser discards `outputReference`/`originHint` and **drops events whose `appVersion` is `null`**, while still answering `200`. The handler therefore emits **one** `console.warn` per page/process — fixed text, no option values — the first time it resolves `appVersion` to `null`, gated on `AvoInspector.shouldLog`. "Per page/process" is scoped to this module: the lite handler latches separately, so an app loading both builds can see one warning from each. `shouldLog` is checked *before* the latch is set, so a call made with logging off does not consume the single warning owed to a later logging-on call. The wire shape is final; the warning and this note are the only things to remove once the parser is fixed.
 
 ### Send path (`callInspectorApi` → `sendTrackingRequest`)
 

@@ -27,7 +27,7 @@ Identical to the full handler, byte for byte:
 - `outputReference` / `originHint` are set on the body only when defined — otherwise the key is absent, never `null` or `""` — and are top-level siblings of `eventProperties`, never sourced from or written into event data.
 - `appVersion`: `originHint` present → the option value, or literal `null` when no usable `appVersion` was given (the configured version is deliberately not applied); `originHint` absent → the option value when given, else the configured version.
 - No `options` (or `{}`) → exactly the pre-3.3.0 key set and values, only `libVersion` differs.
-- IMPORTANT (backend gap, as of 3.3.0): `/inspector/v1/track` discards `outputReference`/`originHint` and **drops events whose `appVersion` is `null`** while still answering `200`. One `console.warn` per page/process (fixed text, no option values) is emitted the first time `appVersion` resolves to `null`, gated on `AvoInspector.shouldLog` — which is checked before the latch is set, so a logging-off call cannot consume the warning owed to a later logging-on one.
+- IMPORTANT (backend gap, as of 3.3.0): `/inspector/v1/track` discards `outputReference`/`originHint` and **drops events whose `appVersion` is `null`** while still answering `200`. One `console.warn` per page/process *from this module* (fixed text, no option values) is emitted the first time `appVersion` resolves to `null`, gated on `AvoInspector.shouldLog` — which is checked before the latch is set, so a logging-off call cannot consume the warning owed to a later logging-on one.
 
 ### Send path (`callInspectorApi` → `sendTrackingRequest`)
 
