@@ -130,10 +130,15 @@ describe("AvoInspectorLite - trackSchema", () => {
 
 describe("AvoInspectorLite - hint omission end-to-end", () => {
   test("trackSchemaFromEvent with whitespace-only outputReference and originHint 'web' stores originHint only", async () => {
+    // Clear the cache BEFORE constructing. AvoBatcherLite's constructor starts an
+    // async restore whose read of the cache happens during construction, with only
+    // the concat deferred to a microtask — so a removeItem afterwards cannot stop
+    // already-read events being appended. Today the global afterEach hides this,
+    // which is exactly why the ordering has to be right rather than merely lucky.
+    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
+
     const inspector = new AvoInspectorLite(defaultLiteOptions);
     inspector.enableLogging(false);
-
-    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
 
     await inspector.trackSchemaFromEvent(
       "Ev",
@@ -154,10 +159,15 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
   });
 
   test("trackSchemaFromEvent with originHint set and no appVersion stores body appVersion as null", async () => {
+    // Clear the cache BEFORE constructing. AvoBatcherLite's constructor starts an
+    // async restore whose read of the cache happens during construction, with only
+    // the concat deferred to a microtask — so a removeItem afterwards cannot stop
+    // already-read events being appended. Today the global afterEach hides this,
+    // which is exactly why the ordering has to be right rather than merely lucky.
+    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
+
     const inspector = new AvoInspectorLite(defaultLiteOptions);
     inspector.enableLogging(false);
-
-    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
 
     await inspector.trackSchemaFromEvent(
       "Ev",

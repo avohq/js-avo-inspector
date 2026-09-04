@@ -186,4 +186,33 @@ describe("AvoDeduplicator - manual calls are only compared against Avo Codegen c
       deduplicator.shouldRegisterEvent("Purchase Completed", { ...params }, false)
     ).toEqual(false);
   });
+
+  // CHARACTERIZATION TEST — this pins behavior that is arguably wrong, so that a
+  // future fix has something to trip over rather than a paragraph in a PR thread.
+  //
+  // `shouldRegisterEvent` takes only (eventName, params, fromAvoFunction). Gateway
+  // options are not part of the identity it compares, so a hinted manual call that
+  // deep-equals a Codegen call from the last 300 ms is dropped, and the observation
+  // loses its outputReference/originHint with it.
+  //
+  // This is pre-existing: the same drop happened before TrackOptions existed, and
+  // nothing in this PR made it more likely. What TrackOptions changes is the cost,
+  // because the dropped call now carries gateway attribution the Codegen call
+  // cannot. Fixing it means changing deduplication identity for every user, which
+  // belongs in its own PR with its own ticket rather than riding along here.
+  test("KNOWN GAP: gateway options do not save a manual call from Codegen dedup", () => {
+    const deduplicator = new AvoDeduplicator();
+
+    expect(
+      deduplicator.shouldRegisterEvent("Purchase Completed", { ...params }, true)
+    ).toEqual(true);
+
+    // Same name, deep-equal params, but bound for a specific gateway output. The
+    // options never reach the deduplicator, so this is dropped anyway. When that
+    // is fixed, this expectation flips to true and this test should be rewritten
+    // as a positive assertion rather than deleted.
+    expect(
+      deduplicator.shouldRegisterEvent("Purchase Completed", { ...params }, false)
+    ).toEqual(false);
+  });
 });
