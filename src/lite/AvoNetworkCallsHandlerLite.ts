@@ -413,11 +413,16 @@ export class AvoNetworkCallsHandlerLite {
     // of the page. Reporting through onCompleted keeps that path recoverable — the
     // batcher puts the events back and retries with the next batch.
     //
-    // The XMLHttpRequest construction is inside the try for the same reason. That
-    // makes this method total: because it cannot throw at all, the gzip promise
-    // chain in callInspectorApi cannot reject either, so the async send path has no
-    // uncaught route out of it. The event handlers below are assigned after the try
-    // deliberately — they run in a later task, which no try/catch here could cover.
+    // The XMLHttpRequest construction is inside the try for the same reason. What
+    // that buys is a precise guarantee, worth stating exactly: no synchronous XHR
+    // setup step can throw out of this method, on either the direct or the gzipped
+    // path. It is NOT a claim that the method never throws — onCompleted is the
+    // caller's own callback, typed to return any, and a throw from it propagates.
+    // That case is harmless here: callInspectorWithBatchBody clears `sending`
+    // before forwarding to its caller's callback, so a throwing callback cannot
+    // latch the guard; on the gzipped path it surfaces as an unhandled rejection.
+    // The event handlers below are assigned after the try deliberately — they run
+    // in a later task, which no try/catch here could cover.
     let xmlhttp: XMLHttpRequest;
     try {
       xmlhttp = new XMLHttpRequest();
