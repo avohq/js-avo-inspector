@@ -169,7 +169,16 @@ describe.each([
   test("X-Avo-Client falls back to web for a value that cannot be a header", () => {
     // setRequestHeader throws on these, which would take the whole batcher down
     // (see the wedge test below). Losing the label beats losing every event.
-    ["gtm\nweb", "gtm web", "gtm:web", "x".repeat(65)].forEach((bad) => {
+    // The last two are the WebIDL ByteString case: any code unit above U+00FF
+    // throws a TypeError before the request is ever sent.
+    [
+      "gtm\nweb",
+      "gtm web",
+      "gtm:web",
+      "x".repeat(65),
+      "gtm-wéb",
+      "gtm-web🚀"
+    ].forEach((bad) => {
       expect(headersFromOneSend(newHandler(bad))["X-Avo-Client"]).toBe("web");
     });
   });
