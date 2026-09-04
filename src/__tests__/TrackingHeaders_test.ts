@@ -136,6 +136,90 @@ describe.each([
   test("no Content-Encoding header on an uncompressed send", () => {
     expect(headersFromOneSend(newHandler())["Content-Encoding"]).toBeUndefined();
   });
+
+  test("every platform token in the contract survives normalization", () => {
+    // The normalizer must not be so strict that it rejects real senders. These
+    // are the X-Avo-Client values the other Avo SDKs and templates send.
+    [
+      "web",
+      "gtm-web",
+      "gtm-server",
+      "ios",
+      "android",
+      "node",
+      "csharp",
+      "ruby",
+      "go"
+    ].forEach((token) => {
+      expect(headersFromOneSend(newHandler(token))["X-Avo-Client"]).toBe(token);
+    });
+  });
+
+  test("X-Avo-Client recovers a token with surrounding whitespace", () => {
+    // A value copied out of a config file keeps its trailing newline. Trimming
+    // it preserves the attribution rather than silently downgrading to "web".
+    expect(headersFromOneSend(newHandler("gtm-web\n"))["X-Avo-Client"]).toBe(
+      "gtm-web"
+    );
+    expect(headersFromOneSend(newHandler("  gtm-web  "))["X-Avo-Client"]).toBe(
+      "gtm-web"
+    );
+  });
+
+  test("X-Avo-Client falls back to web for a value that cannot be a header", () => {
+    // setRequestHeader throws on these, which would take the whole batcher down
+    // (see the wedge test below). Losing the label beats losing every event.
+    ["gtm\nweb", "gtm web", "gtm:web", "x".repeat(65)].forEach((bad) => {
+      expect(headersFromOneSend(newHandler(bad))["X-Avo-Client"]).toBe("web");
+    });
+  });
+
+  test("a rejected header reports through onCompleted instead of throwing", () => {
+    const handler = newHandler();
+    const onCompleted = jest.fn();
+
+    jest.clearAllMocks();
+    xhrMock.setRequestHeader.mockImplementationOnce(() => {
+      throw new SyntaxError("Failed to execute 'setRequestHeader'");
+    });
+
+    expect(() => {
+      handler.callInspectorWithBatchBody(
+        [handler.bodyForSessionStartedCall()],
+        onCompleted
+      );
+    }).not.toThrow();
+
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+    expect(xhrMock.send).not.toHaveBeenCalled();
+  });
+
+  test("a rejected header does not latch the sending guard", () => {
+    // The regression that matters. `sending` is cleared only from the completion
+    // callback, so an exception escaping the synchronous setup would leave it
+    // true and make every later batch return the "another batch sending is in
+    // progress" error for the rest of the page.
+    const handler = newHandler();
+
+    jest.clearAllMocks();
+    xhrMock.setRequestHeader.mockImplementationOnce(() => {
+      throw new SyntaxError("Failed to execute 'setRequestHeader'");
+    });
+    handler.callInspectorWithBatchBody(
+      [handler.bodyForSessionStartedCall()],
+      jest.fn()
+    );
+
+    const secondBatch = jest.fn();
+    handler.callInspectorWithBatchBody(
+      [handler.bodyForSessionStartedCall()],
+      secondBatch
+    );
+
+    expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    expect(secondBatch).not.toHaveBeenCalled();
+  });
 });
 
 describe("client option wiring", () => {

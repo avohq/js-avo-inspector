@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Backward compatible**: calling either method without the `options` argument (or with an empty `{}`) adds no new keys to the request body. The body is byte-for-byte what 3.2.0 sent apart from the `libVersion` value, which carries the release number and therefore changes in every release.
   - Events tracked through Avo Codegen (Avo Functions) never carry `outputReference`/`originHint`/`appVersion`, since Codegen-generated calls have no per-call gateway configuration to pass.
   - The endpoint reads all three fields, including a literal `appVersion: null` (recorded as `"unversioned"`), so no field has to be paired with another. See the endpoint change below.
-- **`client` constructor option**: sets the `X-Avo-Client` request header, which tells Avo which kind of client produced the traffic. Defaults to `"web"`; leave it alone unless this SDK is embedded in another Avo integration that needs its own attribution. The script-tag build reads the same value from `window.inspector.__CLIENT__`, alongside the existing `__API_KEY__`/`__ENV__`/`__VERSION__`/`__APP_NAME__` — which is how the Avo web GTM tag template declares itself as `"gtm-web"`.
+- **`client` constructor option**: sets the `X-Avo-Client` request header, which tells Avo which kind of client produced the traffic. Defaults to `"web"`; leave it alone unless this SDK is embedded in another Avo integration that needs its own attribution. The script-tag build reads the same value from `window.inspector.__CLIENT__`, alongside the existing `__API_KEY__`/`__ENV__`/`__VERSION__`/`__APP_NAME__` — which is how the Avo web GTM tag template declares itself as `"gtm-web"`. The value is trimmed and validated against `/^[A-Za-z0-9._-]{1,64}$/`, falling back to `"web"` otherwise — a value the browser refuses as a header would abort request setup and stop the SDK sending entirely.
 
 ### Changed
 
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known limitations
 
-- **Browser traffic is blocked until the ingestion endpoint's CORS preflight allows the new headers.** `api-key`, `env` and `X-Avo-Client` are not CORS-safelisted, and the endpoint's `Access-Control-Allow-Headers` response does not list them yet, so browsers refuse the request before it is sent. There is deliberately no fallback to the old endpoint and no feature flag — the ingestion change ships separately and unblocks this version without a further SDK release.
+- **Browser traffic is blocked until the ingestion endpoint's CORS preflight allows the new headers.** `api-key`, `env` and `X-Avo-Client` are not CORS-safelisted, and the endpoint's `Access-Control-Allow-Headers` response does not list them yet, so browsers refuse the request before it is sent. They must be added to that list rather than replacing it — `Content-Encoding` is already allowed and a gzipped batch still preflights with it. There is deliberately no fallback to the old endpoint and no feature flag — the ingestion change ships separately and unblocks this version without a further SDK release.
 
 ## [3.2.0] - 2026-06-22
 

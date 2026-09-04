@@ -240,8 +240,10 @@ Two consequences worth knowing:
 > **Rollout status:** the Inspector ingestion endpoint does not yet list `api-key`, `env` and
 > `X-Avo-Client` in its `Access-Control-Allow-Headers` preflight response. Until that server
 > change is deployed, browsers block these requests before they are sent, so this version of
-> the SDK cannot deliver events from a browser. There is deliberately no fallback to the old
-> endpoint. Server-side senders are unaffected.
+> the SDK cannot deliver events from a browser. The three have to be *added* to the existing
+> allow-list rather than replacing it: `Content-Encoding` is already there and is still needed,
+> since a gzipped batch puts it in the preflight too. There is deliberately no fallback to the
+> old endpoint. Server-side senders are unaffected.
 
 ## `X-Avo-Client`
 
@@ -258,6 +260,10 @@ let inspector = new Inspector.AvoInspector({
   client: "gtm-web" // optional; defaults to "web"
 });
 ```
+
+The value is trimmed and must look like a platform token — letters, digits, `.`, `_` or `-`, up
+to 64 characters. Anything else falls back to `"web"`, because a value a browser rejects as a
+header would otherwise throw while the request is being set up and stop the SDK sending at all.
 
 The script-tag build reads the same value from `window.inspector.__CLIENT__`, alongside
 `__API_KEY__`, `__ENV__`, `__VERSION__` and `__APP_NAME__`. That is how the Avo web GTM tag
