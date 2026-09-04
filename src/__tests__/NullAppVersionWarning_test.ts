@@ -50,10 +50,10 @@ const loadFullHandler = (): FreshHandler => {
         handler.bodyForEventSchemaCall(
           "event name",
           eventProperties,
-          null,
-          null,
-          undefined,
-          undefined,
+          null, // eventId
+          null, // eventHash
+          undefined, // eventSpecMetadata
+          undefined, // validatedBranchId
           options
         ),
       setShouldLog: (enable: boolean) => {
@@ -90,10 +90,10 @@ const loadLiteHandler = (): FreshHandler => {
         handler.bodyForEventSchemaCall(
           "event name",
           eventProperties,
-          null,
-          null,
-          undefined,
-          undefined,
+          null, // eventId
+          null, // eventHash
+          undefined, // eventSpecMetadata
+          undefined, // validatedBranchId
           options
         ),
       setShouldLog: (enable: boolean) => {
