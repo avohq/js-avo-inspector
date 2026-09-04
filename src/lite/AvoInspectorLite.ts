@@ -59,6 +59,13 @@ export class AvoInspectorLite {
     version: string;
     appName?: string;
     suffix?: string;
+    /**
+     * Value of the `X-Avo-Client` header, which tells the Inspector API which
+     * kind of client sent the traffic. Defaults to `"web"`. Set it only when
+     * this SDK is embedded in another Avo integration that needs its own
+     * attribution — the web GTM tag template passes `"gtm-web"`.
+     */
+    client?: string;
   }) {
     if (isValueEmpty(options.env)) {
       this.environment = AvoInspectorEnv.Dev;
@@ -109,7 +116,8 @@ export class AvoInspectorLite {
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion
+      libVersion,
+      options.client
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
   }

@@ -144,7 +144,7 @@ describe("NetworkCallsHandler", () => {
 
     expect(xhrMock.setRequestHeader).toBeCalledWith(
       "Content-Type",
-      "text/plain"
+      "application/json"
     );
 
     expect(xhrMock.send).toBeCalledTimes(1);

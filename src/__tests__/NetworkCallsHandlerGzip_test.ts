@@ -125,7 +125,7 @@ describe("NetworkCallsHandler gzip compression", () => {
       await waitFor(() => xhrMock.send.mock.calls.length > 0);
 
       const headers = sentHeaders();
-      expect(headers["Content-Type"]).toBe("text/plain");
+      expect(headers["Content-Type"]).toBe("application/json");
       expect(headers["Content-Encoding"]).toBe("gzip");
 
       const body = sentBody();
@@ -310,7 +310,7 @@ describe("NetworkCallsHandlerLite gzip compression", () => {
     await waitFor(() => xhrMock.send.mock.calls.length > 0);
 
     const headers = sentHeaders();
-    expect(headers["Content-Type"]).toBe("text/plain");
+    expect(headers["Content-Type"]).toBe("application/json");
     expect(headers["Content-Encoding"]).toBe("gzip");
 
     expect(gunzipToString(sentBody())).toBe(expectedJson);

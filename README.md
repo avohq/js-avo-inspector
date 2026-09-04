@@ -134,8 +134,7 @@ inspector.trackSchemaFromEvent(
   {
     outputReference: "meta-x7k2q", // which output checkpoint this observation was bound for
     originHint: "web",             // which upstream source produced the event
-    appVersion: "5.1.0",           // that source's app version — keep this set whenever
-                                   // originHint is set (see "Backend note" below)
+    appVersion: "5.1.0",           // that source's app version
   }
 );
 ```
@@ -200,16 +199,69 @@ applies to that event. That changes how `appVersion` resolves on the wire:
 `appVersion` is the one field in `TrackOptions` that can legitimately be sent as a literal
 `null` rather than being omitted — the `originHint` present / `appVersion` absent row above.
 
-> **Backend note (as of 3.3.0):** the Inspector backend does not yet honor `outputReference`
-> or `originHint` on this SDK's endpoint (`POST /inspector/v1/track`), and does not yet
-> accept a literal `appVersion: null`. Until the backend is updated, setting `originHint`
-> without an `appVersion` causes the event to be **silently dropped** — the HTTP response is
-> still `200`, but the event never reaches the Inspector dashboard. So always pair
-> `originHint` with an `appVersion` for now. When logging is enabled
-> (`inspector.enableLogging(true)`), the SDK emits one `console.warn` the first time it
-> builds such a body — once per build per page, since the full and lite builds are separate
-> modules that latch independently. The SDK already sends the correct wire shape, so these
-> calls start working unchanged the moment the backend catches up.
+> Setting `originHint` without an `appVersion` is a complete, supported call. The endpoint
+> this SDK posts to (`POST /inspector/v2/track`, see [Endpoint and request
+> headers](#endpoint-and-request-headers)) reads both gateway fields and records a `null`
+> `appVersion` as `"unversioned"`.
+
+# Endpoint and request headers
+
+Since version `3.3.0` the SDK posts every batch to the unified Inspector endpoint:
+
+```
+POST https://api.avo.app/inspector/v2/track
+```
+
+with these request headers:
+
+| Header | Value |
+|---|---|
+| `Content-Type` | `application/json` |
+| `api-key` | your Inspector API key |
+| `env` | `dev`, `staging` or `prod` |
+| `X-Avo-Client` | `web` by default — see below |
+| `Content-Encoding` | `gzip`, only when the batch was large enough to compress |
+
+The API key and environment now travel in headers. They are still sent in the request body as
+well — v2 ignores the body copies, and keeping them means one body shape across endpoint
+versions.
+
+Two consequences worth knowing:
+
+- **Every request is now CORS-preflighted.** `api-key`, `env` and `X-Avo-Client` are not
+  CORS-safelisted request headers, so the browser sends an `OPTIONS` request before each
+  `POST`. Previously only gzipped batches were preflighted. The body type moved from
+  `text/plain` to `application/json` for the same reason: `text/plain` existed only to stay
+  inside the CORS safelist, which the new headers make impossible anyway.
+- **Server-side sampling is gone.** v2 never reduces the sampling rate, so stored event counts
+  are exact rather than extrapolated. The SDK still reads `samplingRate` from the response and
+  still applies it; the server simply always answers `1.0`.
+
+> **Rollout status:** the Inspector ingestion endpoint does not yet list `api-key`, `env` and
+> `X-Avo-Client` in its `Access-Control-Allow-Headers` preflight response. Until that server
+> change is deployed, browsers block these requests before they are sent, so this version of
+> the SDK cannot deliver events from a browser. There is deliberately no fallback to the old
+> endpoint. Server-side senders are unaffected.
+
+## `X-Avo-Client`
+
+`X-Avo-Client` tells Avo which kind of client produced the traffic, so it can be attributed
+without inspecting the body. It defaults to `"web"` and you should normally leave it alone.
+Set it only when this SDK is embedded in another Avo integration that needs its own
+attribution:
+
+```javascript
+let inspector = new Inspector.AvoInspector({
+  apiKey: "your api key",
+  env: Inspector.AvoInspectorEnv.Prod,
+  version: "1.0.0",
+  client: "gtm-web" // optional; defaults to "web"
+});
+```
+
+The script-tag build reads the same value from `window.inspector.__CLIENT__`, alongside
+`__API_KEY__`, `__ENV__`, `__VERSION__` and `__APP_NAME__`. That is how the Avo web GTM tag
+template declares itself as `gtm-web`.
 
 # Extracting event schema manually
 

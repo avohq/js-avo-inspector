@@ -11,6 +11,12 @@ type options = {
   env: env,
   version: string,
   publicEncryptionKey?: string,
+  /**
+   * Value of the `X-Avo-Client` header. Defaults to `"web"` when omitted; set it
+   * only when embedding this SDK in another Avo integration that needs its own
+   * attribution.
+   */
+  client?: string,
 }
 
 @new @module("avo-inspector")
@@ -20,10 +26,9 @@ external make: options => t = "AvoInspector"
  * Per-call gateway coordinates. Omitted fields are omitted from the emitted JS
  * object, which is exactly how the SDK expects an absent option.
  *
- * BACKEND NOTE (as of 3.3.0): `POST /inspector/v1/track` does not yet honor
- * `outputReference`/`originHint`, and drops any event whose `appVersion` is
- * null while still answering 200 — so pair `originHint` with `appVersion`
- * until the backend is updated.
+ * `POST /inspector/v2/track`, the endpoint the SDK posts to, decodes both
+ * `outputReference` and `originHint` and accepts a null `appVersion`, so no
+ * field here has to be paired with another.
  */
 type trackOptions = {
   outputReference?: string,

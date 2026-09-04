@@ -54,12 +54,9 @@ export interface SessionStartedBody extends BaseBody {
  * data. Every value is trimmed; empty, whitespace-only and non-string values are
  * treated as absent.
  *
- * BACKEND NOTE (as of 3.3.0): the endpoint this SDK posts to,
- * `POST /inspector/v1/track`, does not yet honor `outputReference`/`originHint`,
- * and drops any event whose `appVersion` is `null` while still answering `200`.
- * So pair `originHint` with an `appVersion` until the backend is updated. The
- * wire shape below is already the final one, so such calls start working
- * unchanged the moment it is — nothing here has to be un-done.
+ * The endpoint this SDK posts to, `POST /inspector/v2/track`, decodes both
+ * `outputReference` and `originHint` and accepts a literal `appVersion: null`
+ * (stored as "unversioned"), so no field here has to be paired with another.
  *
  * Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
  * AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
@@ -69,7 +66,7 @@ export interface TrackOptions {
   outputReference?: string;
   /** Low-cardinality hint identifying the event's upstream source (e.g. "web", "ios"). Never a user identifier. */
   originHint?: string;
-  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (literal null when omitted — which the backend currently drops, see above); without originHint, overrides it only when provided. */
+  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (literal null when omitted); without originHint, overrides it only when provided. */
   appVersion?: string;
 }
 
@@ -82,16 +79,6 @@ function normalizeHint(value: unknown): string | undefined {
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
 }
-
-/**
- * KNOWN BACKEND GAP: the Inspector ingestion endpoint (/inspector/v1/track)
- * silently drops events whose appVersion is null — it still answers 200, so the
- * drop is invisible from here. The latch is per module, so each build emits at
- * most one warning per page/process no matter how many such events are tracked.
- * The full and lite builds latch independently, so an app that loads both can
- * see one warning from each.
- */
-let warnedAboutNullAppVersion = false;
 
 export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
   type: "event";
@@ -170,11 +157,12 @@ export class AvoNetworkCallsHandler {
   private readonly appVersion: string;
   private readonly libVersion: string;
   private readonly publicEncryptionKey?: string;
+  private readonly client: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
 
   private static readonly trackingEndpoint =
-    "https://api.avo.app/inspector/v1/track";
+    "https://api.avo.app/inspector/v2/track";
 
   constructor(
     apiKey: string,
@@ -182,7 +170,8 @@ export class AvoNetworkCallsHandler {
     appName: string,
     appVersion: string,
     libVersion: string,
-    publicEncryptionKey?: string
+    publicEncryptionKey?: string,
+    client?: string
   ) {
     this.apiKey = apiKey;
     this.envName = envName;
@@ -190,6 +179,7 @@ export class AvoNetworkCallsHandler {
     this.appVersion = appVersion;
     this.libVersion = libVersion;
     this.publicEncryptionKey = publicEncryptionKey;
+    this.client = client || "web";
   }
 
   callInspectorWithBatchBody(
@@ -320,18 +310,6 @@ export class AvoNetworkCallsHandler {
       // An origin hint marks an event from another source, whose app version is
       // unrelated to this SDK instance's configured version.
       eventSchemaBody.appVersion = appVersion !== undefined ? appVersion : null;
-      // shouldLog is checked before the latch is set so a call made while logging
-      // is off does not swallow the one warning a later logging-on call deserves.
-      if (
-        appVersion === undefined &&
-        !warnedAboutNullAppVersion &&
-        AvoInspector.shouldLog
-      ) {
-        warnedAboutNullAppVersion = true;
-        console.warn(
-          "[Avo Inspector] originHint is set without appVersion; appVersion will be sent as null, which the Inspector backend currently drops. Pass options.appVersion until the backend is updated."
-        );
-      }
     } else if (appVersion !== undefined) {
       eventSchemaBody.appVersion = appVersion;
     }
@@ -430,7 +408,17 @@ export class AvoNetworkCallsHandler {
   ): void {
     const xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
-    xmlhttp.setRequestHeader("Content-Type", "text/plain");
+    // v2 reads the api key and env from headers (the body keeps carrying both,
+    // so one body shape serves every endpoint version) and attributes traffic by
+    // X-Avo-Client without decoding a body. None of the three is CORS-safelisted,
+    // so a browser preflights every send — which is why the body is no longer
+    // `text/plain`: that content type existed only to stay inside the safelist and
+    // dodge the preflight, a saving custom headers cancel out, and v2's body reader
+    // parses a text/plain body twice and throws.
+    xmlhttp.setRequestHeader("Content-Type", "application/json");
+    xmlhttp.setRequestHeader("api-key", this.apiKey);
+    xmlhttp.setRequestHeader("env", this.envName);
+    xmlhttp.setRequestHeader("X-Avo-Client", this.client);
     if (isGzipped) {
       xmlhttp.setRequestHeader("Content-Encoding", "gzip");
     }

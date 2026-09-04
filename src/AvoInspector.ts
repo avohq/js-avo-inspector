@@ -77,6 +77,13 @@ export class AvoInspector {
     appName?: string;
     suffix?: string;
     publicEncryptionKey?: string;
+    /**
+     * Value of the `X-Avo-Client` header, which tells the Inspector API which
+     * kind of client sent the traffic. Defaults to `"web"`. Set it only when
+     * this SDK is embedded in another Avo integration that needs its own
+     * attribution — the web GTM tag template passes `"gtm-web"`.
+     */
+    client?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -131,7 +138,8 @@ export class AvoInspector {
       options.appName || "",
       this.version,
       libVersion,
-      this.publicEncryptionKey
+      this.publicEncryptionKey,
+      options.client
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
     this.avoDeduplicator = new AvoDeduplicator();

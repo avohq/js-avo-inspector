@@ -1,6 +1,6 @@
 type t
 type env = [#dev | #prod | #staging]
-type options = {apiKey: string, env: env, version: string}
+type options = {apiKey: string, env: env, version: string, client?: string}
 @new @module("avo-inspector/lite")
 external make: options => t = "AvoInspector"
 type trackOptions = {outputReference?: string, originHint?: string, appVersion?: string}

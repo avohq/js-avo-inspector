@@ -2,7 +2,7 @@
 
 ## Short description
 
-Builds Inspector tracking request bodies (session-started and event-schema payloads) and POSTs them to the Avo Inspector ingestion endpoint. Owns batching guard, sampling, stream-id reconciliation, response-driven sampling-rate updates, client-side gzip compression of large request bodies, and — as of this change — the per-call gateway coordinates (`TrackOptions`) that decorate an event-schema body.
+Builds Inspector tracking request bodies (session-started and event-schema payloads) and POSTs them to the Avo Inspector ingestion endpoint. Owns batching guard, sampling, stream-id reconciliation, response-driven sampling-rate updates, client-side gzip compression of large request bodies, the identifying request headers (`api-key`, `env`, `X-Avo-Client`), and — as of this change — the per-call gateway coordinates (`TrackOptions`) that decorate an event-schema body.
 
 ## Tech stack
 
@@ -25,7 +25,7 @@ Builds Inspector tracking request bodies (session-started and event-schema paylo
 
 `gzipMinBodyLength = 1024` — bodies shorter than this (in JS string length) are sent uncompressed.
 
-`warnedAboutNullAppVersion` — module-level boolean latch, so a page/process emits at most one null-`appVersion` warning *from this module* (see below). The lite handler carries its own copy of the latch, so the guarantee is one warning per build, not one per page.
+`client` — instance field holding the `X-Avo-Client` header value. Constructor argument, `""`/`undefined` → `"web"`. Direct integrators pass it as the `client` constructor option; the script-tag build reads `window.inspector.__CLIENT__`, which the web GTM tag template sets to `"gtm-web"`.
 
 ## Functional requirements
 
@@ -48,26 +48,26 @@ Builds Inspector tracking request bodies (session-started and event-schema paylo
   | absent | absent | the configured version (untouched pre-3.3.0 behavior) |
 
 - Omitting `options`, or passing `{}`, yields exactly the pre-3.3.0 key set and values — only `libVersion` differs across versions.
-- IMPORTANT (backend gap, as of 3.3.0): `/inspector/v1/track`'s fast parser discards `outputReference`/`originHint` and **drops events whose `appVersion` is `null`**, while still answering `200`. The handler therefore emits **one** `console.warn` per page/process — fixed text, no option values — the first time it resolves `appVersion` to `null`, gated on `AvoInspector.shouldLog`. "Per page/process" is scoped to this module: the lite handler latches separately, so an app loading both builds can see one warning from each. `shouldLog` is checked *before* the latch is set, so a call made with logging off does not consume the single warning owed to a later logging-on call. The wire shape is final; the warning and this note are the only things to remove once the parser is fixed.
+- The endpoint decodes all three: `/inspector/v2/track` runs the public parser, which reads `outputReference` and `originHint` and stores a `null` `appVersion` as `"unversioned"`. No pairing rule, no warning — the handler emits none.
 
 ### Send path (`callInspectorApi` → `sendTrackingRequest`)
 
 1. `callInspectorApi` serializes events once: `body = JSON.stringify(events)`.
 2. **Uncompressed fast path (synchronous):** if `CompressionStream` is `undefined` OR `body.length < gzipMinBodyLength`, call `sendTrackingRequest(body, isGzipped=false, …)` and return immediately — preserving legacy timing.
 3. **Compressed path (async):** otherwise `gzip(body)` then, in the promise callback, send the compressed `Uint8Array` with `isGzipped=true` if compression succeeded, or fall back to the uncompressed string with `isGzipped=false` if `gzip` returned null.
-4. `sendTrackingRequest(body, isGzipped, onCompleted)` opens an async POST to `trackingEndpoint`, sets `Content-Type: text/plain`, adds `Content-Encoding: gzip` **only when `isGzipped`**, applies `AvoInspector.networkTimeout`, and sends the string-or-bytes body.
+4. `sendTrackingRequest(body, isGzipped, onCompleted)` opens an async POST to `trackingEndpoint` and sets four headers — `Content-Type: application/json`, `api-key: <apiKey>`, `env: <envName>`, `X-Avo-Client: <client>` — plus `Content-Encoding: gzip` **only when `isGzipped`**, applies `AvoInspector.networkTimeout`, and sends the string-or-bytes body. v2 takes the api key and env from the headers and ignores the body copies; the body keeps carrying both regardless, so one body shape serves every endpoint version.
 5. On `onload`: non-200 → Error callback; 200 → parse JSON response (parse failure → Error callback), adopt `response.samplingRate` when it is a valid number, then `onCompleted(null)`. `onerror` / `ontimeout` produce the corresponding Error callbacks.
 
 `gzip(body)` — encodes the string to UTF-8 bytes, pipes through a `"gzip"` `CompressionStream`, concatenates the output chunks into one `Uint8Array`, and returns it. Returns `null` if anything throws.
 
-- IMPORTANT: `trackingEndpoint` is `https://api.avo.app/inspector/v1/track`.
+- IMPORTANT: `trackingEndpoint` is `https://api.avo.app/inspector/v2/track`.
 
 ## Non-functional requirements
 
 - **Network-volume reduction:** large bodies are gzipped client-side (~6–10× smaller) to cut metered ingestion volume.
-- **Backward-compatible fallbacks, behavior-preserving:** browsers without `CompressionStream` send uncompressed *synchronously* with no `Content-Encoding` header (so they never trigger a CORS preflight); runtime compression failure falls back to the uncompressed string; sub-1 KB bodies skip gzip. In every fallback the wire shape is byte-identical to pre-change behavior.
+- **Backward-compatible fallbacks, behavior-preserving:** browsers without `CompressionStream` send uncompressed *synchronously* with no `Content-Encoding` header; runtime compression failure falls back to the uncompressed string; sub-1 KB bodies skip gzip. In every fallback the body bytes are identical to pre-change behavior.
 - **Wire-shape invariant:** a gzipped body must gunzip back to the exact original `JSON.stringify(events)` string.
-- **Preflight note:** sending `Content-Encoding: gzip` is not CORS-safelisted, so compressed POSTs are preflighted; the ingestion server must answer `OPTIONS` and decompress the body.
+- **Preflight note:** `api-key`, `env` and `X-Avo-Client` are not CORS-safelisted, so *every* browser POST is now preflighted — not just the gzipped ones, as before. That is why `Content-Type` moved from `text/plain` to `application/json`: `text/plain` was chosen only to stay inside the CORS safelist and skip the preflight, a saving the new headers cancel out, and v2's body reader parses a `text/plain` body a second time and throws. The ingestion server must answer `OPTIONS` with all four header names in `Access-Control-Allow-Headers`; until it does, browser senders are blocked in production (see README).
 - Re-entrancy guard (`sending`) prevents overlapping batch sends; `samplingRate` is mutated from server responses.
-- **Lite-sync invariant:** every `TrackOptions` / `normalizeHint` / warning-latch line is byte-identical to `src/lite/AvoNetworkCallsHandlerLite.ts`, so `verify:lite-sync` drift stays at its baseline.
-- **Log hygiene:** the one-shot warning never interpolates option values (an `originHint` is low-cardinality by contract but is still customer data).
+- **Lite-sync invariant:** every `TrackOptions` / `normalizeHint` / `client` / request-header line is byte-identical to `src/lite/AvoNetworkCallsHandlerLite.ts`, so `verify:lite-sync` drift stays at or under its baseline.
+- **Sampling:** v2 pins `samplingRate` to `1.0` server-side. The handler's client-side sampling logic is unchanged and still adopts whatever rate the response carries — it just will not be told to reduce it.
