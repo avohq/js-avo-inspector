@@ -187,8 +187,11 @@ describe("AvoDeduplicator - manual calls are only compared against Avo Codegen c
     ).toEqual(false);
   });
 
-  // CHARACTERIZATION TEST — this pins behavior that is arguably wrong, so that a
-  // future fix has something to trip over rather than a paragraph in a PR thread.
+  // CHARACTERIZATION TEST — pins behavior that is arguably wrong, so that the
+  // fix has something to trip over rather than a paragraph in a PR thread.
+  //
+  // Owned by AVO-3560: "Inspector JS SDK: Codegen deduplication silently drops a
+  // gateway-hinted manual call" — https://linear.app/avo/issue/AVO-3560
   //
   // `shouldRegisterEvent` takes only (eventName, params, fromAvoFunction). Gateway
   // options are not part of the identity it compares, so a hinted manual call that
@@ -200,7 +203,7 @@ describe("AvoDeduplicator - manual calls are only compared against Avo Codegen c
   // because the dropped call now carries gateway attribution the Codegen call
   // cannot. Fixing it means changing deduplication identity for every user, which
   // belongs in its own PR with its own ticket rather than riding along here.
-  test("KNOWN GAP: gateway options do not save a manual call from Codegen dedup", () => {
+  test("KNOWN GAP (AVO-3560): gateway options do not save a manual call from Codegen dedup", () => {
     const deduplicator = new AvoDeduplicator();
 
     expect(
@@ -208,9 +211,9 @@ describe("AvoDeduplicator - manual calls are only compared against Avo Codegen c
     ).toEqual(true);
 
     // Same name, deep-equal params, but bound for a specific gateway output. The
-    // options never reach the deduplicator, so this is dropped anyway. When that
-    // is fixed, this expectation flips to true and this test should be rewritten
-    // as a positive assertion rather than deleted.
+    // options never reach the deduplicator, so this is dropped anyway. When
+    // AVO-3560 is fixed, this expectation flips to true and this test should be
+    // rewritten as a positive assertion rather than deleted.
     expect(
       deduplicator.shouldRegisterEvent("Purchase Completed", { ...params }, false)
     ).toEqual(false);

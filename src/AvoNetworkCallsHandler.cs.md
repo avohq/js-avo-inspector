@@ -27,6 +27,8 @@ Builds Inspector tracking request bodies (session-started and event-schema paylo
 
 `client` — instance field holding the `X-Avo-Client` header value. Direct integrators pass it as the `client` constructor option; the script-tag build reads `window.inspector.__CLIENT__`, which the web GTM tag template sets to `"gtm-web"`.
 
+`apiKey` — arrives already trimmed: `AvoInspector` trims it once in its constructor, so the header and the body copy carry the same string and a key pasted with a trailing newline cannot make `setRequestHeader` throw. It has no known shape beyond that, so unlike `client` it is not pattern-validated; the send-path `try`/`catch` is its backstop.
+
 `normalizeClient(client)` — trims the constructor argument and returns `"web"` for `undefined`, a non-string, an empty result, or anything failing `clientTokenPattern` (`/^[A-Za-z0-9._-]{1,64}$/`), logging one `console.warn` in the failing case when `AvoInspector.shouldLog`. Unlike `normalizeHint`, this value becomes a *header*: an unusable one makes `setRequestHeader` throw during synchronous setup, which would latch the `sending` guard (see below). Trimming means a token carrying a trailing newline from a config file keeps its attribution instead of silently degrading to `"web"`.
 
 ## Functional requirements

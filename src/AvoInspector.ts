@@ -105,7 +105,15 @@ export class AvoInspector {
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
-      this.apiKey = options.apiKey;
+      // Trimmed once, here, so only the trimmed value is ever stored. On v2 the
+      // api key is a request header, and a key pasted out of a config file or
+      // read from an env var keeps its trailing newline — which setRequestHeader
+      // refuses, turning every send into a caught, silent failure for the life of
+      // the page. Trimming cannot invalidate a real token, and doing it at the
+      // single source means the header and the body copy carry the same string.
+      // It is not a substitute for the send path's try/catch: an embedded control
+      // character survives trim and is still caught there.
+      this.apiKey = options.apiKey.trim();
     }
 
     if (isValueEmpty(options.version)) {

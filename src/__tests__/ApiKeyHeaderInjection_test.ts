@@ -155,6 +155,43 @@ describe("an unusable api key does not throw at the caller", () => {
     headerSpy.mockRestore();
   });
 
+  test("a key with a trailing newline is trimmed and keeps sending", async () => {
+    // The papercut this closes. setRequestHeader would refuse the raw value on
+    // every send, the send path would catch it, and telemetry would be lost in
+    // silence — from nothing worse than a copy-paste out of a config file.
+    // Trimming happens once in the constructor, so the header and the body copy
+    // carry the same string.
+    const headerSpy = jest.spyOn(XMLHttpRequest.prototype, "setRequestHeader");
+    const inspector = flushingInspector("  api-key-xxx\n");
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 });
+
+    const apiKeyHeader = headerSpy.mock.calls.find(
+      ([name]) => name === "api-key"
+    );
+    expect(apiKeyHeader).toBeDefined();
+    expect(apiKeyHeader?.[1]).toBe("api-key-xxx");
+    expect(sendSpy).toHaveBeenCalled();
+
+    // The body copy is the same trimmed string, not the raw one.
+    const body = JSON.parse(sendSpy.mock.calls[0][0] as string);
+    expect(body[0].apiKey).toBe("api-key-xxx");
+    headerSpy.mockRestore();
+  });
+
+  test("a whitespace-only key still throws the documented message", () => {
+    // Trimming must not turn an unusable key into an empty one that slips past
+    // the constructor's own check.
+    expect(() => new AvoInspector({ ...defaultOptions, apiKey: "   " })).toThrow(
+      "[Avo Inspector] No API key provided. Inspector can't operate without API key."
+    );
+    expect(
+      () => new AvoInspectorLite({ ...defaultOptions, apiKey: "   " })
+    ).toThrow(
+      "[Avo Inspector] No API key provided. Inspector can't operate without API key."
+    );
+  });
+
   test("a usable key on the same path does reach send", async () => {
     // Control: without this the tests above would pass even if tracking had
     // silently stopped working for every key.

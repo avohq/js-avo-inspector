@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Track requests now go to the unified endpoint `POST https://api.avo.app/inspector/v2/track`** (was `POST /inspector/v1/track`), which is the endpoint that decodes the gateway coordinates above. Every Avo Inspector sender is moving to it so traffic can be attributed at the edge without decoding a body.
-  - The API key and environment now travel as the `api-key` and `env` request headers, joined by `X-Avo-Client`. They are still sent in the request body too: v2 ignores the body copies, and keeping them keeps one body shape across endpoint versions.
+  - The API key and environment now travel as the `api-key` and `env` request headers, joined by `X-Avo-Client`. The API key is trimmed once at construction, since a key carrying a trailing newline from a config file or an env var is a valid body value but not a valid header value. They are still sent in the request body too: v2 ignores the body copies, and keeping them keeps one body shape across endpoint versions.
   - `Content-Type` changed from `text/plain` to `application/json`. `text/plain` existed only to stay inside the CORS safelist and avoid a preflight; the three new headers are not safelisted, so **every** request is preflighted now regardless — and v2's body reader parses a `text/plain` body a second time and throws.
   - **Server-side sampling is gone on v2**: the response always carries `samplingRate: 1.0`, so stored counts are exact rather than extrapolated. The SDK's own sampling logic is unchanged and still applies whatever rate the response carries.
 
