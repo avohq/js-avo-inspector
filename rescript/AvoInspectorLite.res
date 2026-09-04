@@ -38,6 +38,13 @@ external trackSchemaFromEvent: (t, string, Js.Json.t) => unit = "trackSchemaFrom
 external trackSchemaFromEventWithOptions: (t, string, Js.Json.t, trackOptions) => unit =
   "trackSchemaFromEvent"
 
+@send
+external trackSchema: (t, string, array<Js.Json.t>) => unit = "trackSchema"
+
+/** Same JS method as `trackSchema`, called with the optional third argument. */
+@send
+external trackSchemaWithOptions: (t, string, array<Js.Json.t>, trackOptions) => unit = "trackSchema"
+
 let setNetworkTimeout = (timeout) => {
   %raw(`require("avo-inspector/lite").AvoInspector.networkTimeout = timeout`)
   ()

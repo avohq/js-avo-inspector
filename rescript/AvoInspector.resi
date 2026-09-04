@@ -9,5 +9,9 @@ external trackSchemaFromEvent: (t, string, Js.Json.t) => unit = "trackSchemaFrom
 @send
 external trackSchemaFromEventWithOptions: (t, string, Js.Json.t, trackOptions) => unit =
   "trackSchemaFromEvent"
+@send
+external trackSchema: (t, string, array<Js.Json.t>) => unit = "trackSchema"
+@send
+external trackSchemaWithOptions: (t, string, array<Js.Json.t>, trackOptions) => unit = "trackSchema"
 
 let setNetworkTimeout: int => unit

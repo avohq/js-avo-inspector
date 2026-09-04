@@ -104,14 +104,16 @@ const loadLiteHandler = (): FreshHandler => {
   return fresh;
 };
 
-const warnMock = () => console.warn as jest.Mock;
+// `console.warn` is spied once in src/__tests__/jest.setup.js and never replaced,
+// so a direct cast is stable across the `jest.isolateModules` loads above.
+const warnMock = console.warn as jest.Mock;
 
 describe.each([
   ["full build", loadFullHandler],
   ["lite build", loadLiteHandler]
 ])("null appVersion warning (%s)", (_name, load) => {
   beforeEach(() => {
-    warnMock().mockClear();
+    warnMock.mockClear();
   });
 
   test("warns exactly once across several originHint-without-appVersion calls", () => {
@@ -122,8 +124,8 @@ describe.each([
     handler.bodyWith({ originHint: "android", outputReference: "meta-x7k2q" });
     handler.bodyWith({ originHint: "web", appVersion: "   " });
 
-    expect(warnMock()).toHaveBeenCalledTimes(1);
-    expect(warnMock()).toHaveBeenCalledWith(WARNING);
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(warnMock).toHaveBeenCalledWith(WARNING);
   });
 
   test("the warning carries no option values", () => {
@@ -135,9 +137,9 @@ describe.each([
       outputReference: "output-that-must-not-be-logged"
     });
 
-    expect(warnMock()).toHaveBeenCalledTimes(1);
+    expect(warnMock).toHaveBeenCalledTimes(1);
 
-    const args = warnMock().mock.calls[0];
+    const args = warnMock.mock.calls[0];
     expect(args.length).toBe(1);
     expect(args[0]).toBe(WARNING);
     expect(args[0]).not.toContain("hint-that-must-not-be-logged");
@@ -151,13 +153,13 @@ describe.each([
     handler.bodyWith({ originHint: "ios" });
     handler.bodyWith({ originHint: "android" });
 
-    expect(warnMock()).not.toHaveBeenCalled();
+    expect(warnMock).not.toHaveBeenCalled();
 
     handler.setShouldLog(true);
     handler.bodyWith({ originHint: "ios" });
 
-    expect(warnMock()).toHaveBeenCalledTimes(1);
-    expect(warnMock()).toHaveBeenCalledWith(WARNING);
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(warnMock).toHaveBeenCalledWith(WARNING);
   });
 
   test("stays silent when appVersion is provided alongside originHint", () => {
@@ -167,7 +169,7 @@ describe.each([
     handler.bodyWith({ originHint: "ios", appVersion: "5.1.0" });
     handler.bodyWith({ originHint: "web", appVersion: "  2.0.0  " });
 
-    expect(warnMock()).not.toHaveBeenCalled();
+    expect(warnMock).not.toHaveBeenCalled();
   });
 
   test("stays silent when there is no originHint at all", () => {
@@ -181,7 +183,7 @@ describe.each([
     // An originHint that normalizes away is not an originHint.
     handler.bodyWith({ originHint: "   " });
 
-    expect(warnMock()).not.toHaveBeenCalled();
+    expect(warnMock).not.toHaveBeenCalled();
   });
 
   test("the warning does not change the body it warns about", () => {
@@ -192,7 +194,7 @@ describe.each([
 
     expect(body.originHint).toBe("ios");
     expect(body.appVersion).toBeNull();
-    expect(warnMock()).toHaveBeenCalledTimes(1);
+    expect(warnMock).toHaveBeenCalledTimes(1);
   });
 });
 
