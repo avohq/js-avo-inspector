@@ -1,7 +1,7 @@
 import { AvoInspectorEnv, type AvoInspectorEnvValueType } from "./AvoInspectorEnv";
 import { AvoSchemaParser } from "./AvoSchemaParser";
 import { AvoBatcher } from "./AvoBatcher";
-import { AvoNetworkCallsHandler, type EventProperty } from "./AvoNetworkCallsHandler";
+import { AvoNetworkCallsHandler, type EventProperty, type TrackOptions } from "./AvoNetworkCallsHandler";
 import { AvoStorage } from "./AvoStorage";
 import { AvoDeduplicator } from "./AvoDeduplicator";
 import { EventSpecCache } from "./eventSpec/AvoEventSpecCache";
@@ -77,6 +77,13 @@ export class AvoInspector {
     appName?: string;
     suffix?: string;
     publicEncryptionKey?: string;
+    /**
+     * Value of the `X-Avo-Client` header, which tells the Inspector API which
+     * kind of client sent the traffic. Defaults to `"web"`. Set it only when
+     * this SDK is embedded in another Avo integration that needs its own
+     * attribution — the web GTM tag template passes `"gtm-web"`.
+     */
+    client?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -98,7 +105,25 @@ export class AvoInspector {
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
-      this.apiKey = options.apiKey;
+      // Trimmed once, here, so only the trimmed value is ever stored. A key
+      // pasted out of a config file or read from an env var keeps its trailing
+      // newline, which on v2 has to survive being a request header.
+      //
+      // This is deliberately not a duplicate of what the platform already does.
+      // XMLHttpRequest strips surrounding whitespace from a header value before
+      // validating it, so a trailing-newline key reaches the server trimmed with
+      // no error — verified against a real server, not read off the spec. But it
+      // does that to the header only. The same key also travels in the request
+      // body, which nothing trims, so leaning on the platform is what would
+      // CREATE a divergence rather than avoid one: the header would carry "key"
+      // while the body carried the raw value. v2 reads the header and ignores
+      // the body copy, but that copy exists precisely so one body shape also
+      // serves v1 — and v1 reads its api key from the body.
+      //
+      // Trimming at the single source keeps the two identical, for 3 bytes
+      // gzipped. It is not a substitute for the send path's try/catch: an
+      // embedded control character survives trim and is still caught there.
+      this.apiKey = options.apiKey.trim();
     }
 
     if (isValueEmpty(options.version)) {
@@ -131,7 +156,8 @@ export class AvoInspector {
       options.appName || "",
       this.version,
       libVersion,
-      this.publicEncryptionKey
+      this.publicEncryptionKey,
+      options.client
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
     this.avoDeduplicator = new AvoDeduplicator();
@@ -159,7 +185,8 @@ export class AvoInspector {
 
   async trackSchemaFromEvent(
     eventName: string,
-    eventProperties: Record<string, any>
+    eventProperties: Record<string, any>,
+    options?: TrackOptions
   ): Promise<EventProperty[]> {
     try {
       if (
@@ -194,11 +221,12 @@ export class AvoInspector {
             schemaWithValidation,
             null,
             null,
-            validationResult
+            validationResult,
+            options
           );
         } else {
           // No spec: fall back to batched flow
-          this.trackSchemaInternal(eventName, eventSchema, null, null);
+          this.trackSchemaInternal(eventName, eventSchema, null, null, options);
         }
 
         return eventSchema;
@@ -285,7 +313,8 @@ export class AvoInspector {
       propertyType: string;
       encryptedPropertyValue?: string;
       children?: any;
-    }>
+    }>,
+    options?: TrackOptions
   ): Promise<void> {
     try {
       if (
@@ -306,7 +335,7 @@ export class AvoInspector {
         // For trackSchema we don't have raw properties, so we can't validate
         // Just fetch/cache spec for future use and use batched flow
         await this.fetchEventSpecIfNeeded(eventName);
-        this.trackSchemaInternal(eventName, eventSchema, null, null);
+        this.trackSchemaInternal(eventName, eventSchema, null, null, options);
       } else {
         if (AvoInspector.shouldLog) {
           console.log("Avo Inspector: Deduplicated event: " + eventName);
@@ -329,14 +358,17 @@ export class AvoInspector {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    options?: TrackOptions
   ): void {
     try {
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
         eventId,
-        eventHash
+        eventHash,
+        undefined, // eventSpecMetadata: always undefined here (only exists on the sendEventWithValidation path)
+        options
       );
     } catch (e) {
       console.error(
@@ -651,7 +683,8 @@ export class AvoInspector {
     eventSchema: EventProperty[],
     eventId: string | null,
     eventHash: string | null,
-    validationResult: ValidationResult
+    validationResult: ValidationResult,
+    options?: TrackOptions
   ): void {
     // Log validation info if shouldLog is enabled
     if (AvoInspector.shouldLog) {
@@ -678,7 +711,8 @@ export class AvoInspector {
       eventId,
       eventHash,
       validationResult.metadata ?? undefined,
-      validationResult.metadata?.branchId
+      validationResult.metadata?.branchId,
+      options
     );
 
     // Send immediately (bypass batching)
@@ -690,12 +724,18 @@ export class AvoInspector {
             error
           );
         }
-        // Fallback: add to batch on failure (without validation data)
+        // Fallback: add to batch on failure (without validation data).
+        // Explicit undefined for eventSpecMetadata (unchanged pre-existing
+        // behavior -- this fallback already dropped it before this change),
+        // options threaded as the 6th arg so a failed immediate send doesn't
+        // silently drop the hints when it re-queues onto the batch.
         this.avoBatcher.handleTrackSchema(
           eventName,
           eventSchema,
           eventId,
-          eventHash
+          eventHash,
+          undefined,
+          options
         );
       } else {
         if (AvoInspector.shouldLog) {

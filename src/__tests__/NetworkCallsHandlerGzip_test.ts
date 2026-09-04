@@ -125,7 +125,7 @@ describe("NetworkCallsHandler gzip compression", () => {
       await waitFor(() => xhrMock.send.mock.calls.length > 0);
 
       const headers = sentHeaders();
-      expect(headers["Content-Type"]).toBe("text/plain");
+      expect(headers["Content-Type"]).toBe("application/json");
       expect(headers["Content-Encoding"]).toBe("gzip");
 
       const body = sentBody();
@@ -265,6 +265,47 @@ describe("NetworkCallsHandler gzip compression", () => {
       expect(customCallback).toHaveBeenCalledTimes(1);
       expect(customCallback).toHaveBeenCalledWith(new Error("Request timed out"));
     });
+
+    test("a rejected header on the compressed path still reports through onCompleted", async () => {
+      // The compressed send runs inside gzip(...).then(...), which has no
+      // rejection handler. A synchronous failure there has to come back through
+      // onCompleted anyway, or the `sending` guard latches and the batcher stops
+      // for the rest of the page — the same deadlock as on the sync path, but
+      // arriving as an unhandled rejection instead of a thrown error.
+      const handler = newHandler();
+      const onCompleted = jest.fn();
+
+      xhrMock.setRequestHeader.mockImplementationOnce(() => {
+        throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      });
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), onCompleted);
+      await waitFor(() => onCompleted.mock.calls.length > 0);
+
+      expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(xhrMock.send).not.toHaveBeenCalled();
+
+      // The guard was cleared, so the next batch still goes out.
+      handler.callInspectorWithBatchBody(smallEvents(handler), jest.fn());
+      expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    });
+
+    test("the lite handler behaves the same on the compressed path", async () => {
+      const handler = newLiteHandler();
+      const onCompleted = jest.fn();
+
+      xhrMock.setRequestHeader.mockImplementationOnce(() => {
+        throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      });
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), onCompleted);
+      await waitFor(() => onCompleted.mock.calls.length > 0);
+
+      expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+
+      handler.callInspectorWithBatchBody(smallEvents(handler), jest.fn());
+      expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("when CompressionStream is unavailable", () => {
@@ -310,7 +351,7 @@ describe("NetworkCallsHandlerLite gzip compression", () => {
     await waitFor(() => xhrMock.send.mock.calls.length > 0);
 
     const headers = sentHeaders();
-    expect(headers["Content-Type"]).toBe("text/plain");
+    expect(headers["Content-Type"]).toBe("application/json");
     expect(headers["Content-Encoding"]).toBe("gzip");
 
     expect(gunzipToString(sentBody())).toBe(expectedJson);

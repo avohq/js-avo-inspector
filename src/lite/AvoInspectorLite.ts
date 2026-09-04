@@ -1,7 +1,7 @@
 import { AvoInspectorEnv, type AvoInspectorEnvValueType } from "../AvoInspectorEnv";
 import { AvoSchemaParserLite as AvoSchemaParser } from "./AvoSchemaParserLite";
 import { AvoBatcher } from "./AvoBatcherLite";
-import { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler, type EventProperty } from "./AvoNetworkCallsHandlerLite";
+import { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler, type EventProperty, type TrackOptions } from "./AvoNetworkCallsHandlerLite";
 import { AvoStorage } from "../AvoStorage";
 import { isValueEmpty } from "../utils";
 
@@ -59,6 +59,13 @@ export class AvoInspectorLite {
     version: string;
     appName?: string;
     suffix?: string;
+    /**
+     * Value of the `X-Avo-Client` header, which tells the Inspector API which
+     * kind of client sent the traffic. Defaults to `"web"`. Set it only when
+     * this SDK is embedded in another Avo integration that needs its own
+     * attribution — the web GTM tag template passes `"gtm-web"`.
+     */
+    client?: string;
   }) {
     if (isValueEmpty(options.env)) {
       this.environment = AvoInspectorEnv.Dev;
@@ -79,7 +86,25 @@ export class AvoInspectorLite {
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
-      this.apiKey = options.apiKey;
+      // Trimmed once, here, so only the trimmed value is ever stored. A key
+      // pasted out of a config file or read from an env var keeps its trailing
+      // newline, which on v2 has to survive being a request header.
+      //
+      // This is deliberately not a duplicate of what the platform already does.
+      // XMLHttpRequest strips surrounding whitespace from a header value before
+      // validating it, so a trailing-newline key reaches the server trimmed with
+      // no error — verified against a real server, not read off the spec. But it
+      // does that to the header only. The same key also travels in the request
+      // body, which nothing trims, so leaning on the platform is what would
+      // CREATE a divergence rather than avoid one: the header would carry "key"
+      // while the body carried the raw value. v2 reads the header and ignores
+      // the body copy, but that copy exists precisely so one body shape also
+      // serves v1 — and v1 reads its api key from the body.
+      //
+      // Trimming at the single source keeps the two identical, for 3 bytes
+      // gzipped. It is not a substitute for the send path's try/catch: an
+      // embedded control character survives trim and is still caught there.
+      this.apiKey = options.apiKey.trim();
     }
 
     if (isValueEmpty(options.version)) {
@@ -109,14 +134,16 @@ export class AvoInspectorLite {
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion
+      libVersion,
+      options.client
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
   }
 
   async trackSchemaFromEvent(
     eventName: string,
-    eventProperties: Record<string, any>
+    eventProperties: Record<string, any>,
+    options?: TrackOptions
   ): Promise<EventProperty[]> {
     try {
       if (AvoInspectorLite.shouldLog) {
@@ -129,7 +156,7 @@ export class AvoInspectorLite {
       }
 
       const eventSchema = await this.extractSchema(eventProperties, false);
-      this.trackSchemaInternal(eventName, eventSchema, null, null);
+      this.trackSchemaInternal(eventName, eventSchema, null, null, options);
       return eventSchema;
     } catch (e) {
       console.error(
@@ -175,7 +202,8 @@ export class AvoInspectorLite {
       propertyType: string;
       encryptedPropertyValue?: string;
       children?: any;
-    }>
+    }>,
+    options?: TrackOptions
   ): Promise<void> {
     try {
       if (AvoInspectorLite.shouldLog) {
@@ -187,7 +215,7 @@ export class AvoInspectorLite {
         );
       }
 
-      this.trackSchemaInternal(eventName, eventSchema, null, null);
+      this.trackSchemaInternal(eventName, eventSchema, null, null, options);
     } catch (e) {
       console.error(
         "Avo Inspector: something went wrong. Please report to support@avo.app.",
@@ -205,14 +233,17 @@ export class AvoInspectorLite {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    options?: TrackOptions
   ): void {
     try {
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
         eventId,
-        eventHash
+        eventHash,
+        undefined,
+        options
       );
     } catch (e) {
       console.error(

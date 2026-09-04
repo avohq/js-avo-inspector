@@ -3,7 +3,8 @@ import {
   type SessionStartedBody,
   type EventSchemaBody,
   type AvoNetworkCallsHandler,
-  type EventProperty
+  type EventProperty,
+  type TrackOptions
 } from "./AvoNetworkCallsHandler";
 import { AvoInspector } from "./AvoInspector";
 import type { EventSpecMetadata } from "./eventSpec/AvoEventSpecFetchTypes";
@@ -16,7 +17,8 @@ export interface AvoBatcherType {
     schema: EventProperty[],
     eventId: string | null,
     eventHash: string | null,
-    eventSpecMetadata?: EventSpecMetadata
+    eventSpecMetadata?: EventSpecMetadata,
+    options?: TrackOptions
   ) => void;
 }
 
@@ -64,7 +66,8 @@ export class AvoBatcher implements AvoBatcherType {
     schema: EventProperty[],
     eventId: string | null,
     eventHash: string | null,
-    eventSpecMetadata?: EventSpecMetadata
+    eventSpecMetadata?: EventSpecMetadata,
+    options?: TrackOptions
   ): void {
     this.events.push(
       this.networkCallsHandler.bodyForEventSchemaCall(
@@ -72,7 +75,9 @@ export class AvoBatcher implements AvoBatcherType {
         schema,
         eventId,
         eventHash,
-        eventSpecMetadata
+        eventSpecMetadata,
+        undefined,
+        options
       )
     );
     this.saveEvents();

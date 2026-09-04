@@ -2,6 +2,7 @@ import { AvoInspectorLite } from "../lite/AvoInspectorLite";
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoInspector as AvoInspectorFromIndex, AvoInspectorEnv as AvoInspectorEnvFromIndex } from "../lite/index";
+import { AvoBatcher as AvoBatcherLite } from "../lite/AvoBatcherLite";
 
 const xhrMock: Partial<XMLHttpRequest> = {
   open: jest.fn(),
@@ -70,6 +71,26 @@ describe("AvoInspectorLite - trackSchemaFromEvent", () => {
     expect(schema2).toBeDefined();
     expect(Array.isArray(schema2)).toBe(true);
   });
+
+  test("threads options through to avoBatcher.handleTrackSchema", async () => {
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    const handleTrackSchemaSpy = jest
+      .spyOn(inspector.avoBatcher, "handleTrackSchema")
+      .mockImplementation(() => {});
+
+    const schema = await inspector.trackSchemaFromEvent("Ev", { a: 1 }, { originHint: "web" });
+
+    expect(handleTrackSchemaSpy).toHaveBeenCalledWith(
+      "Ev",
+      schema,
+      null,
+      null,
+      undefined,
+      { originHint: "web" }
+    );
+  });
 });
 
 describe("AvoInspectorLite - trackSchema", () => {
@@ -82,6 +103,88 @@ describe("AvoInspectorLite - trackSchema", () => {
         { propertyName: "a", propertyType: "int" },
       ])
     ).resolves.toBeUndefined();
+  });
+
+  test("threads options through to avoBatcher.handleTrackSchema", async () => {
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    const handleTrackSchemaSpy = jest
+      .spyOn(inspector.avoBatcher, "handleTrackSchema")
+      .mockImplementation(() => {});
+
+    const schema = [{ propertyName: "a", propertyType: "int" }];
+
+    await inspector.trackSchema("Ev", schema, { originHint: "web" });
+
+    expect(handleTrackSchemaSpy).toHaveBeenCalledWith(
+      "Ev",
+      schema,
+      null,
+      null,
+      undefined,
+      { originHint: "web" }
+    );
+  });
+});
+
+describe("AvoInspectorLite - hint omission end-to-end", () => {
+  test("trackSchemaFromEvent with whitespace-only outputReference and originHint 'web' stores originHint only", async () => {
+    // Clear the cache BEFORE constructing. AvoBatcherLite's constructor starts an
+    // async restore whose read of the cache happens during construction, with only
+    // the concat deferred to a microtask — so a removeItem afterwards cannot stop
+    // already-read events being appended. Today the global afterEach hides this,
+    // which is exactly why the ordering has to be right rather than merely lucky.
+    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
+
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    await inspector.trackSchemaFromEvent(
+      "Ev",
+      { a: 1 },
+      { outputReference: "  ", originHint: "web" }
+    );
+
+    const events = AvoInspectorLite.avoStorage.getItem<any[]>(
+      AvoBatcherLite.cacheKey
+    );
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect(events[0].originHint).toEqual("web");
+      expect(Object.prototype.hasOwnProperty.call(events[0], "outputReference")).toEqual(false);
+    }
+  });
+
+  test("trackSchemaFromEvent with originHint set and no appVersion stores body appVersion as null", async () => {
+    // Clear the cache BEFORE constructing. AvoBatcherLite's constructor starts an
+    // async restore whose read of the cache happens during construction, with only
+    // the concat deferred to a microtask — so a removeItem afterwards cannot stop
+    // already-read events being appended. Today the global afterEach hides this,
+    // which is exactly why the ordering has to be right rather than merely lucky.
+    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
+
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    await inspector.trackSchemaFromEvent(
+      "Ev",
+      { a: 1 },
+      { originHint: "ios" }
+    );
+
+    const events = AvoInspectorLite.avoStorage.getItem<any[]>(
+      AvoBatcherLite.cacheKey
+    );
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect(events[0].appVersion).toBeNull();
+      expect(Object.prototype.hasOwnProperty.call(events[0], "appVersion")).toEqual(true);
+    }
   });
 });
 

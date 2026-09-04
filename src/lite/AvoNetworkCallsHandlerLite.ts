@@ -45,8 +45,78 @@ export interface SessionStartedBody extends BaseBody {
   type: "sessionStarted";
 }
 
-export interface EventSchemaBody extends BaseBody {
+/**
+ * Per-call gateway coordinates, sent as top-level siblings of `eventProperties`
+ * on the track body — never nested inside the schema, and never read from event
+ * data. Every value is trimmed; empty, whitespace-only and non-string values are
+ * treated as absent.
+ *
+ * The endpoint this SDK posts to, `POST /inspector/v2/track`, decodes both
+ * `outputReference` and `originHint` and accepts a literal `appVersion: null`
+ * (stored as "unversioned"), so no field here has to be paired with another.
+ *
+ * Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
+ * AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
+ */
+export interface TrackOptions {
+  /** Reference of the gateway output this observation was bound for. Omit for a gateway-level observation. */
+  outputReference?: string;
+  /** Low-cardinality hint identifying the event's upstream source (e.g. "web", "ios"). Never a user identifier. */
+  originHint?: string;
+  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (literal null when omitted); without originHint, overrides it only when provided. */
+  appVersion?: string;
+}
+
+/**
+ * Normalizes a hint value: strings are trimmed; anything else (numbers,
+ * booleans, null, undefined, objects, arrays) is treated as absent.
+ */
+function normalizeHint(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/** Shape of every X-Avo-Client token: "web", "gtm-web", "ios", "csharp", … */
+const clientTokenPattern = /^[A-Za-z0-9._-]{1,64}$/;
+
+/**
+ * Normalizes the X-Avo-Client value. Unlike the hint fields this one becomes a
+ * request header, so an unusable value is not merely dropped from a body — it
+ * makes setRequestHeader throw during synchronous request setup. That throw
+ * would escape callInspectorWithBatchBody, which clears its `sending`
+ * re-entrancy guard only from the completion callback, latching the guard and
+ * silently cancelling every later batch for the lifetime of the page.
+ *
+ * The value arrives from a constructor option or, in the script-tag build, from
+ * `window.inspector.__CLIENT__` — so a token copied out of a config with a
+ * trailing newline is entirely plausible. Falling back to "web" loses one
+ * attribution label; letting it through would lose all the events.
+ */
+function normalizeClient(client: string | undefined): string {
+  if (typeof client !== "string") return "web";
+  const trimmed = client.trim();
+  if (trimmed === "") return "web";
+  if (!clientTokenPattern.test(trimmed)) {
+    if (AvoInspector.shouldLog) {
+      console.warn(
+        "[Avo Inspector] Unusable client value. Sending X-Avo-Client: web instead."
+      );
+    }
+    return "web";
+  }
+  return trimmed;
+}
+
+export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
   type: "event";
+
+  /**
+   * Nullable only here: with an originHint set and no per-event appVersion the
+   * event is source-scoped, so a literal null is sent rather than the SDK's
+   * configured version. Session-started bodies always carry the string version.
+   */
+  appVersion: string | null;
 
   // Identification
   /** ID of the base event from spec (null if no spec available) */
@@ -63,6 +133,11 @@ export interface EventSchemaBody extends BaseBody {
 
   /** Branch ID from getEventSpec response when value validation was performed */
   validatedBranchId?: string;
+
+  /** Gateway output this observation was bound for; absent = gateway checkpoint. */
+  outputReference?: string;
+  /** Low-cardinality hint identifying the event's upstream source. */
+  originHint?: string;
 }
 
 /** Bodies smaller than this are sent uncompressed — gzip overhead outweighs the gain. */
@@ -109,24 +184,27 @@ export class AvoNetworkCallsHandlerLite {
   private readonly appName: string;
   private readonly appVersion: string;
   private readonly libVersion: string;
+  private readonly client: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
 
   private static readonly trackingEndpoint =
-    "https://api.avo.app/inspector/v1/track";
+    "https://api.avo.app/inspector/v2/track";
 
   constructor(
     apiKey: string,
     envName: string,
     appName: string,
     appVersion: string,
-    libVersion: string
+    libVersion: string,
+    client?: string
   ) {
     this.apiKey = apiKey;
     this.envName = envName;
     this.appName = appName;
     this.appVersion = appVersion;
     this.libVersion = libVersion;
+    this.client = normalizeClient(client);
   }
 
   callInspectorWithBatchBody(
@@ -199,7 +277,8 @@ export class AvoNetworkCallsHandlerLite {
     eventId: string | null,
     eventHash: string | null,
     eventSpecMetadata?: EventSpecMetadata,
-    validatedBranchId?: string
+    validatedBranchId?: string,
+    options?: TrackOptions
   ): EventSchemaBody {
     const eventSchemaBody = this.createBaseCallBody() as EventSchemaBody;
     eventSchemaBody.type = "event";
@@ -224,6 +303,22 @@ export class AvoNetworkCallsHandlerLite {
     // Set validated branch ID if value validation was performed
     if (validatedBranchId) {
       eventSchemaBody.validatedBranchId = validatedBranchId;
+    }
+
+    // Set gateway hints if provided and non-empty after normalization
+    const outputReference = normalizeHint(options?.outputReference);
+    const originHint = normalizeHint(options?.originHint);
+    const appVersion = normalizeHint(options?.appVersion);
+    if (outputReference !== undefined) {
+      eventSchemaBody.outputReference = outputReference;
+    }
+    if (originHint !== undefined) {
+      eventSchemaBody.originHint = originHint;
+      // An origin hint marks an event from another source, whose app version is
+      // unrelated to this SDK instance's configured version.
+      eventSchemaBody.appVersion = appVersion !== undefined ? appVersion : null;
+    } else if (appVersion !== undefined) {
+      eventSchemaBody.appVersion = appVersion;
     }
 
     return eventSchemaBody;
@@ -310,14 +405,52 @@ export class AvoNetworkCallsHandlerLite {
     isGzipped: boolean,
     onCompleted: (error: Error | null) => any
   ): void {
-    const xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("POST", AvoNetworkCallsHandlerLite.trackingEndpoint, true);
-    xmlhttp.setRequestHeader("Content-Type", "text/plain");
-    if (isGzipped) {
-      xmlhttp.setRequestHeader("Content-Encoding", "gzip");
+    // Everything from construction up to and including send() runs synchronously,
+    // and any of it can throw: a header value the browser rejects, or a send() the
+    // environment refuses. callInspectorWithBatchBody clears its `sending`
+    // re-entrancy guard only from onCompleted, so an exception escaping this method
+    // would latch the guard and silently cancel every later batch for the lifetime
+    // of the page. Reporting through onCompleted keeps that path recoverable — the
+    // batcher puts the events back and retries with the next batch.
+    //
+    // The XMLHttpRequest construction is inside the try for the same reason. What
+    // that buys is a precise guarantee, worth stating exactly: no synchronous XHR
+    // setup step can throw out of this method, on either the direct or the gzipped
+    // path. It is NOT a claim that the method never throws — onCompleted is the
+    // caller's own callback, typed to return any, and a throw from it propagates.
+    // That case is harmless here: callInspectorWithBatchBody clears `sending`
+    // before forwarding to its caller's callback, so a throwing callback cannot
+    // latch the guard; on the gzipped path it surfaces as an unhandled rejection.
+    // The event handlers below are assigned after the try deliberately — they run
+    // in a later task, which no try/catch here could cover.
+    let xmlhttp: XMLHttpRequest;
+    try {
+      xmlhttp = new XMLHttpRequest();
+      xmlhttp.open("POST", AvoNetworkCallsHandlerLite.trackingEndpoint, true);
+      // v2 reads the api key and env from headers (the body keeps carrying both,
+      // so one body shape serves every endpoint version) and attributes traffic by
+      // X-Avo-Client without decoding a body. None of the three is CORS-safelisted,
+      // so a browser preflights every send — which is why the body is no longer
+      // `text/plain`: that content type existed only to stay inside the safelist and
+      // dodge the preflight, a saving custom headers cancel out, and v2's body reader
+      // parses a text/plain body twice and throws.
+      xmlhttp.setRequestHeader("Content-Type", "application/json");
+      xmlhttp.setRequestHeader("api-key", this.apiKey);
+      xmlhttp.setRequestHeader("env", this.envName);
+      xmlhttp.setRequestHeader("X-Avo-Client", this.client);
+      if (isGzipped) {
+        xmlhttp.setRequestHeader("Content-Encoding", "gzip");
+      }
+      xmlhttp.timeout = AvoInspector.networkTimeout;
+      xmlhttp.send(body as XMLHttpRequestBodyInit);
+    } catch (e) {
+      onCompleted(
+        new Error(
+          `Failed to send request: ${e instanceof Error ? e.message : String(e)}`
+        )
+      );
+      return;
     }
-    xmlhttp.timeout = AvoInspector.networkTimeout;
-    xmlhttp.send(body as XMLHttpRequestBodyInit);
 
     xmlhttp.onload = () => {
       if (xmlhttp.status !== 200) {

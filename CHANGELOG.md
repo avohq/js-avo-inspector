@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-09-02
+
+### Added
+
+- **`options` parameter for gateway hints on `trackSchemaFromEvent` and `trackSchema`**: Both track methods now accept an optional third argument, `options: TrackOptions`, on the full build (`AvoInspector`) and the lite build (`AvoInspectorLite`).
+  - `TrackOptions` is `{ outputReference?: string; originHint?: string; appVersion?: string }`, exported as a type from the package root (`avo-inspector`) and from the lite entry (`avo-inspector/lite`).
+  - `outputReference` identifies which gateway output (destination checkpoint) an observation was bound for; omit it for a gateway-level observation.
+  - `originHint` identifies the event's upstream source (e.g. `"web"`, `"ios"`) and should be a low-cardinality value, never a user identifier.
+  - `appVersion` sets the app version of the source that produced the event. When `originHint` is set, the event came from a different source than the app this SDK instance was configured for, so `appVersion` replaces the SDK's configured version on that event's body — sent as `null` when `originHint` is set but `appVersion` is omitted, rather than falling back to the SDK's root version. When `originHint` is not set, `appVersion` overrides the SDK's configured version only when provided; omitting both leaves the root version unchanged.
+  - All three fields are sent as top-level siblings of `eventProperties` on the track request body, never nested inside the schema.
+  - **Normalization**: string values are trimmed; empty strings, whitespace-only strings, and non-string values (numbers, booleans, `null`, objects, arrays) are omitted entirely. Omitted `outputReference`/`originHint` are never sent as `null` or `""`. `appVersion` is the one field in `TrackOptions` that can legitimately be sent as a literal `null` on the wire (with `originHint` set and `appVersion` omitted) — see rule above.
+  - **Backward compatible**: calling either method without the `options` argument (or with an empty `{}`) adds no new keys to the request body. The body is byte-for-byte what 3.2.0 sent apart from the `libVersion` value, which carries the release number and therefore changes in every release.
+  - Events tracked through Avo Codegen (Avo Functions) never carry `outputReference`/`originHint`/`appVersion`, since Codegen-generated calls have no per-call gateway configuration to pass.
+  - The endpoint reads all three fields, including a literal `appVersion: null` (recorded as `"unversioned"`), so no field has to be paired with another. See the endpoint change below.
+- **`client` constructor option**: sets the `X-Avo-Client` request header, which tells Avo which kind of client produced the traffic. Defaults to `"web"`; leave it alone unless this SDK is embedded in another Avo integration that needs its own attribution. The script-tag build reads the same value from `window.inspector.__CLIENT__`, alongside the existing `__API_KEY__`/`__ENV__`/`__VERSION__`/`__APP_NAME__` — which is how the Avo web GTM tag template declares itself as `"gtm-web"`. The value is trimmed and validated against `/^[A-Za-z0-9._-]{1,64}$/`, falling back to `"web"` otherwise — a value the browser refuses as a header would abort request setup and stop the SDK sending entirely.
+
+### Changed
+
+- **Track requests now go to the unified endpoint `POST https://api.avo.app/inspector/v2/track`** (was `POST /inspector/v1/track`), which is the endpoint that decodes the gateway coordinates above. Every Avo Inspector sender is moving to it so traffic can be attributed at the edge without decoding a body.
+  - The API key and environment now travel as the `api-key` and `env` request headers, joined by `X-Avo-Client`. The API key is trimmed once at construction, since a key carrying a trailing newline from a config file or an env var is a valid body value but not a valid header value. They are still sent in the request body too: v2 ignores the body copies, and keeping them keeps one body shape across endpoint versions.
+  - `Content-Type` changed from `text/plain` to `application/json`. `text/plain` existed only to stay inside the CORS safelist and avoid a preflight; the three new headers are not safelisted, so **every** request is preflighted now regardless — and v2's body reader parses a `text/plain` body a second time and throws.
+  - **Server-side sampling is gone on v2**: the response always carries `samplingRate: 1.0`, so stored counts are exact rather than extrapolated. The SDK's own sampling logic is unchanged and still applies whatever rate the response carries.
+
+### Known limitations
+
+- **Browser traffic is blocked until the ingestion endpoint's CORS preflight allows the new headers.** `api-key`, `env` and `X-Avo-Client` are not CORS-safelisted, and the endpoint's `Access-Control-Allow-Headers` response does not list them yet, so browsers refuse the request before it is sent. They must be added to that list rather than replacing it — `Content-Encoding` is already allowed and a gzipped batch still preflights with it. There is deliberately no fallback to the old endpoint and no feature flag — the ingestion change ships separately and unblocks this version without a further SDK release.
+
 ## [3.2.0] - 2026-06-22
 
 ### Added

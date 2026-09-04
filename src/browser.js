@@ -18,6 +18,12 @@ if (typeof window !== "undefined") {
   if (window.inspector.__PUBLIC_ENCRYPTION_KEY__) {
     options.publicEncryptionKey = window.inspector.__PUBLIC_ENCRYPTION_KEY__;
   }
+  // Optional X-Avo-Client override. Absent for a direct script-tag install, in
+  // which case the SDK defaults to "web"; the web GTM tag template sets it to
+  // "gtm-web" before loading this script so its traffic is attributable.
+  if (window.inspector.__CLIENT__) {
+    options.client = window.inspector.__CLIENT__;
+  }
   window.inspector = new AvoInspector(options);
 
   callQueue.forEach((call) => {

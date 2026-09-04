@@ -115,6 +115,94 @@ describe("Batcher", () => {
     expect(checkBatchSpy).toHaveBeenCalledTimes(1);
   });
 
+  test("handleTrackSchema forwards options to bodyForEventSchemaCall with validatedBranchId explicitly undefined", () => {
+    const bodyForEventSchemaCallSpy = jest.spyOn(
+      AvoNetworkCallsHandler.prototype as any,
+      "bodyForEventSchemaCall"
+    );
+
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { outputReference: "meta-x7k2q" }
+    );
+
+    expect(bodyForEventSchemaCallSpy).toHaveBeenCalledWith(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      undefined,
+      { outputReference: "meta-x7k2q" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).outputReference).toEqual("meta-x7k2q");
+      expect(Object.prototype.hasOwnProperty.call(events[0], "originHint")).toEqual(false);
+    }
+
+    bodyForEventSchemaCallSpy.mockRestore();
+  });
+
+  test("handleTrackSchema forwards options to storage with only originHint set (outputReference stays absent)", () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "android" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).originHint).toEqual("android");
+      expect(Object.prototype.hasOwnProperty.call(events[0], "outputReference")).toEqual(false);
+    }
+  });
+
+  test("trackSchema entered through the public AvoInspector method threads options through to the storage round trip", async () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    await inspector.trackSchema(
+      "event name",
+      [{ propertyName: "prop0", propertyType: "string" }],
+      { outputReference: "meta-x7k2q" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).outputReference).toEqual("meta-x7k2q");
+    }
+  });
+
   test("checkIfBatchNeedsToBeSent is called on handleTrackSchema", () => {
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);
@@ -273,6 +361,55 @@ describe("Batcher", () => {
 
     dateNowSpy.mockRestore();
     streamIdSpy.mockRestore();
+  });
+
+  test("handleTrackSchema storage round trip: originHint + appVersion set -> stored event appVersion is the given appVersion", () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios", appVersion: "5.1.0" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toEqual("5.1.0");
+    }
+  });
+
+  test("handleTrackSchema storage round trip: originHint set, appVersion absent -> stored event appVersion is null (JSON storage keeps null)", () => {
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toBeNull();
+      expect(Object.prototype.hasOwnProperty.call(events[0], "appVersion")).toEqual(true);
+    }
   });
 
   test("Only latest 1000 events are stored in the storage", (done) => {
