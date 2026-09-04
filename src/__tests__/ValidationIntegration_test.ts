@@ -553,8 +553,8 @@ describe("Validation Integration", () => {
       // calling sendEventWithValidation with options undefined (Codegen-emitted
       // calls have no notion of a GTM tag's per-instance gateway config), so a
       // Codegen-tracked event's body must never carry the gateway hint fields.
-      expect(eventBody.hasOwnProperty('outputReference')).toBe(false);
-      expect(eventBody.hasOwnProperty('originHint')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(eventBody, 'outputReference')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(eventBody, 'originHint')).toBe(false);
       // Codegen-tracked events never carry an originHint, so the appVersion
       // rule leaves the SDK's root configured version in place, unreplaced.
       expect(eventBody.appVersion).toBe("1.0.0");

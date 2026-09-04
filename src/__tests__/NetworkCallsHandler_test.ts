@@ -438,8 +438,8 @@ describe("NetworkCallsHandler", () => {
         eventId: null,
         eventHash: null
       });
-      expect(body.hasOwnProperty("outputReference")).toBe(false);
-      expect(body.hasOwnProperty("originHint")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
     });
 
     test("bodyForEventSchemaCall with options = {} produces body with no outputReference/originHint keys", () => {
@@ -453,8 +453,8 @@ describe("NetworkCallsHandler", () => {
         {}
       );
 
-      expect(body.hasOwnProperty("outputReference")).toBe(false);
-      expect(body.hasOwnProperty("originHint")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
     });
 
     test("bodyForEventSchemaCall trims outputReference and omits originHint when absent", () => {
@@ -469,7 +469,7 @@ describe("NetworkCallsHandler", () => {
       );
 
       expect(body.outputReference).toBe("meta-x7k2q");
-      expect(body.hasOwnProperty("originHint")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
     });
 
     test("bodyForEventSchemaCall omits originHint when it is an empty string", () => {
@@ -483,7 +483,7 @@ describe("NetworkCallsHandler", () => {
         { originHint: "" }
       );
 
-      expect(body.hasOwnProperty("originHint")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
     });
 
     test("bodyForEventSchemaCall omits outputReference/originHint for non-string values", () => {
@@ -497,8 +497,8 @@ describe("NetworkCallsHandler", () => {
         { outputReference: 42 as any, originHint: null as any }
       );
 
-      expect(body.hasOwnProperty("outputReference")).toBe(false);
-      expect(body.hasOwnProperty("originHint")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
     });
 
     test("bodyForEventSchemaCall sets both outputReference and originHint when both provided", () => {
@@ -528,7 +528,7 @@ describe("NetworkCallsHandler", () => {
       );
 
       expect(body.originHint).toBe("android");
-      expect(body.hasOwnProperty("outputReference")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
     });
 
     test("bodyForEventSchemaCall with options omitted and options = {} produce bodies with identical key sets (no new keys)", () => {
@@ -594,7 +594,7 @@ describe("NetworkCallsHandler", () => {
           { outputReference: value as any }
         );
 
-        expect(body.hasOwnProperty("outputReference")).toBe(false);
+        expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
       }
     );
 
@@ -611,7 +611,7 @@ describe("NetworkCallsHandler", () => {
           { originHint: value as any }
         );
 
-        expect(body.hasOwnProperty("originHint")).toBe(false);
+        expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
       }
     );
 
@@ -629,7 +629,7 @@ describe("NetworkCallsHandler", () => {
       const parsed = JSON.parse(JSON.stringify(body));
 
       expect(parsed.outputReference).toBe("meta-x7k2q");
-      expect(parsed.hasOwnProperty("originHint")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(parsed, "originHint")).toBe(false);
       expect(Object.keys(parsed)).not.toContain("originHint");
     });
   });
@@ -664,7 +664,7 @@ describe("NetworkCallsHandler", () => {
       );
 
       expect(body.appVersion).toBeNull();
-      expect(body.hasOwnProperty("appVersion")).toBe(true);
+      expect(Object.prototype.hasOwnProperty.call(body, "appVersion")).toBe(true);
     });
 
     test("originHint absent, appVersion present -> body.appVersion is options.appVersion", () => {
@@ -812,7 +812,7 @@ describe("NetworkCallsHandler", () => {
 
       const parsed = JSON.parse(jsonString);
       expect(parsed.appVersion).toBeNull();
-      expect(parsed.hasOwnProperty("appVersion")).toBe(true);
+      expect(Object.prototype.hasOwnProperty.call(parsed, "appVersion")).toBe(true);
     });
   });
 });

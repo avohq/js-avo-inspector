@@ -149,7 +149,7 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     if (events !== null) {
       expect(events.length).toEqual(1);
       expect(events[0].originHint).toEqual("web");
-      expect(events[0].hasOwnProperty("outputReference")).toEqual(false);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "outputReference")).toEqual(false);
     }
   });
 
@@ -173,7 +173,7 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     if (events !== null) {
       expect(events.length).toEqual(1);
       expect(events[0].appVersion).toBeNull();
-      expect(events[0].hasOwnProperty("appVersion")).toEqual(true);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "appVersion")).toEqual(true);
     }
   });
 });

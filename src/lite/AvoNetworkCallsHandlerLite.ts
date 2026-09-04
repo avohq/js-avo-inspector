@@ -27,7 +27,7 @@ export interface EventProperty {
 export interface BaseBody {
   apiKey: string;
   appName: string;
-  appVersion: string | null;
+  appVersion: string;
   libVersion: string;
   env: string;
   libPlatform: "web";
@@ -45,14 +45,28 @@ export interface SessionStartedBody extends BaseBody {
   type: "sessionStarted";
 }
 
-// Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
-// AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
+/**
+ * Per-call gateway coordinates, sent as top-level siblings of `eventProperties`
+ * on the track body — never nested inside the schema, and never read from event
+ * data. Every value is trimmed; empty, whitespace-only and non-string values are
+ * treated as absent.
+ *
+ * BACKEND NOTE (as of 3.3.0): the endpoint this SDK posts to,
+ * `POST /inspector/v1/track`, does not yet honor `outputReference`/`originHint`,
+ * and drops any event whose `appVersion` is `null` while still answering `200`.
+ * So pair `originHint` with an `appVersion` until the backend is updated. The
+ * wire shape below is already the final one, so such calls start working
+ * unchanged the moment it is — nothing here has to be un-done.
+ *
+ * Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
+ * AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
+ */
 export interface TrackOptions {
   /** Reference of the gateway output this observation was bound for. Omit for a gateway-level observation. */
   outputReference?: string;
   /** Low-cardinality hint identifying the event's upstream source (e.g. "web", "ios"). Never a user identifier. */
   originHint?: string;
-  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (null when omitted); without originHint, overrides it only when provided. */
+  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (literal null when omitted — which the backend currently drops, see above); without originHint, overrides it only when provided. */
   appVersion?: string;
 }
 
@@ -66,8 +80,23 @@ function normalizeHint(value: unknown): string | undefined {
   return trimmed === "" ? undefined : trimmed;
 }
 
-export interface EventSchemaBody extends BaseBody {
+/**
+ * KNOWN BACKEND GAP: the Inspector ingestion endpoint (/inspector/v1/track)
+ * silently drops events whose appVersion is null — it still answers 200, so the
+ * drop is invisible from here. Latched module-level so one page/process emits at
+ * most one warning no matter how many such events are tracked.
+ */
+let warnedAboutNullAppVersion = false;
+
+export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
   type: "event";
+
+  /**
+   * Nullable only here: with an originHint set and no per-event appVersion the
+   * event is source-scoped, so a literal null is sent rather than the SDK's
+   * configured version. Session-started bodies always carry the string version.
+   */
+  appVersion: string | null;
 
   // Identification
   /** ID of the base event from spec (null if no spec available) */
@@ -265,6 +294,18 @@ export class AvoNetworkCallsHandlerLite {
       // An origin hint marks an event from another source, whose app version is
       // unrelated to this SDK instance's configured version.
       eventSchemaBody.appVersion = appVersion !== undefined ? appVersion : null;
+      // shouldLog is checked before the latch is set so a call made while logging
+      // is off does not swallow the one warning a later logging-on call deserves.
+      if (
+        appVersion === undefined &&
+        !warnedAboutNullAppVersion &&
+        AvoInspector.shouldLog
+      ) {
+        warnedAboutNullAppVersion = true;
+        console.warn(
+          "[Avo Inspector] originHint is set without appVersion; appVersion will be sent as null, which the Inspector backend currently drops. Pass options.appVersion until the backend is updated."
+        );
+      }
     } else if (appVersion !== undefined) {
       eventSchemaBody.appVersion = appVersion;
     }

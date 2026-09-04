@@ -46,7 +46,7 @@ The lite build has the same tracking API as the full version — `trackSchemaFro
 - Does not support event deduplication — **if you use both Avo Codegen and manual `trackSchemaFromEvent` calls for the same events, use the full build instead** to avoid sending duplicate schemas
 - Works universally with any bundler or minifier — no flags or configuration needed
 
-**Lite build size:** ~20 KB minified, ~5.2 KB gzipped.
+**Lite build size:** ~23 KB minified, ~5.7 KB gzipped (measured by `yarn check:lite-size`).
 
 See `examples/lite-size-demos/` for working examples with terser, webpack, and rollup.
 
@@ -111,9 +111,13 @@ inspector.trackSchema("Event name", [
 ]);
 ```
 
-# TrackOptions: outputReference and originHint
+# Gateways
 
-Available since version `3.3.0`. Both `trackSchemaFromEvent` and `trackSchema` accept an optional third argument, `options: TrackOptions`, for customers running Inspector behind a gateway with one Inspector API key shared across multiple destinations:
+Available since version `3.3.0`. Avo Inspector is moving to a multi-gate model: one Inspector
+API key per *gateway* (a server-side proxy or event bus checkpoint) rather than one Inspector
+source per individual destination. Both `trackSchemaFromEvent` and `trackSchema` accept an
+optional trailing argument, `options: TrackOptions`, that lets a gateway-scoped key tell
+observations taken at different checkpoints, and from different upstream sources, apart:
 
 ```typescript
 interface TrackOptions {
@@ -124,35 +128,87 @@ interface TrackOptions {
 ```
 
 ```javascript
-inspector.trackSchemaFromEvent("Event name", { "String Prop": "Prop Value" }, { outputReference: "meta-x7k2q", originHint: "web" });
+inspector.trackSchemaFromEvent(
+  "Event name",
+  { "String Prop": "Prop Value" },
+  {
+    outputReference: "meta-x7k2q", // which output checkpoint this observation was bound for
+    originHint: "web",             // which upstream source produced the event
+    appVersion: "5.1.0",           // that source's app version — keep this set whenever
+                                   // originHint is set (see "Backend note" below)
+  }
+);
 ```
 
 ```javascript
 inspector.trackSchema(
   "Event name",
   [{ propertyName: "String prop", propertyType: "string" }],
-  { outputReference: "meta-x7k2q", originHint: "web" }
+  { outputReference: "meta-x7k2q", originHint: "web", appVersion: "5.1.0" }
 );
 ```
 
-```javascript
-inspector.trackSchemaFromEvent("Event name", { "String Prop": "Prop Value" }, { originHint: "ios", appVersion: "5.1.0" });
-```
-
-- **`outputReference`**: which gateway output (destination checkpoint) this observation was bound for. Set it when you're observing a specific output; leave it out for a gateway-level observation that isn't tied to one output.
-- **`originHint`**: identifies the event's upstream source. Keep it low-cardinality (e.g. `"web"`, `"ios"`) — never a user identifier or other high-cardinality value.
-- **`appVersion`**: the app version of the source that produced the event. Because an `originHint` marks an event as coming from a different source than the app this SDK instance was configured for, the two fields interact:
-
-  | `originHint` | `appVersion` | Event body's `appVersion` |
-  |---|---|---|
-  | present | present | `appVersion` |
-  | present | absent | `null` (the SDK's configured version is not applied) |
-  | absent | present | `appVersion` |
-  | absent | absent | the SDK's configured version (unchanged behaviour) |
+| Field | Purpose |
+|---|---|
+| `outputReference` | Which gateway output (destination checkpoint) this observation was bound for. Leave it out for a gateway-level observation that isn't tied to one output. |
+| `originHint` | Identifies the event's upstream source (e.g. `"web"`, `"ios"`). See [Origin hint](#origin-hint) below. |
+| `appVersion` | Per-event app version of the source that produced the event. See [App version](#app-version) below for how it interacts with `originHint`. |
 
 - All three fields are optional and independent — you can set any combination of them.
-- Values are trimmed, and empty strings, whitespace-only strings, and non-string values are omitted rather than sent as `null` or `""` — except `appVersion`, which is sent as a literal `null` (not omitted) when `originHint` is present but `appVersion` is not, per the table above.
-- Events tracked automatically through Avo Codegen (Avo Functions) never carry these fields — `TrackOptions` only applies to `trackSchemaFromEvent`/`trackSchema` calls you make directly.
+- Values are trimmed. Empty strings, whitespace-only strings, and non-string values
+  (numbers, booleans, `null`, objects, arrays) are treated as absent, and
+  `outputReference`/`originHint` are then omitted from the request body entirely rather than
+  sent as `null` or `""`.
+- All three fields are sent as top-level siblings of `eventProperties`, never nested inside the
+  schema. Calling either method without `options` (or with an empty `{}`) produces a request
+  body with exactly the pre-3.3.0 key set — only `libVersion` differs.
+- Events tracked automatically through Avo Codegen (Avo Functions) never carry these fields —
+  `TrackOptions` only applies to `trackSchemaFromEvent`/`trackSchema` calls you make directly.
+
+> An event property of your own literally named `outputReference`, `originHint` or
+> `appVersion` (with unrelated business meaning) is unaffected. It still appears inside
+> `eventProperties` exactly as before — the top-level fields described here come only from
+> `TrackOptions`, never from event data, and neither direction leaks into the other.
+
+## Origin hint
+
+`originHint` must be a **low-cardinality** value (e.g. `"web"`, `"ios"`, `"android"`) — it
+**MUST NOT** be a user identifier or any other high-cardinality value. This is a
+documentation-only rule; the SDK does not validate it at runtime.
+
+```javascript
+inspector.trackSchemaFromEvent(
+  "Event name",
+  { "String Prop": "Prop Value" },
+  { originHint: "ios", appVersion: "5.1.0" }
+);
+```
+
+## App version
+
+Setting `originHint` marks the event as coming from a different source than the app this
+Inspector instance was constructed with, so the instance's configured `version` no longer
+applies to that event. That changes how `appVersion` resolves on the wire:
+
+| `originHint` | `appVersion` | Event body's `appVersion` |
+|---|---|---|
+| present | present | `appVersion`, trimmed |
+| present | absent | literal `null` (the SDK's configured version is not applied) |
+| absent | present | `appVersion`, trimmed |
+| absent | absent | the SDK's configured version (unchanged behaviour) |
+
+`appVersion` is the one field in `TrackOptions` that can legitimately be sent as a literal
+`null` rather than being omitted — the `originHint` present / `appVersion` absent row above.
+
+> **Backend note (as of 3.3.0):** the Inspector backend does not yet honor `outputReference`
+> or `originHint` on this SDK's endpoint (`POST /inspector/v1/track`), and does not yet
+> accept a literal `appVersion: null`. Until the backend is updated, setting `originHint`
+> without an `appVersion` causes the event to be **silently dropped** — the HTTP response is
+> still `200`, but the event never reaches the Inspector dashboard. So always pair
+> `originHint` with an `appVersion` for now. When logging is enabled
+> (`inspector.enableLogging(true)`), the SDK emits one `console.warn` per page the first time
+> it builds such a body. The SDK already sends the correct wire shape, so these calls start
+> working unchanged the moment the backend catches up.
 
 # Extracting event schema manually
 

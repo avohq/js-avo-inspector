@@ -16,8 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `appVersion` sets the app version of the source that produced the event. When `originHint` is set, the event came from a different source than the app this SDK instance was configured for, so `appVersion` replaces the SDK's configured version on that event's body — sent as `null` when `originHint` is set but `appVersion` is omitted, rather than falling back to the SDK's root version. When `originHint` is not set, `appVersion` overrides the SDK's configured version only when provided; omitting both leaves the root version unchanged.
   - All three fields are sent as top-level siblings of `eventProperties` on the track request body, never nested inside the schema.
   - **Normalization**: string values are trimmed; empty strings, whitespace-only strings, and non-string values (numbers, booleans, `null`, objects, arrays) are omitted entirely. Omitted `outputReference`/`originHint` are never sent as `null` or `""`. `appVersion` is the one field in `TrackOptions` that can legitimately be sent as a literal `null` on the wire (with `originHint` set and `appVersion` omitted) — see rule above.
-  - **Backward compatible**: calling either method without the `options` argument produces a request body identical to previous versions — no new keys are added.
+  - **Backward compatible**: calling either method without the `options` argument (or with an empty `{}`) produces a request body identical to previous versions except `libVersion` — no new keys are added.
   - Events tracked through Avo Codegen (Avo Functions) never carry `outputReference`/`originHint`/`appVersion`, since Codegen-generated calls have no per-call gateway configuration to pass.
+  - **One-shot warning**: when logging is enabled (`inspector.enableLogging(true)`), the first event body built with an `originHint` and no usable `appVersion` logs a single `console.warn` per page/process, naming no option values. See "Known limitations" below for why.
+
+### Known limitations
+
+- **Backend note — the ingestion endpoint does not honor these fields yet.** This SDK posts to `POST /inspector/v1/track`, whose parser currently discards `outputReference` and `originHint`, and **drops any event whose `appVersion` is `null`** — the request still returns HTTP `200`, so the drop is invisible to the SDK and to your app.
+  - Consequence: pair `originHint` with an `appVersion` until the backend is updated. `originHint` without `appVersion` is a valid call per the contract, but that event currently never reaches the Inspector dashboard.
+  - The SDK deliberately sends the final wire shape now rather than working around the gap, so existing calls start working unchanged the moment the backend parser is updated. Nothing here has to be un-done then — only this note and the warning are removed.
 
 ## [3.2.0] - 2026-06-22
 

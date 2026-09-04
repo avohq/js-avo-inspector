@@ -151,7 +151,7 @@ describe("Batcher", () => {
     if (events !== null) {
       expect(events.length).toEqual(1);
       expect((events[0] as EventSchemaBody).outputReference).toEqual("meta-x7k2q");
-      expect(events[0].hasOwnProperty("originHint")).toEqual(false);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "originHint")).toEqual(false);
     }
 
     bodyForEventSchemaCallSpy.mockRestore();
@@ -178,7 +178,7 @@ describe("Batcher", () => {
     if (events !== null) {
       expect(events.length).toEqual(1);
       expect((events[0] as EventSchemaBody).originHint).toEqual("android");
-      expect(events[0].hasOwnProperty("outputReference")).toEqual(false);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "outputReference")).toEqual(false);
     }
   });
 
@@ -408,7 +408,7 @@ describe("Batcher", () => {
     if (events !== null) {
       expect(events.length).toEqual(1);
       expect((events[0] as EventSchemaBody).appVersion).toBeNull();
-      expect(events[0].hasOwnProperty("appVersion")).toEqual(true);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "appVersion")).toEqual(true);
     }
   });
 
