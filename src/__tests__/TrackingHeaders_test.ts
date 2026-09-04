@@ -169,8 +169,10 @@ describe.each([
   test("X-Avo-Client falls back to web for a value that cannot be a header", () => {
     // setRequestHeader throws on these, which would take the whole batcher down
     // (see the wedge test below). Losing the label beats losing every event.
-    // The last two are the WebIDL ByteString case: any code unit above U+00FF
-    // throws a TypeError before the request is ever sent.
+    // The emoji is the WebIDL ByteString case: a code unit above U+00FF throws
+    // a TypeError before the request is sent. The accented token is not — U+00E9
+    // is inside Latin-1 and setRequestHeader accepts it — so it is here to pin
+    // that the token pattern is ASCII-only by intent, not by accident.
     [
       "gtm\nweb",
       "gtm web",
