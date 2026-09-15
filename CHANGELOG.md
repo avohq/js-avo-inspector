@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`enableLogging(false)` now actually silences dev logs**: The constructor unconditionally forced logging on for the `Dev` environment and handed that snapshot value to `AvoStorage`, `EventSpecCache`, and `AvoEventSpecFetcher` at construction time, so a later `enableLogging(false)` never reached those sub-components and dev log noise kept printing.
+  - The environment default (dev on, prod/staging off) is now applied only when logging hasn't been set explicitly via `enableLogging()` or `AvoInspector.shouldLog`, so an explicit opt-out is no longer clobbered.
+  - `enableLogging()` now propagates the new value to the already-constructed storage, cache, and fetcher so the toggle takes effect immediately.
+
 ## [3.2.0] - 2026-06-22
 
 ### Added

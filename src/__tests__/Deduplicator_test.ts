@@ -20,7 +20,8 @@ describe("Deduplicator", () => {
 
   beforeAll(() => {
     jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
-      fetch: jest.fn().mockResolvedValue(null)
+      fetch: jest.fn().mockResolvedValue(null),
+      setShouldLog: jest.fn()
     }) as any);
   });
 
