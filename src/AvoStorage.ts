@@ -1,5 +1,6 @@
 abstract class PlatformAvoStorage {
   abstract init (shouldLog: boolean, suffix: string): void;
+  abstract setShouldLog (shouldLog: boolean): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
   abstract getItem<T>(key: string): T | null;
   abstract setItem<T>(key: string, value: T): void;
@@ -28,6 +29,10 @@ class BrowserAvoStorage extends PlatformAvoStorage {
     this.shouldLog = shouldLog;
     this.suffix = suffix;
     this.initializeStorageWeb(this.isLocalStorageAvailable());
+  }
+
+  setShouldLog (shouldLog: boolean): void {
+    this.shouldLog = shouldLog;
   }
 
   private initializeStorageWeb (isLocalStorageAvailable: boolean): void {
@@ -168,6 +173,10 @@ export class AvoStorage {
 
   isInitialized (): boolean {
     return this.storageImpl.isInitialized();
+  }
+
+  setShouldLog (shouldLog: boolean): void {
+    this.storageImpl.setShouldLog(shouldLog);
   }
 
   async getItemAsync<T>(key: string): Promise<T | null> {
