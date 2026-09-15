@@ -1,3 +1,4 @@
+import type { AvoInspector as AvoInspectorClass } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 /**
@@ -15,7 +16,7 @@ import { AvoInspectorEnv } from "../AvoInspectorEnv";
  */
 describe("enableLogging – dev log suppression (AVO-3079)", () => {
   // Loaded fresh in beforeEach so each test starts from clean static state.
-  let AvoInspector: typeof import("../AvoInspector").AvoInspector;
+  let AvoInspector: typeof AvoInspectorClass;
 
   const apiKey = "api-key-xxx";
   const version = "1.0.0";
@@ -42,7 +43,11 @@ describe("enableLogging – dev log suppression (AVO-3079)", () => {
 
   beforeEach(() => {
     jest.resetModules();
-    AvoInspector = require("../AvoInspector").AvoInspector;
+    // requireActual (not a bare require) after resetModules gives a freshly
+    // evaluated module, and keeps the file lint-clean (no-var-requires).
+    AvoInspector = jest.requireActual<{
+      AvoInspector: typeof AvoInspectorClass;
+    }>("../AvoInspector").AvoInspector;
     (console.log as jest.Mock).mockClear();
   });
 
