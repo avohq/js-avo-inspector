@@ -469,7 +469,7 @@ describe("NetworkCallsHandler", () => {
       expect(xhrMock.send.mock.calls).toEqual([[JSON.stringify([body])]]);
     });
 
-    test("without a client, outputReference and originHint are left out of the body even when given", () => {
+    test("without a client, the options are ignored entirely: no hints, and no appVersion override", () => {
       const body = networkHandler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
@@ -482,10 +482,14 @@ describe("NetworkCallsHandler", () => {
 
       expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
       expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
-      // appVersion is a v1 field, so the override still applies.
-      expect(body.appVersion).toBe("5.1.0");
+      expect(body.appVersion).toBe(version);
       expect(JSON.stringify(body)).not.toContain("meta-x7k2q");
       expect(JSON.stringify(body)).not.toContain("android");
+      expect(JSON.stringify(body)).not.toContain("5.1.0");
+      // The same body as the call without options.
+      expect(body).toEqual(
+        networkHandler.bodyForEventSchemaCall(eventName, eventProperties, null, null)
+      );
     });
 
     test("with a client, the same options put both hints on the body (positive control for the omission above)", () => {
@@ -907,10 +911,10 @@ describe("NetworkCallsHandler", () => {
     });
   });
 
-  // Without a client the hint is left out, so the origin-scoped null never
-  // applies: v1 drops an event whose appVersion is null. Each null-producing call
-  // from the v2 block above is repeated here, with v2Handler as its positive
-  // control, so a null leaking onto v1 fails here rather than passing unnoticed.
+  // Without the gtm-web client the options are ignored entirely: no origin-scoped
+  // null (v1 drops an event whose appVersion is null) and no appVersion override.
+  // Each call from the v2 block above is repeated here, with v2Handler as its
+  // positive control, so an option leaking onto v1 fails here.
   describe("TrackOptions.appVersion with originHint (v1, no client)", () => {
     const eventName = "event name";
     const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
@@ -949,17 +953,12 @@ describe("NetworkCallsHandler", () => {
       }
     );
 
-    test("originHint present, appVersion present -> options.appVersion, trimmed", () => {
-      expect(
-        bodyWith(networkHandler, { originHint: "ios", appVersion: " 5.1.0 " })
-          .appVersion
-      ).toBe("5.1.0");
-    });
-
-    test("originHint absent, appVersion present -> options.appVersion overrides", () => {
-      expect(bodyWith(networkHandler, { appVersion: "5.1.0" }).appVersion).toBe(
-        "5.1.0"
-      );
+    test.each([
+      ["originHint present, appVersion present", { originHint: "ios", appVersion: " 5.1.0 " }],
+      ["originHint absent, appVersion present", { appVersion: "5.1.0" }]
+    ])("%s -> the configured version: the override is ignored (v2 applies it)", (_description, options) => {
+      expect(bodyWith(v2Handler, options).appVersion).toBe("5.1.0");
+      expect(bodyWith(networkHandler, options).appVersion).toBe(version);
     });
 
     test("the serialized body carries a string appVersion and no null, where v2's has a literal null", () => {

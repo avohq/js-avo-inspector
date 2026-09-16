@@ -46,18 +46,20 @@ export interface SessionStartedBody extends BaseBody {
 }
 
 /**
- * Per-call gateway coordinates, sent as top-level siblings of `eventProperties`
- * on the track body — never nested inside the schema, and never read from event
- * data. Every value is trimmed; empty, whitespace-only and non-string values are
- * treated as absent.
+ * INTERNAL — not part of the public API, and not exported from either entry
+ * point. Per-call gateway coordinates for the web GTM tag template, which passes
+ * them as a third argument to `window.inspector.trackSchemaFromEvent` in the
+ * script-tag build (see src/browser.js).
  *
- * `outputReference` and `originHint` are v2 fields, sent only when a client is
- * configured. `POST /inspector/v2/track` decodes both and accepts a literal
+ * They are sent as top-level siblings of `eventProperties` on the track body —
+ * never nested inside the schema, and never read from event data. Every value is
+ * trimmed; empty, whitespace-only and non-string values are treated as absent.
+ *
+ * They only apply on the v2 transport, i.e. when a client is configured.
+ * `POST /inspector/v2/track` decodes both hints and accepts a literal
  * `appVersion: null` (stored as "unversioned"). Without a client the SDK is on
- * `POST /inspector/v1/track`, which has neither field and drops an event whose
- * `appVersion` is null, so both hints are left out of the body there, the
- * origin-scoped null never applies, and `appVersion` is the only option that
- * has an effect.
+ * `POST /inspector/v1/track` and the options are ignored entirely, `appVersion`
+ * included, so the body is exactly the one 3.2.0 built.
  *
  * Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
  * AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
@@ -67,7 +69,7 @@ export interface TrackOptions {
   outputReference?: string;
   /** Low-cardinality hint identifying the event's upstream source (e.g. "web", "ios"). Never a user identifier. */
   originHint?: string;
-  /** App version of the source that produced the event. With originHint set and a client configured (v2), replaces the SDK's configured version (literal null when omitted); otherwise overrides it only when provided. */
+  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (literal null when omitted); without originHint, overrides it only when provided. */
   appVersion?: string;
 }
 
@@ -81,59 +83,40 @@ function normalizeHint(value: unknown): string | undefined {
   return trimmed === "" ? undefined : trimmed;
 }
 
-/** Shape of every X-Avo-Client token: "web", "gtm-web", "ios", "csharp", … */
-const clientTokenPattern = /^[A-Za-z0-9._-]{1,64}$/;
+/**
+ * The only client that selects the v2 transport: the one the web GTM tag template
+ * writes to `window.inspector.__CLIENT__`. It is also the only `X-Avo-Client`
+ * value this SDK ever sends.
+ */
+const webGtmTemplateClient = "gtm-web";
 
 /**
- * Normalizes the client, which is also what selects the transport: it returns
- * undefined — v1, exactly as 3.2.0 sent it — unless the client is a string that
- * is still non-empty after trimming, and the X-Avo-Client value for v2 otherwise.
+ * Normalizes the client, which is also what selects the transport. It returns
+ * "gtm-web" — v2 — only when the client is a string that is exactly "gtm-web"
+ * after trimming (a value copied out of a config keeps its trailing newline, so
+ * trimming keeps that attribution). Anything else — absent, blank, non-string,
+ * "web", another platform token, a different case — returns undefined: v1,
+ * exactly as 3.2.0 sent it. Every caller other than the web GTM tag template
+ * stays on v1.
  *
- * Unlike the hint fields that value becomes a request header, so an unusable one
- * is not merely dropped from a body — it makes setRequestHeader throw during
- * synchronous request setup. That throw would escape callInspectorWithBatchBody,
- * which clears its `sending` re-entrancy guard only from the completion callback,
- * latching the guard and silently cancelling every later batch for the lifetime
- * of the page.
- *
- * The value arrives from a constructor option or, in the script-tag build, from
- * `window.inspector.__CLIENT__` — so a token copied out of a config with a
- * trailing newline is entirely plausible. A non-blank value that is not a usable
- * token still asked for v2, so it keeps v2 and falls back to "web": that loses
- * one attribution label, where letting it through would lose all the events.
+ * Returning only the constant also means no caller-supplied string ever becomes
+ * a request header, so an unusable value can never make setRequestHeader throw
+ * during synchronous request setup.
  */
 function normalizeClient(client: unknown): string | undefined {
-  const trimmed = normalizeHint(client);
-  if (trimmed === undefined) return undefined;
-  if (!clientTokenPattern.test(trimmed)) {
-    if (AvoInspector.shouldLog) {
-      console.warn(
-        "[Avo Inspector] Unusable client value. Sending X-Avo-Client: web instead."
-      );
-    }
-    return "web";
-  }
-  return trimmed;
+  return normalizeHint(client) === webGtmTemplateClient
+    ? webGtmTemplateClient
+    : undefined;
 }
-
-/**
- * One-shot latch for the warning a handler without a client (v1) gives when
- * TrackOptions hints are left out. v1 answers 200 regardless and has no
- * outputReference/originHint fields, so the gap is not visible from here. v2
- * never warns. The latch is per module, so each build emits the warning at most
- * once per page/process no matter how many such events are tracked. The full
- * and lite builds latch independently, so an app that loads both can see one
- * from each.
- */
-let warnedAboutOmittedHints = false;
 
 export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
   type: "event";
 
   /**
-   * Nullable only here: with an originHint set and no per-event appVersion the
-   * event is source-scoped, so a literal null is sent rather than the SDK's
-   * configured version. Session-started bodies always carry the string version.
+   * Nullable only here, and only on v2: with an originHint set and no per-event
+   * appVersion the event is source-scoped, so a literal null is sent rather than
+   * the SDK's configured version. Session-started bodies, and every v1 body,
+   * always carry the string version.
    */
   appVersion: string | null;
 
@@ -204,9 +187,10 @@ export class AvoNetworkCallsHandlerLite {
   private readonly appVersion: string;
   private readonly libVersion: string;
   /**
-   * The X-Avo-Client value, or undefined when no client is configured. It is
-   * also the transport switch, decided once in the constructor: undefined keeps
-   * the v1 request byte for byte as 3.2.0 sent it; a client selects v2.
+   * "gtm-web" for the web GTM tag template, otherwise undefined. It is the
+   * transport switch, decided once in the constructor: undefined keeps the v1
+   * request byte for byte as 3.2.0 sent it; "gtm-web" selects v2 and is the
+   * X-Avo-Client value.
    */
   private readonly client: string | undefined;
   private readonly trackingEndpoint: string;
@@ -331,37 +315,24 @@ export class AvoNetworkCallsHandlerLite {
       eventSchemaBody.validatedBranchId = validatedBranchId;
     }
 
-    // Set gateway hints if provided and non-empty after normalization. The
-    // hints are v2 fields, so without a client they are left out of the body.
-    const outputReference = normalizeHint(options?.outputReference);
-    const originHint = normalizeHint(options?.originHint);
-    const appVersion = normalizeHint(options?.appVersion);
-    const isV2 = this.client !== undefined;
-    if (outputReference !== undefined && isV2) {
-      eventSchemaBody.outputReference = outputReference;
-    }
-    if (originHint !== undefined && isV2) {
-      eventSchemaBody.originHint = originHint;
-      // An origin hint marks an event from another source, whose app version is
-      // unrelated to this SDK instance's configured version.
-      eventSchemaBody.appVersion = appVersion !== undefined ? appVersion : null;
-    } else if (appVersion !== undefined) {
-      // v1 leaves the hint out, so the event keeps a string version: v1 drops an
-      // event whose appVersion is null.
-      eventSchemaBody.appVersion = appVersion;
-    }
-    // shouldLog is checked before the latch is set so a call made while logging
-    // is off does not swallow the one warning a later logging-on call deserves.
-    if (
-      (outputReference !== undefined || originHint !== undefined) &&
-      !isV2 &&
-      !warnedAboutOmittedHints &&
-      AvoInspector.shouldLog
-    ) {
-      warnedAboutOmittedHints = true;
-      console.warn(
-        "[Avo Inspector] outputReference and originHint are sent only when a client is configured, so they were left out of this event."
-      );
+    // Gateway options belong to the v2 transport. Without a client they are
+    // ignored entirely — the appVersion override included — so the body is
+    // exactly the one 3.2.0 built for the same call.
+    if (this.client !== undefined) {
+      const outputReference = normalizeHint(options?.outputReference);
+      const originHint = normalizeHint(options?.originHint);
+      const appVersion = normalizeHint(options?.appVersion);
+      if (outputReference !== undefined) {
+        eventSchemaBody.outputReference = outputReference;
+      }
+      if (originHint !== undefined) {
+        eventSchemaBody.originHint = originHint;
+        // An origin hint marks an event from another source, whose app version is
+        // unrelated to this SDK instance's configured version.
+        eventSchemaBody.appVersion = appVersion !== undefined ? appVersion : null;
+      } else if (appVersion !== undefined) {
+        eventSchemaBody.appVersion = appVersion;
+      }
     }
 
     return eventSchemaBody;

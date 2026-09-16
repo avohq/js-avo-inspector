@@ -162,20 +162,178 @@ describe("__CLIENT__ handshake with the web GTM tag template", () => {
     ["empty", ""],
     ["absent", undefined],
     ["whitespace only", "   "],
-    ["a lone newline", "\n"]
-  ])("a %s __CLIENT__ is not a client, so v1", (_description, client) => {
+    ["a lone newline", "\n"],
+    ["web", "web"],
+    ["gtm-server", "gtm-server"],
+    ["GTM-WEB", "GTM-WEB"],
+    ["some other embed's token", "some-other-embed"],
+    ["the number 42", 42]
+  ])("a %s __CLIENT__ is not the web GTM template, so v1", (_description, client) => {
     const sent = requestAfterBootstrap({ __CLIENT__: client });
 
     expect(sent.url).toBe(trackingEndpoint);
     expect(sent.headerCalls).toEqual([["Content-Type", "text/plain"]]);
   });
 
-  test("passes any token through verbatim, not just the GTM one", () => {
-    // The bootstrap must not special-case "gtm-web": other Avo integrations
-    // that embed this bundle get v2 and their own token the same way.
-    const sent = requestAfterBootstrap({ __CLIENT__: "some-other-embed" });
+  test("gtm-web with surrounding whitespace is trimmed and selects v2", () => {
+    const sent = requestAfterBootstrap({ __CLIENT__: " gtm-web " });
 
     expect(sent.url).toBe(trackingEndpointV2);
-    expect(sent.headers["X-Avo-Client"]).toBe("some-other-embed");
+    expect(sent.headers["X-Avo-Client"]).toBe("gtm-web");
+  });
+});
+
+/**
+ * The web GTM tag template's call: `callInWindow('inspector.trackSchemaFromEvent',
+ * event, props, hints)`, with hints only when the tag has any. It reaches either
+ * the live instance or, before the bundle has loaded, the loader stub, whose
+ * queue the bootstrap replays.
+ */
+describe("gateway options through the window call (web GTM template)", () => {
+  const hints = {
+    outputReference: "meta-x7k2q",
+    originHint: "web",
+    appVersion: "5.1.0"
+  };
+
+  async function waitFor(condition: () => boolean): Promise<void> {
+    const start = Date.now();
+    while (!condition()) {
+      if (Date.now() - start > 1000) {
+        throw new Error("Timed out waiting for condition");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  /** The URL and event bodies of the one request a flush produced. */
+  const theRequest = async (): Promise<{ url: string; events: any[] }> => {
+    await waitFor(() => xhrMock.send.mock.calls.length > 0);
+    expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    return {
+      url: xhrMock.open.mock.calls[0][1],
+      events: JSON.parse(xhrMock.send.mock.calls[0][0])
+    };
+  };
+
+  const has = (object: object, key: string): boolean =>
+    Object.prototype.hasOwnProperty.call(object, key);
+
+  /** Bootstraps a live instance that flushes every event. */
+  const liveInspector = (props: QueueProps): any => {
+    const inspector = bootstrap(props);
+    inspector.setBatchSize(1);
+    jest.clearAllMocks();
+    return inspector;
+  };
+
+  test("gtm-web + trackSchemaFromEvent with a third argument: v2 with the hints", async () => {
+    const inspector = liveInspector({ __CLIENT__: "gtm-web" });
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 }, hints);
+
+    const { url, events } = await theRequest();
+    expect(url).toBe(trackingEndpointV2);
+    expect(events[0].outputReference).toBe("meta-x7k2q");
+    expect(events[0].originHint).toBe("web");
+    expect(events[0].appVersion).toBe("5.1.0");
+  });
+
+  test("gtm-web + trackSchemaFromEvent with two arguments: v2 without them (control for the test above)", async () => {
+    const inspector = liveInspector({ __CLIENT__: "gtm-web" });
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 });
+
+    const { url, events } = await theRequest();
+    expect(url).toBe(trackingEndpointV2);
+    expect(has(events[0], "outputReference")).toBe(false);
+    expect(has(events[0], "originHint")).toBe(false);
+    expect(events[0].appVersion).toBe(baseQueueProps.__VERSION__);
+  });
+
+  test("gtm-web + trackSchema with a third argument: v2 with the hints", async () => {
+    const inspector = liveInspector({ __CLIENT__: "gtm-web" });
+
+    await inspector.trackSchema(
+      "Ev",
+      [{ propertyName: "a", propertyType: "int" }],
+      hints
+    );
+
+    const { url, events } = await theRequest();
+    expect(url).toBe(trackingEndpointV2);
+    expect(events[0].outputReference).toBe("meta-x7k2q");
+    expect(events[0].originHint).toBe("web");
+  });
+
+  test("the wrapper does not depend on how it is invoked (detached from the instance)", async () => {
+    const inspector = liveInspector({ __CLIENT__: "gtm-web" });
+    const detached = inspector.trackSchemaFromEvent;
+
+    await detached("Ev", { a: 1 }, { outputReference: "meta-x7k2q" });
+
+    const { events } = await theRequest();
+    expect(events[0].outputReference).toBe("meta-x7k2q");
+  });
+
+  test("without __CLIENT__ a third argument is inert: v1, no hints, the configured version", async () => {
+    const inspector = liveInspector({});
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 }, hints);
+
+    const { url, events } = await theRequest();
+    expect(url).toBe(trackingEndpoint);
+    expect(has(events[0], "outputReference")).toBe(false);
+    expect(has(events[0], "originHint")).toBe(false);
+    expect(events[0].appVersion).toBe(baseQueueProps.__VERSION__);
+  });
+
+  describe("calls queued on the loader stub before the bundle loaded", () => {
+    /**
+     * Installs the real loader stub (src/script.js), sets the snippet values on
+     * it the way the template does, queues calls through it, then loads the
+     * bundle.
+     */
+    const bootstrapAfterQueuedCalls = (
+      props: QueueProps,
+      queue: (stub: any) => void
+    ): void => {
+      delete (window as any).inspector;
+      jest.isolateModules(() => {
+        require("../script");
+      });
+      const stub = (window as any).inspector;
+      Object.assign(stub, baseQueueProps, props);
+      stub.setBatchSize(1);
+      queue(stub);
+
+      jest.clearAllMocks();
+      jest.resetModules();
+      require("../browser");
+    };
+
+    test("a queued three-argument trackSchemaFromEvent replays with its hints", async () => {
+      bootstrapAfterQueuedCalls({ __CLIENT__: "gtm-web" }, (stub) => {
+        stub.trackSchemaFromEvent("Ev", { a: 1 }, hints);
+      });
+
+      const { url, events } = await theRequest();
+      expect(url).toBe(trackingEndpointV2);
+      expect(events[0].eventName).toBe("Ev");
+      expect(events[0].outputReference).toBe("meta-x7k2q");
+      expect(events[0].originHint).toBe("web");
+      expect(events[0].appVersion).toBe("5.1.0");
+    });
+
+    test("a queued two-argument trackSchemaFromEvent replays without hints (control)", async () => {
+      bootstrapAfterQueuedCalls({ __CLIENT__: "gtm-web" }, (stub) => {
+        stub.trackSchemaFromEvent("Ev", { a: 1 });
+      });
+
+      const { url, events } = await theRequest();
+      expect(url).toBe(trackingEndpointV2);
+      expect(events[0].eventName).toBe("Ev");
+      expect(has(events[0], "outputReference")).toBe(false);
+    });
   });
 });

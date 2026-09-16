@@ -8,11 +8,16 @@ import type {
 } from "../AvoNetworkCallsHandler";
 
 import { defaultOptions } from "./constants";
+import {
+  trackSchemaFromEventWithOptions,
+  trackSchemaWithOptions,
+  withClient
+} from "./helpers/internalGateway";
 
-// outputReference and originHint are sent only on the v2 transport, which a
-// configured client selects. The v1 side of each rule is in
-// TrackOptionsTransport_test.ts.
-const v2Options = { ...defaultOptions, client: "gtm-web" };
+// Internal web GTM template support. outputReference and originHint are sent
+// only on the v2 transport, which the internal client selects. The v1 side of
+// each rule is in TrackOptionsTransport_test.ts.
+const v2Options = withClient(defaultOptions, "gtm-web");
 
 /** Type extracted for a property, or undefined when the property is absent. */
 const typeOf = (
@@ -41,7 +46,8 @@ describe("TrackOptions - property-name collision", () => {
     // avoStorage is a static set by the constructor, so clear it only after one exists.
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "Gateway Event",
       {
         // Customer properties that happen to share the option names. These carry
@@ -81,7 +87,8 @@ describe("TrackOptions - property-name collision", () => {
     inspector.enableLogging(false);
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "Gateway Event",
       {
         outputReference: "a property, not an option",
@@ -119,7 +126,8 @@ describe("TrackOptions - property-name collision", () => {
     // avoStorage is a static set by the constructor, so clear it only after one exists.
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "Gateway Event",
       { amount: 99 },
       { outputReference: "meta-x7k2q", originHint: "web", appVersion: "5.1.0" }
@@ -144,12 +152,14 @@ describe("TrackOptions - primary use case: several outputReferences for the same
 
     // Same tick on purpose: this is the shape of a gateway fanning one event out
     // to several outputs behind a single Inspector API key.
-    const first = inspector.trackSchemaFromEvent(
+    const first = trackSchemaFromEventWithOptions(
+      inspector,
       "Purchase Completed",
       { amount: 99, currency: "USD" },
       { outputReference: "meta-x7k2q" }
     );
-    const second = inspector.trackSchemaFromEvent(
+    const second = trackSchemaFromEventWithOptions(
+      inspector,
       "Purchase Completed",
       { amount: 99, currency: "USD" },
       { outputReference: "tiktok-9f3q2" }
@@ -183,10 +193,10 @@ describe("TrackOptions - primary use case: several outputReferences for the same
     const schema = [{ propertyName: "amount", propertyType: "int" }];
 
     await Promise.all([
-      inspector.trackSchema("Purchase Completed", schema, {
+      trackSchemaWithOptions(inspector, "Purchase Completed", schema, {
         outputReference: "meta-x7k2q"
       }),
-      inspector.trackSchema("Purchase Completed", schema, {
+      trackSchemaWithOptions(inspector, "Purchase Completed", schema, {
         outputReference: "tiktok-9f3q2"
       })
     ]);

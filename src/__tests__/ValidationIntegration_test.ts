@@ -3,6 +3,10 @@ import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
 import type { EventSpecResponse, EventSpecResponseWire } from "../eventSpec/AvoEventSpecFetchTypes";
+import {
+  trackSchemaFromEventWithOptions,
+  withClient
+} from "./helpers/internalGateway";
 
 // Mock dependencies
 jest.mock("../AvoStorage", () => ({
@@ -515,12 +519,12 @@ describe("Validation Integration", () => {
       ["no client (v1)", undefined],
       ["a client (v2)", "gtm-web"]
     ])("should validate events from Avo Functions (_avoFunctionTrackSchemaFromEvent), with %s", async (_transport, client) => {
-      const inspector = new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        client
-      });
+      const inspector = new AvoInspector(
+        withClient(
+          { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+          client
+        )
+      );
 
       callInspectorImmediatelySpy = jest
         .spyOn(
@@ -566,12 +570,13 @@ describe("Validation Integration", () => {
       expect(eventBody.appVersion).toBe("1.0.0");
     });
 
-    test("trackSchemaFromEvent with options.appVersion on the validated path sends the given appVersion when originHint is set", async () => {
-      const inspector = new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0"
-      });
+    test("with a client, the internal trackSchemaFromEvent with options.appVersion on the validated path sends the given appVersion when originHint is set", async () => {
+      const inspector = new AvoInspector(
+        withClient(
+          { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+          "gtm-web"
+        )
+      );
 
       callInspectorImmediatelySpy = jest
         .spyOn(
@@ -582,7 +587,8 @@ describe("Validation Integration", () => {
           args[1](null);
         });
 
-      await inspector.trackSchemaFromEvent(
+      await trackSchemaFromEventWithOptions(
+        inspector,
         "test_event",
         { required_prop: "test", optional_prop: 50, status: "active" },
         { originHint: "ios", appVersion: "5.1.0" }
@@ -593,14 +599,14 @@ describe("Validation Integration", () => {
       expect(eventBody.appVersion).toBe("5.1.0");
     });
 
-    test("trackSchemaFromEvent with options on the validated path includes both hint fields (contrast with Avo Functions path above)", async () => {
-      // A configured client selects v2, the only transport that sends the hints.
-      const inspector = new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0",
-        client: "gtm-web"
-      });
+    test("the internal trackSchemaFromEvent with options on the validated path includes both hint fields (contrast with Avo Functions path above)", async () => {
+      // The internal client selects v2, the only transport that sends the hints.
+      const inspector = new AvoInspector(
+        withClient(
+          { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+          "gtm-web"
+        )
+      );
 
       callInspectorImmediatelySpy = jest
         .spyOn(
@@ -613,7 +619,8 @@ describe("Validation Integration", () => {
 
       // Use the manual tracking method (in scope for hints), unlike the
       // Avo-Function path exercised above.
-      await inspector.trackSchemaFromEvent(
+      await trackSchemaFromEventWithOptions(
+        inspector,
         "test_event",
         { required_prop: "test", optional_prop: 50, status: "active" },
         { outputReference: "meta-x7k2q", originHint: "web" }

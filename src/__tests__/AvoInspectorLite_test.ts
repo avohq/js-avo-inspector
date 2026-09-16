@@ -3,6 +3,11 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoInspector as AvoInspectorFromIndex, AvoInspectorEnv as AvoInspectorEnvFromIndex } from "../lite/index";
 import { AvoBatcher as AvoBatcherLite } from "../lite/AvoBatcherLite";
+import {
+  trackSchemaFromEventWithOptions,
+  trackSchemaWithOptions,
+  withClient
+} from "./helpers/internalGateway";
 
 const xhrMock: Partial<XMLHttpRequest> = {
   open: jest.fn(),
@@ -72,7 +77,7 @@ describe("AvoInspectorLite - trackSchemaFromEvent", () => {
     expect(Array.isArray(schema2)).toBe(true);
   });
 
-  test("threads options through to avoBatcher.handleTrackSchema", async () => {
+  test("the internal method threads options through to avoBatcher.handleTrackSchema", async () => {
     const inspector = new AvoInspectorLite(defaultLiteOptions);
     inspector.enableLogging(false);
 
@@ -80,7 +85,7 @@ describe("AvoInspectorLite - trackSchemaFromEvent", () => {
       .spyOn(inspector.avoBatcher, "handleTrackSchema")
       .mockImplementation(() => {});
 
-    const schema = await inspector.trackSchemaFromEvent("Ev", { a: 1 }, { originHint: "web" });
+    const schema = await trackSchemaFromEventWithOptions(inspector, "Ev", { a: 1 }, { originHint: "web" });
 
     expect(handleTrackSchemaSpy).toHaveBeenCalledWith(
       "Ev",
@@ -105,7 +110,7 @@ describe("AvoInspectorLite - trackSchema", () => {
     ).resolves.toBeUndefined();
   });
 
-  test("threads options through to avoBatcher.handleTrackSchema", async () => {
+  test("the internal method threads options through to avoBatcher.handleTrackSchema", async () => {
     const inspector = new AvoInspectorLite(defaultLiteOptions);
     inspector.enableLogging(false);
 
@@ -115,7 +120,7 @@ describe("AvoInspectorLite - trackSchema", () => {
 
     const schema = [{ propertyName: "a", propertyType: "int" }];
 
-    await inspector.trackSchema("Ev", schema, { originHint: "web" });
+    await trackSchemaWithOptions(inspector, "Ev", schema, { originHint: "web" });
 
     expect(handleTrackSchemaSpy).toHaveBeenCalledWith(
       "Ev",
@@ -137,14 +142,14 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     // which is exactly why the ordering has to be right rather than merely lucky.
     AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
 
-    // A configured client selects v2, the only transport that sends the hints.
-    const inspector = new AvoInspectorLite({
-      ...defaultLiteOptions,
-      client: "gtm-web"
-    });
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspectorLite(
+      withClient(defaultLiteOptions, "gtm-web")
+    );
     inspector.enableLogging(false);
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "Ev",
       { a: 1 },
       { outputReference: "  ", originHint: "web" }
@@ -171,13 +176,13 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
 
     // The origin-scoped null is v2-only, so this needs a client.
-    const inspector = new AvoInspectorLite({
-      ...defaultLiteOptions,
-      client: "gtm-web"
-    });
+    const inspector = new AvoInspectorLite(
+      withClient(defaultLiteOptions, "gtm-web")
+    );
     inspector.enableLogging(false);
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "Ev",
       { a: 1 },
       { originHint: "ios" }
@@ -195,14 +200,14 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     }
   });
 
-  test("without a client, the same call stores the configured version, not null", async () => {
+  test("without a client, the same call is ignored entirely: configured version, no hints", async () => {
     // Positive control is the test above: the same call with a client stores null.
     AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
 
     const inspector = new AvoInspectorLite(defaultLiteOptions);
     inspector.enableLogging(false);
 
-    await inspector.trackSchemaFromEvent("Ev", { a: 1 }, { originHint: "ios" });
+    await trackSchemaFromEventWithOptions(inspector, "Ev", { a: 1 }, { originHint: "ios", appVersion: "5.1.0" });
 
     const events = AvoInspectorLite.avoStorage.getItem<any[]>(
       AvoBatcherLite.cacheKey

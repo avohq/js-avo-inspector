@@ -77,15 +77,6 @@ export class AvoInspector {
     appName?: string;
     suffix?: string;
     publicEncryptionKey?: string;
-    /**
-     * Identifies the Avo integration this SDK is embedded in — the web GTM tag
-     * template passes `"gtm-web"`. Setting it opts into the v2 transport
-     * (`/inspector/v2/track`, with this value as the `X-Avo-Client` header),
-     * which is the only one that sends `TrackOptions.outputReference` and
-     * `originHint`. Leave it unset otherwise: without it the SDK sends to
-     * `/inspector/v1/track` exactly as 3.2.0 did. A blank value counts as unset.
-     */
-    client?: string;
   }) {
     // the constructor does aggressive null/undefined checking because same code paths will be accessible from JS
     if (isValueEmpty(options.env)) {
@@ -161,7 +152,11 @@ export class AvoInspector {
       this.version,
       libVersion,
       this.publicEncryptionKey,
-      options.client
+      // INTERNAL: the web GTM tag template's client, which selects the v2
+      // transport. Only the script-tag bootstrap sets it (src/browser.js, from
+      // window.inspector.__CLIENT__), so it is deliberately not in the options
+      // type. Without it the SDK stays on v1 exactly as 3.2.0.
+      (options as typeof options & { _client?: string })._client
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
     this.avoDeduplicator = new AvoDeduplicator();
@@ -187,10 +182,28 @@ export class AvoInspector {
     }
   }
 
-  async trackSchemaFromEvent(
+  trackSchemaFromEvent(
+    eventName: string,
+    eventProperties: Record<string, any>
+  ): Promise<EventProperty[]> {
+    return this._trackSchemaFromEventWithOptions(
+      eventName,
+      eventProperties,
+      undefined
+    );
+  }
+
+  // INTERNAL — not public API. `trackSchemaFromEvent` with the web GTM tag template's
+  // gateway options, reached only through the script-tag bootstrap
+  // (src/browser.js), which routes a third argument here. Private and
+  // underscore-named like `_avoFunctionTrackSchemaFromEvent`, so it stays out
+  // of the typings (a line comment, not JSDoc, so none of this is emitted into
+  // the .d.ts either). The options have an effect only when the instance has a
+  // client (v2); without one they are ignored entirely.
+  private async _trackSchemaFromEventWithOptions(
     eventName: string,
     eventProperties: Record<string, any>,
-    options?: TrackOptions
+    options: TrackOptions | undefined
   ): Promise<EventProperty[]> {
     try {
       if (
@@ -310,7 +323,26 @@ export class AvoInspector {
     }
   }
 
-  async trackSchema(
+  trackSchema(
+    eventName: string,
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      encryptedPropertyValue?: string;
+      children?: any;
+    }>
+  ): Promise<void> {
+    return this._trackSchemaWithOptions(eventName, eventSchema, undefined);
+  }
+
+  // INTERNAL — not public API. `trackSchema` with the web GTM tag template's
+  // gateway options, reached only through the script-tag bootstrap
+  // (src/browser.js), which routes a third argument here. Private and
+  // underscore-named like `_avoFunctionTrackSchemaFromEvent`, so it stays out
+  // of the typings (a line comment, not JSDoc, so none of this is emitted into
+  // the .d.ts either). The options have an effect only when the instance has a
+  // client (v2); without one they are ignored entirely.
+  private async _trackSchemaWithOptions(
     eventName: string,
     eventSchema: Array<{
       propertyName: string;
@@ -318,7 +350,7 @@ export class AvoInspector {
       encryptedPropertyValue?: string;
       children?: any;
     }>,
-    options?: TrackOptions
+    options: TrackOptions | undefined
   ): Promise<void> {
     try {
       if (

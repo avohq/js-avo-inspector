@@ -5,6 +5,7 @@ import { AvoStorage } from "../AvoStorage";
 import { AvoStreamId } from "../AvoStreamId";
 
 import { defaultOptions, networkCallType } from "./constants";
+import { trackSchemaWithOptions, withClient } from "./helpers/internalGateway";
 
 const inspectorVersion = process.env.npm_package_version || "";
 
@@ -121,8 +122,8 @@ describe("Batcher", () => {
       "bodyForEventSchemaCall"
     );
 
-    // A configured client selects v2, the only transport that sends the hints.
-    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -159,8 +160,8 @@ describe("Batcher", () => {
   });
 
   test("handleTrackSchema forwards options to storage with only originHint set (outputReference stays absent)", () => {
-    // A configured client selects v2, the only transport that sends the hints.
-    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -184,14 +185,15 @@ describe("Batcher", () => {
     }
   });
 
-  test("trackSchema entered through the public AvoInspector method threads options through to the storage round trip", async () => {
-    // A configured client selects v2, the only transport that sends the hints.
-    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
+  test("trackSchema entered through the internal AvoInspector method threads options through to the storage round trip", async () => {
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
 
-    await inspector.trackSchema(
+    await trackSchemaWithOptions(
+      inspector,
       "event name",
       [{ propertyName: "prop0", propertyType: "string" }],
       { outputReference: "meta-x7k2q" }
@@ -366,8 +368,9 @@ describe("Batcher", () => {
     streamIdSpy.mockRestore();
   });
 
-  test("handleTrackSchema storage round trip: originHint + appVersion set -> stored event appVersion is the given appVersion", () => {
-    const inspector = new AvoInspector(defaultOptions);
+  test("handleTrackSchema storage round trip with a client: originHint + appVersion set -> stored event appVersion is the given appVersion", () => {
+    // Options apply only on v2, so this needs the internal client.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -392,7 +395,7 @@ describe("Batcher", () => {
 
   test("handleTrackSchema storage round trip with a client: originHint set, appVersion absent -> stored event appVersion is null (JSON storage keeps null)", () => {
     // The origin-scoped null is v2-only, so this needs a client.
-    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -416,7 +419,7 @@ describe("Batcher", () => {
     }
   });
 
-  test("handleTrackSchema storage round trip without a client: originHint set, appVersion absent -> stored event keeps the configured version", () => {
+  test("handleTrackSchema storage round trip without a client: originHint set, appVersion absent -> options ignored, stored event keeps the configured version", () => {
     // Positive control is the test above: with a client the same call stores null.
     const inspector = new AvoInspector(defaultOptions);
     inspector.enableLogging(false);

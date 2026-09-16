@@ -107,7 +107,7 @@ describe("NetworkCallsHandlerLite - TrackOptions parity", () => {
     expect(xhrMock.send.mock.calls).toEqual([[JSON.stringify([body])]]);
   });
 
-  test("without a client, outputReference and originHint are left out of the body even when given", () => {
+  test("without a client, the options are ignored entirely: no hints, and no appVersion override", () => {
     const body = networkHandler.bodyForEventSchemaCall(
       eventName,
       eventProperties,
@@ -122,8 +122,10 @@ describe("NetworkCallsHandlerLite - TrackOptions parity", () => {
       false
     );
     expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
-    // appVersion is a v1 field, so the override still applies.
-    expect(body.appVersion).toBe("5.1.0");
+    expect(body.appVersion).toBe(version);
+    expect(body).toEqual(
+      networkHandler.bodyForEventSchemaCall(eventName, eventProperties, null, null)
+    );
   });
 
   test("with a client, the same options put both hints on the body (positive control for the omission above)", () => {
@@ -418,9 +420,9 @@ describe("NetworkCallsHandlerLite - TrackOptions.appVersion with originHint (v2,
   });
 });
 
-// Without a client the hint is left out and the origin-scoped null never
-// applies: v1 drops an event whose appVersion is null. Each case carries the v2
-// handler as its positive control.
+// Without the gtm-web client the options are ignored entirely: no origin-scoped
+// null (v1 drops an event whose appVersion is null) and no appVersion override.
+// Each case carries the v2 handler as its positive control.
 describe("NetworkCallsHandlerLite - TrackOptions.appVersion with originHint (v1, no client)", () => {
   const { apiKey, env, version } = defaultOptions;
 
@@ -469,11 +471,13 @@ describe("NetworkCallsHandlerLite - TrackOptions.appVersion with originHint (v1,
     }
   );
 
-  test("an appVersion option still overrides, with or without originHint", () => {
-    expect(
-      bodyWith(v1(), { originHint: "ios", appVersion: " 5.1.0 " }).appVersion
-    ).toBe("5.1.0");
-    expect(bodyWith(v1(), { appVersion: "5.1.0" }).appVersion).toBe("5.1.0");
+  test("an appVersion option is ignored too, with or without originHint (v2 applies it)", () => {
+    [{ originHint: "ios", appVersion: " 5.1.0 " }, { appVersion: "5.1.0" }].forEach(
+      (options) => {
+        expect(bodyWith(v2(), options).appVersion).toBe("5.1.0");
+        expect(bodyWith(v1(), options).appVersion).toBe(version);
+      }
+    );
   });
 
   test("the serialized body carries a string appVersion and no null, where v2's has a literal null", () => {

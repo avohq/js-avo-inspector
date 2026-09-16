@@ -280,3 +280,163 @@ describe("v1 wire, no client, script-tag bootstrap", () => {
     ]);
   });
 });
+
+/**
+ * A third argument changes nothing without the web GTM template's client.
+ *
+ * Gateway options are internal (web GTM template only). A JS caller can still
+ * pass a third argument to the public track methods, and the internal methods
+ * accept one; without the client both must produce 3.2.0's bytes — the
+ * appVersion in the options included.
+ *
+ * Still runnable against 3.2.0: the internal methods are used only where they
+ * exist, and there a third argument to the public methods was always ignored.
+ */
+describe("v1 wire, no client, a third argument is inert", () => {
+  const options = {
+    outputReference: "meta-x7k2q",
+    originHint: "ios",
+    appVersion: "5.1.0"
+  };
+
+  const clearEventCache = (): void => {
+    (global as any).__localStorageMock.clear();
+  };
+
+  async function waitForSend(): Promise<void> {
+    await waitFor(() => xhrMock.send.mock.calls.length > 0);
+  }
+
+  const builds: Array<[string, () => any, string]> = [
+    [
+      "full build",
+      () => {
+        clearEventCache();
+        const inspector = new AvoInspector({
+          apiKey: "api-key-xxx",
+          env: "prod",
+          version: "1"
+        } as any);
+        inspector.enableLogging(false);
+        AvoInspector.batchSize = 1;
+        return inspector;
+      },
+      "stream-id"
+    ],
+    [
+      "lite build",
+      () => {
+        clearEventCache();
+        const inspector = new AvoInspectorLite({
+          apiKey: "api-key-xxx",
+          env: "prod",
+          version: "1"
+        } as any);
+        inspector.enableLogging(false);
+        AvoInspectorLite.batchSize = 1;
+        return inspector;
+      },
+      ""
+    ]
+  ];
+
+  const calls: Array<[string, (inspector: any) => Promise<unknown>]> = [
+    [
+      "public trackSchemaFromEvent(name, props, options)",
+      (inspector) =>
+        inspector.trackSchemaFromEvent("event name", { prop0: "value" }, options)
+    ],
+    [
+      "public trackSchema(name, schema, options)",
+      (inspector) =>
+        inspector.trackSchema(
+          "event name",
+          [{ propertyName: "prop0", propertyType: "string" }],
+          options
+        )
+    ],
+    [
+      "internal trackSchemaFromEvent with options, where it exists",
+      (inspector) =>
+        inspector._trackSchemaFromEventWithOptions
+          ? inspector._trackSchemaFromEventWithOptions(
+              "event name",
+              { prop0: "value" },
+              options
+            )
+          : inspector.trackSchemaFromEvent("event name", { prop0: "value" }, options)
+    ],
+    [
+      "internal trackSchema with options, where it exists",
+      (inspector) =>
+        inspector._trackSchemaWithOptions
+          ? inspector._trackSchemaWithOptions(
+              "event name",
+              [{ propertyName: "prop0", propertyType: "string" }],
+              options
+            )
+          : inspector.trackSchema(
+              "event name",
+              [{ propertyName: "prop0", propertyType: "string" }],
+              options
+            )
+    ]
+  ];
+
+  describe.each(builds)("%s", (_build, newInspector, streamId) => {
+    test.each(calls)("%s sends 3.2.0's bytes", async (_call, track) => {
+      const inspector = newInspector();
+      jest.clearAllMocks();
+
+      await track(inspector);
+      await waitForSend();
+
+      expect(xhrMock.open.mock.calls).toEqual([["POST", v1Endpoint, true]]);
+      expect(headerCalls()).toEqual([["Content-Type", "text/plain"]]);
+      expect(xhrMock.send.mock.calls).toEqual([
+        [`[${manualEventJson(packageVersion, streamId)}]`]
+      ]);
+    });
+  });
+
+  test.each([
+    ["no __CLIENT__", {}],
+    ["__CLIENT__ web", { __CLIENT__: "web" }],
+    ["__CLIENT__ GTM-WEB", { __CLIENT__: "GTM-WEB" }],
+    ["__CLIENT__ gtm-server", { __CLIENT__: "gtm-server" }]
+  ])("script tag with %s: a three-argument window call sends 3.2.0's bytes", async (_description, clientProps) => {
+    clearEventCache();
+    const callQueue: any[] = [];
+    Object.assign(callQueue, {
+      __API_KEY__: "api-key-xxx",
+      __ENV__: "prod",
+      __VERSION__: "1",
+      __APP_NAME__: ""
+    }, clientProps);
+    (window as any).inspector = callQueue;
+
+    jest.isolateModules(() => {
+      require("../browser");
+      jest.spyOn(require("../AvoGuid").default, "newGuid").mockReturnValue(
+        "generated-guid"
+      );
+      jest
+        .spyOn(require("../AvoStreamId").AvoStreamId, "streamId", "get")
+        .mockReturnValue("stream-id");
+    });
+
+    const inspector = (window as any).inspector;
+    inspector.setBatchSize(1);
+    jest.clearAllMocks();
+
+    await inspector.trackSchemaFromEvent("event name", { prop0: "value" }, options);
+    await waitForSend();
+
+    expect(xhrMock.open.mock.calls).toEqual([["POST", v1Endpoint, true]]);
+    expect(headerCalls()).toEqual([["Content-Type", "text/plain"]]);
+    expect(xhrMock.send.mock.calls).toEqual([
+      [`[${manualEventJson(packageVersion, "stream-id")}]`]
+    ]);
+    delete (window as any).inspector;
+  });
+});

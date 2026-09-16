@@ -1,11 +1,12 @@
 /**
  * Transport selection, and the request each transport sends.
  *
- * The transport is chosen once, when the handler is constructed: a configured
- * client selects v2 (`/inspector/v2/track`, JSON body, the api key and env in
- * request headers, `X-Avo-Client` for attribution at the edge). Without one the
- * SDK stays on v1 exactly as 3.2.0 sent it. A client counts as configured only
- * when it is a string that is still non-empty after trimming.
+ * The transport is chosen once, when the handler is constructed. v2
+ * (`/inspector/v2/track`, JSON body, the api key and env in request headers,
+ * `X-Avo-Client: gtm-web`) is selected only by the web GTM tag template's client:
+ * a string that is exactly "gtm-web" after trimming. Every other caller — no
+ * client, blank, non-string, "web", any other token — stays on v1 exactly as
+ * 3.2.0 sent it.
  *
  * The byte-level v1 pin against 3.2.0 lives in V1WireBaseline_test.ts; this file
  * covers the selection rule and the v2 request.
@@ -23,6 +24,7 @@ import {
   trackingEndpoint,
   trackingEndpointV2
 } from "./constants";
+import { withClient } from "./helpers/internalGateway";
 
 const inspectorVersion = process.env.npm_package_version || "";
 
@@ -129,16 +131,28 @@ describe.each([
       ["tabs and newlines", "\t\r\n "],
       ["null", null],
       ["a number", 42],
-      ["an object", { client: "gtm-web" }]
-    ])("a client that is %s is not a client, so v1", (_description, client) => {
+      ["an object", { client: "gtm-web" }],
+      ["web", "web"],
+      ["gtm-server", "gtm-server"],
+      ["another platform token", "ios"],
+      ["GTM-WEB (case differs)", "GTM-WEB"],
+      ["gtm-web with a suffix", "gtm-web2"],
+      ["gtm-web with an inner space", "gtm web"],
+      ["gtm-web with an inner newline", "gtm\nweb"],
+      ["gtm-web with a non-ASCII character", "gtm-wéb"]
+    ])("a client that is %s selects v1", (_description, client) => {
       const sent = oneSend(newHandler(client));
 
       expect(sent.url).toBe(trackingEndpoint);
       expect(sent.headerCalls).toEqual(v1HeaderCalls);
     });
 
+    test("control: exactly gtm-web, the one value excluded above, selects v2", () => {
+      expect(oneSend(newHandler("gtm-web")).url).toBe(trackingEndpointV2);
+    });
+
     test("v1 sends no api-key, env or X-Avo-Client header; the body carries apiKey and env", () => {
-      const sent = oneSend(newHandler(""));
+      const sent = oneSend(newHandler("web"));
 
       expect(sent.headers["api-key"]).toBeUndefined();
       expect(sent.headers.env).toBeUndefined();
@@ -147,19 +161,24 @@ describe.each([
       expect(sent.body[0].env).toBe(env);
     });
 
-    test("a blank client is not an unusable one: no invalid-client warning", () => {
+    test("selection never logs, whatever the client", () => {
       AvoInspector.shouldLog = true;
       AvoInspectorLite.shouldLog = true;
       const warn = console.warn as jest.Mock;
+      const log = console.log as jest.Mock;
       try {
         warn.mockClear();
-        newHandler("   ");
-        newHandler("");
+        log.mockClear();
+        ["", "   ", "web", "gtm web", "x".repeat(65), "gtm-web🚀", "gtm-web"].forEach(
+          (client) => newHandler(client)
+        );
         expect(warn).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalled();
 
-        // Positive control: a non-blank unusable client does warn.
-        newHandler("gtm web");
-        expect(warn).toHaveBeenCalledTimes(1);
+        // Positive control that the spies observe this code: logging during a
+        // send with shouldLog on does reach console.log.
+        oneSend(newHandler("gtm-web"));
+        expect(log).toHaveBeenCalled();
       } finally {
         AvoInspector.shouldLog = false;
         AvoInspectorLite.shouldLog = false;
@@ -167,7 +186,7 @@ describe.each([
     });
   });
 
-  describe("client set: v2", () => {
+  describe("client gtm-web: v2", () => {
     test("posts to v2 with Content-Type, api-key, env and X-Avo-Client", () => {
       const sent = oneSend(newHandler("gtm-web"));
 
@@ -207,57 +226,12 @@ describe.each([
       ).toBeUndefined();
     });
 
-    test("every platform token in the contract survives normalization", () => {
-      // The normalizer must not be so strict that it rejects real senders. These
-      // are the X-Avo-Client values the other Avo SDKs and templates send.
-      [
-        "web",
-        "gtm-web",
-        "gtm-server",
-        "ios",
-        "android",
-        "node",
-        "csharp",
-        "ruby",
-        "go"
-      ].forEach((token) => {
-        const sent = oneSend(newHandler(token));
-        expect(sent.url).toBe(trackingEndpointV2);
-        expect(sent.headers["X-Avo-Client"]).toBe(token);
-      });
-    });
-
-    test("a client with surrounding whitespace is trimmed and still selects v2", () => {
-      // A value copied out of a config file keeps its trailing newline. Trimming
-      // it preserves the attribution rather than silently downgrading.
-      [
-        ["gtm-web\n", "gtm-web"],
-        ["  gtm-web  ", "gtm-web"]
-      ].forEach(([raw, trimmed]) => {
+    test("gtm-web with surrounding whitespace is trimmed and still selects v2", () => {
+      // A value copied out of a config file keeps its trailing newline.
+      ["gtm-web\n", "  gtm-web  ", "\tgtm-web\r\n"].forEach((raw) => {
         const sent = oneSend(newHandler(raw));
         expect(sent.url).toBe(trackingEndpointV2);
-        expect(sent.headers["X-Avo-Client"]).toBe(trimmed);
-      });
-    });
-
-    test("a non-blank client that cannot be a header still selects v2, with X-Avo-Client: web", () => {
-      // setRequestHeader throws on these, which would take the whole batcher down
-      // (see the wedge test below). Losing the label beats losing every event.
-      // The emoji is the WebIDL ByteString case: a code unit above U+00FF throws
-      // a TypeError before the request is sent. The accented token is not — U+00E9
-      // is inside Latin-1 and setRequestHeader accepts it — so it is here to pin
-      // that the token pattern is ASCII-only by intent, not by accident.
-      [
-        "gtm\nweb",
-        "gtm web",
-        "gtm:web",
-        "x".repeat(65),
-        "gtm-wéb",
-        "gtm-web🚀"
-      ].forEach((bad) => {
-        const sent = oneSend(newHandler(bad));
-        expect(sent.url).toBe(trackingEndpointV2);
-        expect(sent.headers["X-Avo-Client"]).toBe("web");
+        expect(sent.headers["X-Avo-Client"]).toBe("gtm-web");
       });
     });
 
@@ -347,7 +321,7 @@ describe.each([
   );
 });
 
-describe("client option wiring through the public constructors", () => {
+describe("internal client wiring through the constructors", () => {
   /** The handler an inspector instance actually sends through. */
   const handlerOf = (inspector: any): any => inspector.avoNetworkCallsHandler;
 
@@ -355,30 +329,59 @@ describe("client option wiring through the public constructors", () => {
     ["AvoInspector", (options: any) => new AvoInspector(options)],
     ["AvoInspectorLite", (options: any) => new AvoInspectorLite(options)]
   ])("%s", (_name, newInspector) => {
-    test("without a client option it stays on v1", () => {
+    test("without the internal client it stays on v1", () => {
       const sent = oneSend(handlerOf(newInspector(defaultOptions)));
 
       expect(sent.url).toBe(trackingEndpoint);
       expect(sent.headerCalls).toEqual(v1HeaderCalls);
     });
 
-    test("a blank client option stays on v1", () => {
+    test("a blank internal client stays on v1", () => {
       const sent = oneSend(
-        handlerOf(newInspector({ ...defaultOptions, client: " \n" }))
+        handlerOf(newInspector(withClient(defaultOptions, " \n")))
       );
 
       expect(sent.url).toBe(trackingEndpoint);
       expect(sent.headerCalls).toEqual(v1HeaderCalls);
     });
 
-    test("a client option selects v2 and becomes X-Avo-Client", () => {
+    test.each([["web"], ["gtm-server"], ["GTM-WEB"], ["ios"]])(
+      "the internal client %s is not gtm-web, so v1",
+      (client) => {
+        const sent = oneSend(
+          handlerOf(newInspector(withClient(defaultOptions, client)))
+        );
+
+        expect(sent.url).toBe(trackingEndpoint);
+        expect(sent.headerCalls).toEqual(v1HeaderCalls);
+      }
+    );
+
+    test("the internal client selects v2 and becomes X-Avo-Client", () => {
       const sent = oneSend(
-        handlerOf(newInspector({ ...defaultOptions, client: "gtm-web" }))
+        handlerOf(newInspector(withClient(defaultOptions, "gtm-web")))
       );
 
       expect(sent.url).toBe(trackingEndpointV2);
       expect(sent.headers["X-Avo-Client"]).toBe("gtm-web");
       expect(sent.headers["api-key"]).toBe(apiKey);
     });
+  });
+});
+
+describe("the public client option does not exist", () => {
+  // `client` is not a public option: a JS caller that passes it anyway stays on
+  // v1. The internal `_client` above is the positive control.
+  test.each([
+    ["AvoInspector", (options: any) => new AvoInspector(options)],
+    ["AvoInspectorLite", (options: any) => new AvoInspectorLite(options)]
+  ])("%s ignores a client key in its options", (_name, newInspector) => {
+    const sent = oneSend(
+      (newInspector({ ...defaultOptions, client: "gtm-web" }) as any)
+        .avoNetworkCallsHandler
+    );
+
+    expect(sent.url).toBe(trackingEndpoint);
+    expect(sent.headerCalls).toEqual(v1HeaderCalls);
   });
 });

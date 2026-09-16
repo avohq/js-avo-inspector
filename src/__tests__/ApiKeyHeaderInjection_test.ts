@@ -22,8 +22,8 @@
  * mistyped api key silently ended all telemetry rather than failing one send.
  * The last test here is the one that covers that.
  *
- * Only v2 puts the key in a header, and v2 is selected by a configured client,
- * so the header tests below configure one. Without a client the SDK is on v1,
+ * Only v2 puts the key in a header, and v2 is selected by the internal client
+ * (the web GTM template's), so the header tests below configure one. Without a client the SDK is on v1,
  * where the key travels only in the body as it did in 3.2.0; the last block
  * pins that.
  *
@@ -36,6 +36,7 @@ import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorLite } from "../lite/AvoInspectorLite";
 
 import { defaultOptions } from "./constants";
+import { withClient } from "./helpers/internalGateway";
 
 /** A key that would inject a header if the value were serialized verbatim. */
 const crlfKey = "api-key-xxx\r\nX-Injected: yes";
@@ -50,7 +51,7 @@ const crlfKey = "api-key-xxx\r\nX-Injected: yes";
  * to catch.
  */
 const flushingInspector = (apiKey: string): AvoInspector =>
-  flushingInspectorWith({ ...defaultOptions, apiKey, client: "gtm-web" });
+  flushingInspectorWith(withClient({ ...defaultOptions, apiKey }, "gtm-web"));
 
 /** No client, so v1: the key travels only in the body. */
 const flushingV1Inspector = (apiKey: string): AvoInspector =>
@@ -66,11 +67,9 @@ const flushingInspectorWith = (
 };
 
 const flushingLiteInspector = (apiKey: string): AvoInspectorLite => {
-  const inspector = new AvoInspectorLite({
-    ...defaultOptions,
-    apiKey,
-    client: "gtm-web"
-  });
+  const inspector = new AvoInspectorLite(
+    withClient({ ...defaultOptions, apiKey }, "gtm-web")
+  );
   inspector.enableLogging(false);
   AvoInspectorLite.batchSize = 1;
   return inspector;

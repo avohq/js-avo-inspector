@@ -6,6 +6,11 @@ import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
 import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
 
 import { error } from "../__tests__/constants";
+import {
+  trackSchemaFromEventWithOptions,
+  trackSchemaWithOptions,
+  withClient
+} from "./helpers/internalGateway";
 
 // Mocked so the validated/immediate-send path (fetchAndValidateEvent) can be
 // driven deterministically. Mirrors ValidationIntegration_test.ts's setup.
@@ -279,24 +284,25 @@ describe("Initialization", () => {
   });
 });
 
-describe("TrackOptions argument acceptance", () => {
-  test("trackSchemaFromEvent accepts a 3rd TrackOptions argument without throwing", async () => {
+describe("internal gateway methods (web GTM template only)", () => {
+  test("_trackSchemaFromEventWithOptions accepts gateway options and returns the schema", async () => {
     const inspector = new AvoInspector({
       apiKey: "test-key",
       env: AvoInspectorEnv.Prod,
       version: "1.0.0"
     });
 
-    const schema = await inspector.trackSchemaFromEvent(
+    const schema = await trackSchemaFromEventWithOptions(
+      inspector,
       "test_event",
       { a: 1 },
       { outputReference: "meta-x7k2q", originHint: "web" }
     );
 
-    expect(Array.isArray(schema)).toBe(true);
+    expect(schema).toEqual([{ propertyName: "a", propertyType: "int" }]);
   });
 
-  test("trackSchema accepts a 3rd TrackOptions argument without throwing", async () => {
+  test("_trackSchemaWithOptions accepts gateway options", async () => {
     const inspector = new AvoInspector({
       apiKey: "test-key",
       env: AvoInspectorEnv.Prod,
@@ -304,12 +310,33 @@ describe("TrackOptions argument acceptance", () => {
     });
 
     await expect(
-      inspector.trackSchema(
+      trackSchemaWithOptions(
+        inspector,
         "test_event",
         [{ propertyName: "a", propertyType: "int" }],
         { outputReference: "meta-x7k2q", originHint: "web" }
       )
     ).resolves.toBeUndefined();
+  });
+
+  test("the public methods delegate to the internal ones with no options, even when JS passes a third argument", async () => {
+    const inspector = new AvoInspector({
+      apiKey: "test-key",
+      env: AvoInspectorEnv.Prod,
+      version: "1.0.0"
+    });
+    const fromEventSpy = jest.spyOn(
+      inspector as any,
+      "_trackSchemaFromEventWithOptions"
+    );
+    const schemaSpy = jest.spyOn(inspector as any, "_trackSchemaWithOptions");
+    const schema = [{ propertyName: "a", propertyType: "int" }];
+
+    await (inspector as any).trackSchemaFromEvent("Ev", { a: 1 }, { originHint: "web" });
+    await (inspector as any).trackSchema("Ev", schema, { originHint: "web" });
+
+    expect(fromEventSpy.mock.calls).toEqual([["Ev", { a: 1 }, undefined]]);
+    expect(schemaSpy.mock.calls).toEqual([["Ev", schema, undefined]]);
   });
 });
 
@@ -329,13 +356,13 @@ describe("TrackOptions on the validated/immediate-send path", () => {
   });
 
   test("bodyForEventSchemaCall is called with options as the 7th arg and the immediately-sent body carries the hint fields", async () => {
-    // A configured client selects v2, the only transport that sends the hints.
-    const inspector = new AvoInspector({
-      apiKey: "test-key",
-      env: AvoInspectorEnv.Dev,
-      version: "1.0.0",
-      client: "gtm-web"
-    });
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(
+      withClient(
+        { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+        "gtm-web"
+      )
+    );
 
     const bodyForEventSchemaCallSpy = jest.spyOn(
       AvoNetworkCallsHandler.prototype as any,
@@ -353,7 +380,8 @@ describe("TrackOptions on the validated/immediate-send path", () => {
 
     const options = { outputReference: "meta-x7k2q", originHint: "web" };
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "test_event",
       { required_prop: "test_value" },
       options
@@ -388,7 +416,8 @@ describe("TrackOptions on the validated/immediate-send path", () => {
         args[1](null);
       });
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "test_event",
       { required_prop: "test_value" },
       { outputReference: "meta-x7k2q", originHint: "web" }
@@ -423,7 +452,8 @@ describe("TrackOptions on the validated/immediate-send path", () => {
 
     const options = { outputReference: "meta-x7k2q", originHint: "web" };
 
-    await inspector.trackSchemaFromEvent(
+    await trackSchemaFromEventWithOptions(
+      inspector,
       "test_event",
       { required_prop: "test_value" },
       options

@@ -4,6 +4,10 @@ import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
 import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 
 import { defaultOptions } from "./constants";
+import {
+  trackSchemaFromEventWithOptions,
+  trackSchemaWithOptions
+} from "./helpers/internalGateway";
 
 const inspectorVersion = process.env.npm_package_version || "";
 
@@ -95,7 +99,7 @@ describe("Batcher", () => {
     );
   });
 
-  test("handleTrackSchema is called on trackSchemaFromEvent with options when no spec available", async () => {
+  test("handleTrackSchema is called on the internal trackSchemaFromEvent with options when no spec available", async () => {
     const eventName = "event name";
     const properties = {
       prop0: "",
@@ -107,7 +111,7 @@ describe("Batcher", () => {
 
     const schema = await inspector.extractSchema(properties);
 
-    await inspector.trackSchemaFromEvent(eventName, properties, options);
+    await trackSchemaFromEventWithOptions(inspector, eventName, properties, options);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
@@ -120,7 +124,7 @@ describe("Batcher", () => {
     );
   });
 
-  test("handleTrackSchema is called on trackSchema with options", async () => {
+  test("handleTrackSchema is called on the internal trackSchema with options", async () => {
     const eventName = "event name";
     const schema = [
       {
@@ -134,7 +138,7 @@ describe("Batcher", () => {
     ];
     const options = { outputReference: "meta-x7k2q" };
 
-    await inspector.trackSchema(eventName, schema, options);
+    await trackSchemaWithOptions(inspector, eventName, schema, options);
 
     expect(inspector.avoBatcher.handleTrackSchema).toHaveBeenCalledTimes(1);
     expect(inspector.avoBatcher.handleTrackSchema).toBeCalledWith(
