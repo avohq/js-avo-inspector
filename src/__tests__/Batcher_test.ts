@@ -121,7 +121,8 @@ describe("Batcher", () => {
       "bodyForEventSchemaCall"
     );
 
-    const inspector = new AvoInspector(defaultOptions);
+    // A configured client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -158,7 +159,8 @@ describe("Batcher", () => {
   });
 
   test("handleTrackSchema forwards options to storage with only originHint set (outputReference stays absent)", () => {
-    const inspector = new AvoInspector(defaultOptions);
+    // A configured client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -183,7 +185,8 @@ describe("Batcher", () => {
   });
 
   test("trackSchema entered through the public AvoInspector method threads options through to the storage round trip", async () => {
-    const inspector = new AvoInspector(defaultOptions);
+    // A configured client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -387,8 +390,9 @@ describe("Batcher", () => {
     }
   });
 
-  test("handleTrackSchema storage round trip: originHint set, appVersion absent -> stored event appVersion is null (JSON storage keeps null)", () => {
-    const inspector = new AvoInspector(defaultOptions);
+  test("handleTrackSchema storage round trip with a client: originHint set, appVersion absent -> stored event appVersion is null (JSON storage keeps null)", () => {
+    // The origin-scoped null is v2-only, so this needs a client.
+    const inspector = new AvoInspector({ ...defaultOptions, client: "gtm-web" });
     inspector.enableLogging(false);
 
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -409,6 +413,32 @@ describe("Batcher", () => {
       expect(events.length).toEqual(1);
       expect((events[0] as EventSchemaBody).appVersion).toBeNull();
       expect(Object.prototype.hasOwnProperty.call(events[0], "appVersion")).toEqual(true);
+    }
+  });
+
+  test("handleTrackSchema storage round trip without a client: originHint set, appVersion absent -> stored event keeps the configured version", () => {
+    // Positive control is the test above: with a client the same call stores null.
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toEqual(defaultOptions.version);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "originHint")).toEqual(false);
     }
   });
 

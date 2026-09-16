@@ -17,7 +17,10 @@ describe("NetworkCallsHandler", () => {
   const { apiKey, env, version } = defaultOptions;
   const appName = "";
 
+  /** No client configured: the v1 transport. */
   let networkHandler: AvoNetworkCallsHandler;
+  /** Client configured: the v2 transport, which is the only one that sends the hints. */
+  let v2Handler: AvoNetworkCallsHandler;
   let baseBody: BaseBody;
 
   const customCallback = jest.fn();
@@ -40,6 +43,16 @@ describe("NetworkCallsHandler", () => {
       "",
       version,
       inspectorVersion
+    );
+
+    v2Handler = new AvoNetworkCallsHandler(
+      apiKey,
+      env,
+      "",
+      version,
+      inspectorVersion,
+      undefined, // publicEncryptionKey
+      "gtm-web"
     );
 
     baseBody = {
@@ -142,10 +155,10 @@ describe("NetworkCallsHandler", () => {
     expect(xhrMock.open).toBeCalledTimes(1);
     expect(xhrMock.open).toBeCalledWith("POST", trackingEndpoint, true);
 
-    expect(xhrMock.setRequestHeader).toBeCalledWith(
-      "Content-Type",
-      "application/json"
-    );
+    // No client configured, so this is the v1 request, exactly as in 3.2.0.
+    expect(xhrMock.setRequestHeader.mock.calls).toEqual([
+      ["Content-Type", "text/plain"]
+    ]);
 
     expect(xhrMock.send).toBeCalledTimes(1);
     expect(xhrMock.send).toBeCalledWith(JSON.stringify(events));
@@ -421,6 +434,9 @@ describe("NetworkCallsHandler", () => {
     const eventName = "event name";
     const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
 
+    // Pins v1: no client is configured on networkHandler, so both the body and
+    // the request must be 3.2.0's. The byte-for-byte version of this pin, checked
+    // against the 3.2.0 source itself, is V1WireBaseline_test.ts.
     test("bodyForEventSchemaCall without options produces body identical to pre-change baseline (regression)", () => {
       const body = networkHandler.bodyForEventSchemaCall(
         eventName,
@@ -440,10 +456,81 @@ describe("NetworkCallsHandler", () => {
       });
       expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
       expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
+
+      // Earlier tests in this file swap in the error mock; put the success mock back.
+      (window as any).XMLHttpRequest = jest.fn(() => xhrMock);
+      networkHandler.callInspectorWithBatchBody([body], customCallback);
+      xhrMock.onload();
+
+      expect(xhrMock.open.mock.calls).toEqual([["POST", trackingEndpoint, true]]);
+      expect(xhrMock.setRequestHeader.mock.calls).toEqual([
+        ["Content-Type", "text/plain"]
+      ]);
+      expect(xhrMock.send.mock.calls).toEqual([[JSON.stringify([body])]]);
+    });
+
+    test("without a client, outputReference and originHint are left out of the body even when given", () => {
+      const body = networkHandler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { outputReference: "meta-x7k2q", originHint: "android", appVersion: "5.1.0" }
+      );
+
+      expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
+      // appVersion is a v1 field, so the override still applies.
+      expect(body.appVersion).toBe("5.1.0");
+      expect(JSON.stringify(body)).not.toContain("meta-x7k2q");
+      expect(JSON.stringify(body)).not.toContain("android");
+    });
+
+    test("with a client, the same options put both hints on the body (positive control for the omission above)", () => {
+      const body = v2Handler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        { outputReference: "meta-x7k2q", originHint: "android", appVersion: "5.1.0" }
+      );
+
+      expect(body.outputReference).toBe("meta-x7k2q");
+      expect(body.originHint).toBe("android");
+      expect(body.appVersion).toBe("5.1.0");
+    });
+
+    test("with a client and no options, the body is the same as without a client", () => {
+      expect(
+        v2Handler.bodyForEventSchemaCall(eventName, eventProperties, null, null)
+      ).toEqual(
+        networkHandler.bodyForEventSchemaCall(eventName, eventProperties, null, null)
+      );
+    });
+
+    test("Codegen bodies never carry the hints on either transport, and keep eventId/eventHash/avoFunction", () => {
+      [networkHandler, v2Handler].forEach((handler) => {
+        const body = handler.bodyForEventSchemaCall(
+          eventName,
+          eventProperties,
+          "event id",
+          "event hash"
+        );
+
+        expect(body.avoFunction).toBe(true);
+        expect(body.eventId).toBe("event id");
+        expect(body.eventHash).toBe("event hash");
+        expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toBe(false);
+        expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
+      });
     });
 
     test("bodyForEventSchemaCall with options = {} produces body with no outputReference/originHint keys", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -458,7 +545,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("bodyForEventSchemaCall trims outputReference and omits originHint when absent", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -473,7 +560,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("bodyForEventSchemaCall omits originHint when it is an empty string", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -487,7 +574,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("bodyForEventSchemaCall omits outputReference/originHint for non-string values", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -502,7 +589,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("bodyForEventSchemaCall sets both outputReference and originHint when both provided", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -517,7 +604,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("bodyForEventSchemaCall sets only originHint when only originHint is provided (outputReference stays absent)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -532,13 +619,13 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("bodyForEventSchemaCall with options omitted and options = {} produce bodies with identical key sets (no new keys)", () => {
-      const bodyWithoutOptions = networkHandler.bodyForEventSchemaCall(
+      const bodyWithoutOptions = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
         null
       );
-      const bodyWithEmptyOptions = networkHandler.bodyForEventSchemaCall(
+      const bodyWithEmptyOptions = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -556,7 +643,7 @@ describe("NetworkCallsHandler", () => {
     test("bodyForEventSchemaCall preserves an originHint of 200+ characters untouched, no length limit", () => {
       const longHint = "a".repeat(210);
 
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -584,7 +671,7 @@ describe("NetworkCallsHandler", () => {
     test.each(invalidHintValues)(
       "bodyForEventSchemaCall omits outputReference when options.outputReference is %s",
       (_description, value) => {
-        const body = networkHandler.bodyForEventSchemaCall(
+        const body = v2Handler.bodyForEventSchemaCall(
           eventName,
           eventProperties,
           null,
@@ -601,7 +688,7 @@ describe("NetworkCallsHandler", () => {
     test.each(invalidHintValues)(
       "bodyForEventSchemaCall omits originHint when options.originHint is %s",
       (_description, value) => {
-        const body = networkHandler.bodyForEventSchemaCall(
+        const body = v2Handler.bodyForEventSchemaCall(
           eventName,
           eventProperties,
           null,
@@ -616,7 +703,7 @@ describe("NetworkCallsHandler", () => {
     );
 
     test("body with hints survives JSON.stringify -> JSON.parse with keys intact and no undefined-valued keys for the omitted field", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = v2Handler.bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -634,12 +721,16 @@ describe("NetworkCallsHandler", () => {
     });
   });
 
-  describe("TrackOptions.appVersion with originHint", () => {
+  // The origin-scoped null is a v2 rule: v2 stores a null appVersion as
+  // "unversioned", while v1 silently drops the event. The v1 side is pinned in
+  // the describe block after this one.
+  describe("TrackOptions.appVersion with originHint (v2, client set)", () => {
+    const handler = () => v2Handler;
     const eventName = "event name";
     const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
 
     test("originHint present, appVersion present -> body.appVersion is options.appVersion", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -653,7 +744,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("originHint present, appVersion absent -> body.appVersion is null (root version ignored)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -668,7 +759,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("originHint absent, appVersion present -> body.appVersion is options.appVersion", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -682,7 +773,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("originHint absent, appVersion absent -> body.appVersion is the root version (unchanged behaviour)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -693,7 +784,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("appVersion is trimmed", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -707,7 +798,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("appVersion of '' is treated as absent (originHint present -> null)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -721,7 +812,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("appVersion of '   ' (whitespace-only) is treated as absent (originHint present -> null)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -735,7 +826,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("appVersion of 42 (non-string) is treated as absent (originHint present -> null)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -749,7 +840,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("appVersion of '' is treated as absent (originHint absent -> root version)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -763,7 +854,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("appVersion of '   ' (whitespace-only) is treated as absent (originHint absent -> root version)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -777,7 +868,7 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("appVersion of 42 (non-string) is treated as absent (originHint absent -> root version)", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -791,13 +882,13 @@ describe("NetworkCallsHandler", () => {
     });
 
     test("sessionStarted body still carries the root version, unaffected by appVersion rule", () => {
-      const body = networkHandler.bodyForSessionStartedCall();
+      const body = handler().bodyForSessionStartedCall();
 
       expect(body.appVersion).toBe(version);
     });
 
     test("body with originHint and no appVersion survives JSON round trip preserving literal null", () => {
-      const body = networkHandler.bodyForEventSchemaCall(
+      const body = handler().bodyForEventSchemaCall(
         eventName,
         eventProperties,
         null,
@@ -813,6 +904,74 @@ describe("NetworkCallsHandler", () => {
       const parsed = JSON.parse(jsonString);
       expect(parsed.appVersion).toBeNull();
       expect(Object.prototype.hasOwnProperty.call(parsed, "appVersion")).toBe(true);
+    });
+  });
+
+  // Without a client the hint is left out, so the origin-scoped null never
+  // applies: v1 drops an event whose appVersion is null. Each null-producing call
+  // from the v2 block above is repeated here, with v2Handler as its positive
+  // control, so a null leaking onto v1 fails here rather than passing unnoticed.
+  describe("TrackOptions.appVersion with originHint (v1, no client)", () => {
+    const eventName = "event name";
+    const eventProperties = [{ propertyName: "prop0", propertyType: "string" }];
+
+    const bodyWith = (
+      handler: AvoNetworkCallsHandler,
+      options: Record<string, unknown>
+    ) =>
+      handler.bodyForEventSchemaCall(
+        eventName,
+        eventProperties,
+        null,
+        null,
+        undefined,
+        undefined,
+        options as any
+      );
+
+    const nullOnV2: Array<[string, Record<string, unknown>]> = [
+      ["appVersion absent", { originHint: "ios" }],
+      ["appVersion ''", { originHint: "ios", appVersion: "" }],
+      ["appVersion '   '", { originHint: "ios", appVersion: "   " }],
+      ["appVersion 42", { originHint: "ios", appVersion: 42 }],
+      ["appVersion null", { originHint: "ios", appVersion: null }]
+    ];
+
+    test.each(nullOnV2)(
+      "originHint present, %s -> the configured version, not null (v2 sends null)",
+      (_description, options) => {
+        // Positive control: the same call does produce null on v2.
+        expect(bodyWith(v2Handler, options).appVersion).toBeNull();
+
+        const body = bodyWith(networkHandler, options);
+        expect(body.appVersion).toBe(version);
+        expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toBe(false);
+      }
+    );
+
+    test("originHint present, appVersion present -> options.appVersion, trimmed", () => {
+      expect(
+        bodyWith(networkHandler, { originHint: "ios", appVersion: " 5.1.0 " })
+          .appVersion
+      ).toBe("5.1.0");
+    });
+
+    test("originHint absent, appVersion present -> options.appVersion overrides", () => {
+      expect(bodyWith(networkHandler, { appVersion: "5.1.0" }).appVersion).toBe(
+        "5.1.0"
+      );
+    });
+
+    test("the serialized body carries a string appVersion and no null, where v2's has a literal null", () => {
+      const v2Json = JSON.stringify(bodyWith(v2Handler, { originHint: "ios" }));
+      expect(v2Json).toContain('"appVersion":null');
+
+      const v1Json = JSON.stringify(
+        bodyWith(networkHandler, { originHint: "ios" })
+      );
+      expect(v1Json).not.toContain('"appVersion":null');
+      expect(v1Json).toContain(`"appVersion":"${version}"`);
+      expect(JSON.parse(v1Json).appVersion).toBe(version);
     });
   });
 });

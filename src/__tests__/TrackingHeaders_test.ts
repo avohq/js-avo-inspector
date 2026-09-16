@@ -1,7 +1,14 @@
 /**
- * The v2 wire contract: one unified endpoint, the api key and env moved into
- * request headers, and an X-Avo-Client header so the edge can attribute traffic
- * without decoding a body.
+ * Transport selection, and the request each transport sends.
+ *
+ * The transport is chosen once, when the handler is constructed: a configured
+ * client selects v2 (`/inspector/v2/track`, JSON body, the api key and env in
+ * request headers, `X-Avo-Client` for attribution at the edge). Without one the
+ * SDK stays on v1 exactly as 3.2.0 sent it. A client counts as configured only
+ * when it is a string that is still non-empty after trimming.
+ *
+ * The byte-level v1 pin against 3.2.0 lives in V1WireBaseline_test.ts; this file
+ * covers the selection rule and the v2 request.
  */
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorLite } from "../lite/AvoInspectorLite";
@@ -12,9 +19,9 @@ import { AvoStreamId } from "../AvoStreamId";
 import xhrMock from "../__mocks__/xhr";
 
 import {
-  defaultAvoClient,
   defaultOptions,
-  trackingEndpoint
+  trackingEndpoint,
+  trackingEndpointV2
 } from "./constants";
 
 const inspectorVersion = process.env.npm_package_version || "";
@@ -32,19 +39,37 @@ const sentHeaders = (): Record<string, string> => {
   return headers;
 };
 
-/** Sends one session-started body through `handler` and returns the headers. */
-const headersFromOneSend = (handler: {
+interface SentRequest {
+  url: string;
+  headers: Record<string, string>;
+  /** Every setRequestHeader call, in order. */
+  headerCalls: Array<[string, string]>;
+  body: any;
+}
+
+/** Sends one session-started body through `handler` and returns what went out. */
+const oneSend = (handler: {
   bodyForSessionStartedCall: () => any;
   callInspectorWithBatchBody: (
     events: any[],
     onCompleted: (error: Error | null) => any
   ) => void;
-}): Record<string, string> => {
+}): SentRequest => {
   const events = [handler.bodyForSessionStartedCall()];
   jest.clearAllMocks();
   handler.callInspectorWithBatchBody(events, jest.fn());
-  return sentHeaders();
+  expect(xhrMock.open).toHaveBeenCalledTimes(1);
+  return {
+    url: xhrMock.open.mock.calls[0][1],
+    headers: sentHeaders(),
+    headerCalls: xhrMock.setRequestHeader.mock.calls.map(
+      ([name, value]: [string, string]) => [name, value] as [string, string]
+    ),
+    body: JSON.parse(xhrMock.send.mock.calls[0][0])
+  };
 };
+
+const v1HeaderCalls = [["Content-Type", "text/plain"]];
 
 beforeAll(() => {
   jest
@@ -56,10 +81,15 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+test("the two endpoints are the ones the backend serves", () => {
+  expect(trackingEndpoint).toBe("https://api.avo.app/inspector/v1/track");
+  expect(trackingEndpointV2).toBe("https://api.avo.app/inspector/v2/track");
+});
+
 describe.each([
   [
     "full build",
-    (client?: string) =>
+    (client?: unknown) =>
       new AvoNetworkCallsHandler(
         apiKey,
         env,
@@ -67,237 +97,288 @@ describe.each([
         version,
         inspectorVersion,
         undefined, // publicEncryptionKey
-        client
+        client as string | undefined
       )
   ],
   [
     "lite build",
-    (client?: string) =>
+    (client?: unknown) =>
       new AvoNetworkCallsHandlerLite(
         apiKey,
         env,
         "",
         version,
         inspectorVersion,
-        client
+        client as string | undefined
       )
   ]
-])("v2 tracking request (%s)", (_name, newHandler) => {
-  test("posts to the unified v2 endpoint", () => {
-    const handler = newHandler();
-    const events = [handler.bodyForSessionStartedCall()];
+])("transport selection (%s)", (_name, newHandler) => {
+  describe("no client: v1", () => {
+    test("no client argument posts to v1 with only Content-Type: text/plain", () => {
+      const sent = oneSend(newHandler());
 
-    jest.clearAllMocks();
-    handler.callInspectorWithBatchBody(events, jest.fn());
-
-    expect(xhrMock.open).toHaveBeenCalledTimes(1);
-    expect(xhrMock.open).toHaveBeenCalledWith("POST", trackingEndpoint, true);
-    expect(trackingEndpoint).toBe("https://api.avo.app/inspector/v2/track");
-  });
-
-  test("sends api-key, env and X-Avo-Client alongside a JSON content type", () => {
-    const headers = headersFromOneSend(newHandler());
-
-    expect(headers["api-key"]).toBe(apiKey);
-    expect(headers.env).toBe(env);
-    expect(headers["X-Avo-Client"]).toBe(defaultAvoClient);
-    expect(headers["Content-Type"]).toBe("application/json");
-  });
-
-  test("X-Avo-Client defaults to web when no client is given", () => {
-    expect(headersFromOneSend(newHandler())["X-Avo-Client"]).toBe("web");
-    expect(headersFromOneSend(newHandler(undefined))["X-Avo-Client"]).toBe(
-      "web"
-    );
-    // An empty override is not an override.
-    expect(headersFromOneSend(newHandler(""))["X-Avo-Client"]).toBe("web");
-  });
-
-  test("X-Avo-Client carries the override the embedding integration passes", () => {
-    expect(headersFromOneSend(newHandler("gtm-web"))["X-Avo-Client"]).toBe(
-      "gtm-web"
-    );
-  });
-
-  test("the body still carries apiKey and env, which v2 takes from the headers", () => {
-    const handler = newHandler();
-    const events = [handler.bodyForSessionStartedCall()];
-
-    jest.clearAllMocks();
-    handler.callInspectorWithBatchBody(events, jest.fn());
-
-    // One body shape across endpoint versions: v2 ignores these copies rather
-    // than rejecting them, and keeping them keeps the JSON schema unchanged.
-    const body = JSON.parse(xhrMock.send.mock.calls[0][0]);
-    expect(body[0].apiKey).toBe(apiKey);
-    expect(body[0].env).toBe(env);
-  });
-
-  test("no Content-Encoding header on an uncompressed send", () => {
-    expect(headersFromOneSend(newHandler())["Content-Encoding"]).toBeUndefined();
-  });
-
-  test("every platform token in the contract survives normalization", () => {
-    // The normalizer must not be so strict that it rejects real senders. These
-    // are the X-Avo-Client values the other Avo SDKs and templates send.
-    [
-      "web",
-      "gtm-web",
-      "gtm-server",
-      "ios",
-      "android",
-      "node",
-      "csharp",
-      "ruby",
-      "go"
-    ].forEach((token) => {
-      expect(headersFromOneSend(newHandler(token))["X-Avo-Client"]).toBe(token);
-    });
-  });
-
-  test("X-Avo-Client recovers a token with surrounding whitespace", () => {
-    // A value copied out of a config file keeps its trailing newline. Trimming
-    // it preserves the attribution rather than silently downgrading to "web".
-    expect(headersFromOneSend(newHandler("gtm-web\n"))["X-Avo-Client"]).toBe(
-      "gtm-web"
-    );
-    expect(headersFromOneSend(newHandler("  gtm-web  "))["X-Avo-Client"]).toBe(
-      "gtm-web"
-    );
-  });
-
-  test("X-Avo-Client falls back to web for a value that cannot be a header", () => {
-    // setRequestHeader throws on these, which would take the whole batcher down
-    // (see the wedge test below). Losing the label beats losing every event.
-    // The emoji is the WebIDL ByteString case: a code unit above U+00FF throws
-    // a TypeError before the request is sent. The accented token is not — U+00E9
-    // is inside Latin-1 and setRequestHeader accepts it — so it is here to pin
-    // that the token pattern is ASCII-only by intent, not by accident.
-    [
-      "gtm\nweb",
-      "gtm web",
-      "gtm:web",
-      "x".repeat(65),
-      "gtm-wéb",
-      "gtm-web🚀"
-    ].forEach((bad) => {
-      expect(headersFromOneSend(newHandler(bad))["X-Avo-Client"]).toBe("web");
-    });
-  });
-
-  test("a rejected header reports through onCompleted instead of throwing", () => {
-    const handler = newHandler();
-    const onCompleted = jest.fn();
-
-    jest.clearAllMocks();
-    xhrMock.setRequestHeader.mockImplementationOnce(() => {
-      throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      expect(sent.url).toBe(trackingEndpoint);
+      expect(sent.headerCalls).toEqual(v1HeaderCalls);
     });
 
-    expect(() => {
-      handler.callInspectorWithBatchBody(
-        [handler.bodyForSessionStartedCall()],
-        onCompleted
-      );
-    }).not.toThrow();
+    test.each([
+      ["undefined", undefined],
+      ["an empty string", ""],
+      ["whitespace only", "   "],
+      ["a lone newline", "\n"],
+      ["tabs and newlines", "\t\r\n "],
+      ["null", null],
+      ["a number", 42],
+      ["an object", { client: "gtm-web" }]
+    ])("a client that is %s is not a client, so v1", (_description, client) => {
+      const sent = oneSend(newHandler(client));
 
-    expect(onCompleted).toHaveBeenCalledTimes(1);
-    expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
-    expect(xhrMock.send).not.toHaveBeenCalled();
-  });
-
-  test("a rejected header does not latch the sending guard", () => {
-    // The regression that matters. `sending` is cleared only from the completion
-    // callback, so an exception escaping the synchronous setup would leave it
-    // true and make every later batch return the "another batch sending is in
-    // progress" error for the rest of the page.
-    const handler = newHandler();
-
-    jest.clearAllMocks();
-    xhrMock.setRequestHeader.mockImplementationOnce(() => {
-      throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      expect(sent.url).toBe(trackingEndpoint);
+      expect(sent.headerCalls).toEqual(v1HeaderCalls);
     });
-    handler.callInspectorWithBatchBody(
-      [handler.bodyForSessionStartedCall()],
-      jest.fn()
-    );
 
-    const secondBatch = jest.fn();
-    handler.callInspectorWithBatchBody(
-      [handler.bodyForSessionStartedCall()],
-      secondBatch
-    );
+    test("v1 sends no api-key, env or X-Avo-Client header; the body carries apiKey and env", () => {
+      const sent = oneSend(newHandler(""));
 
-    expect(xhrMock.send).toHaveBeenCalledTimes(1);
-    expect(secondBatch).not.toHaveBeenCalled();
-  });
+      expect(sent.headers["api-key"]).toBeUndefined();
+      expect(sent.headers.env).toBeUndefined();
+      expect(sent.headers["X-Avo-Client"]).toBeUndefined();
+      expect(sent.body[0].apiKey).toBe(apiKey);
+      expect(sent.body[0].env).toBe(env);
+    });
 
-  test("a failed XMLHttpRequest construction does not latch the guard either", () => {
-    // The construction sits inside the same try, which is what makes
-    // sendTrackingRequest total — and therefore makes the gzip promise chain in
-    // callInspectorApi unable to reject.
-    const handler = newHandler();
-    const onCompleted = jest.fn();
+    test("a blank client is not an unusable one: no invalid-client warning", () => {
+      AvoInspector.shouldLog = true;
+      AvoInspectorLite.shouldLog = true;
+      const warn = console.warn as jest.Mock;
+      try {
+        warn.mockClear();
+        newHandler("   ");
+        newHandler("");
+        expect(warn).not.toHaveBeenCalled();
 
-    jest.clearAllMocks();
-    (window.XMLHttpRequest as unknown as jest.Mock).mockImplementationOnce(
-      () => {
-        throw new Error("XMLHttpRequest is not available");
+        // Positive control: a non-blank unusable client does warn.
+        newHandler("gtm web");
+        expect(warn).toHaveBeenCalledTimes(1);
+      } finally {
+        AvoInspector.shouldLog = false;
+        AvoInspectorLite.shouldLog = false;
       }
-    );
+    });
+  });
 
-    expect(() => {
+  describe("client set: v2", () => {
+    test("posts to v2 with Content-Type, api-key, env and X-Avo-Client", () => {
+      const sent = oneSend(newHandler("gtm-web"));
+
+      expect(sent.url).toBe(trackingEndpointV2);
+      expect(sent.headerCalls).toEqual([
+        ["Content-Type", "application/json"],
+        ["api-key", apiKey],
+        ["env", env],
+        ["X-Avo-Client", "gtm-web"]
+      ]);
+    });
+
+    test("the body still carries apiKey and env, which v2 takes from the headers", () => {
+      // One body shape across endpoint versions: v2 ignores these copies rather
+      // than rejecting them, and keeping them keeps the JSON schema unchanged.
+      const sent = oneSend(newHandler("gtm-web"));
+
+      expect(sent.body[0].apiKey).toBe(apiKey);
+      expect(sent.body[0].env).toBe(env);
+    });
+
+    test("the v2 body is the same shape as the v1 body", () => {
+      // Positive control for the pair: the transports differ on the request,
+      // not on the session-started body.
+      // messageId and createdAt are per body, so they are blanked.
+      const comparable = (body: any[]) =>
+        body.map((event) => ({ ...event, messageId: "", createdAt: "" }));
+
+      expect(comparable(oneSend(newHandler("gtm-web")).body)).toEqual(
+        comparable(oneSend(newHandler()).body)
+      );
+    });
+
+    test("no Content-Encoding header on an uncompressed send", () => {
+      expect(
+        oneSend(newHandler("gtm-web")).headers["Content-Encoding"]
+      ).toBeUndefined();
+    });
+
+    test("every platform token in the contract survives normalization", () => {
+      // The normalizer must not be so strict that it rejects real senders. These
+      // are the X-Avo-Client values the other Avo SDKs and templates send.
+      [
+        "web",
+        "gtm-web",
+        "gtm-server",
+        "ios",
+        "android",
+        "node",
+        "csharp",
+        "ruby",
+        "go"
+      ].forEach((token) => {
+        const sent = oneSend(newHandler(token));
+        expect(sent.url).toBe(trackingEndpointV2);
+        expect(sent.headers["X-Avo-Client"]).toBe(token);
+      });
+    });
+
+    test("a client with surrounding whitespace is trimmed and still selects v2", () => {
+      // A value copied out of a config file keeps its trailing newline. Trimming
+      // it preserves the attribution rather than silently downgrading.
+      [
+        ["gtm-web\n", "gtm-web"],
+        ["  gtm-web  ", "gtm-web"]
+      ].forEach(([raw, trimmed]) => {
+        const sent = oneSend(newHandler(raw));
+        expect(sent.url).toBe(trackingEndpointV2);
+        expect(sent.headers["X-Avo-Client"]).toBe(trimmed);
+      });
+    });
+
+    test("a non-blank client that cannot be a header still selects v2, with X-Avo-Client: web", () => {
+      // setRequestHeader throws on these, which would take the whole batcher down
+      // (see the wedge test below). Losing the label beats losing every event.
+      // The emoji is the WebIDL ByteString case: a code unit above U+00FF throws
+      // a TypeError before the request is sent. The accented token is not — U+00E9
+      // is inside Latin-1 and setRequestHeader accepts it — so it is here to pin
+      // that the token pattern is ASCII-only by intent, not by accident.
+      [
+        "gtm\nweb",
+        "gtm web",
+        "gtm:web",
+        "x".repeat(65),
+        "gtm-wéb",
+        "gtm-web🚀"
+      ].forEach((bad) => {
+        const sent = oneSend(newHandler(bad));
+        expect(sent.url).toBe(trackingEndpointV2);
+        expect(sent.headers["X-Avo-Client"]).toBe("web");
+      });
+    });
+
+    test("a rejected header reports through onCompleted instead of throwing", () => {
+      const handler = newHandler("gtm-web");
+      const onCompleted = jest.fn();
+
+      jest.clearAllMocks();
+      xhrMock.setRequestHeader.mockImplementationOnce(() => {
+        throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      });
+
+      expect(() => {
+        handler.callInspectorWithBatchBody(
+          [handler.bodyForSessionStartedCall()],
+          onCompleted
+        );
+      }).not.toThrow();
+
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+      expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(xhrMock.send).not.toHaveBeenCalled();
+    });
+
+    test("a rejected header does not latch the sending guard", () => {
+      // The regression that matters. `sending` is cleared only from the completion
+      // callback, so an exception escaping the synchronous setup would leave it
+      // true and make every later batch return the "another batch sending is in
+      // progress" error for the rest of the page.
+      const handler = newHandler("gtm-web");
+
+      jest.clearAllMocks();
+      xhrMock.setRequestHeader.mockImplementationOnce(() => {
+        throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      });
       handler.callInspectorWithBatchBody(
         [handler.bodyForSessionStartedCall()],
-        onCompleted
+        jest.fn()
       );
-    }).not.toThrow();
-    expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
 
-    const secondBatch = jest.fn();
-    handler.callInspectorWithBatchBody(
-      [handler.bodyForSessionStartedCall()],
-      secondBatch
-    );
+      const secondBatch = jest.fn();
+      handler.callInspectorWithBatchBody(
+        [handler.bodyForSessionStartedCall()],
+        secondBatch
+      );
 
-    expect(xhrMock.send).toHaveBeenCalledTimes(1);
+      expect(xhrMock.send).toHaveBeenCalledTimes(1);
+      expect(secondBatch).not.toHaveBeenCalled();
+    });
   });
+
+  test.each([
+    ["no client (v1)", undefined],
+    ["a client (v2)", "gtm-web"]
+  ])(
+    "with %s, a failed XMLHttpRequest construction does not latch the guard",
+    (_description, client) => {
+      // The construction sits inside the same try on both transports, which is
+      // what makes sendTrackingRequest total — and therefore makes the gzip
+      // promise chain in callInspectorApi unable to reject.
+      const handler = newHandler(client);
+      const onCompleted = jest.fn();
+
+      jest.clearAllMocks();
+      (window.XMLHttpRequest as unknown as jest.Mock).mockImplementationOnce(
+        () => {
+          throw new Error("XMLHttpRequest is not available");
+        }
+      );
+
+      expect(() => {
+        handler.callInspectorWithBatchBody(
+          [handler.bodyForSessionStartedCall()],
+          onCompleted
+        );
+      }).not.toThrow();
+      expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+
+      const secondBatch = jest.fn();
+      handler.callInspectorWithBatchBody(
+        [handler.bodyForSessionStartedCall()],
+        secondBatch
+      );
+
+      expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    }
+  );
 });
 
-describe("client option wiring", () => {
+describe("client option wiring through the public constructors", () => {
   /** The handler an inspector instance actually sends through. */
   const handlerOf = (inspector: any): any => inspector.avoNetworkCallsHandler;
 
-  test("AvoInspector defaults X-Avo-Client to web", () => {
-    const headers = headersFromOneSend(
-      handlerOf(new AvoInspector(defaultOptions))
-    );
+  describe.each([
+    ["AvoInspector", (options: any) => new AvoInspector(options)],
+    ["AvoInspectorLite", (options: any) => new AvoInspectorLite(options)]
+  ])("%s", (_name, newInspector) => {
+    test("without a client option it stays on v1", () => {
+      const sent = oneSend(handlerOf(newInspector(defaultOptions)));
 
-    expect(headers["X-Avo-Client"]).toBe("web");
-    expect(headers["api-key"]).toBe(apiKey);
-  });
+      expect(sent.url).toBe(trackingEndpoint);
+      expect(sent.headerCalls).toEqual(v1HeaderCalls);
+    });
 
-  test("AvoInspector forwards a client option to the header", () => {
-    const headers = headersFromOneSend(
-      handlerOf(new AvoInspector({ ...defaultOptions, client: "gtm-web" }))
-    );
+    test("a blank client option stays on v1", () => {
+      const sent = oneSend(
+        handlerOf(newInspector({ ...defaultOptions, client: " \n" }))
+      );
 
-    expect(headers["X-Avo-Client"]).toBe("gtm-web");
-  });
+      expect(sent.url).toBe(trackingEndpoint);
+      expect(sent.headerCalls).toEqual(v1HeaderCalls);
+    });
 
-  test("AvoInspectorLite defaults X-Avo-Client to web", () => {
-    const headers = headersFromOneSend(
-      handlerOf(new AvoInspectorLite(defaultOptions))
-    );
+    test("a client option selects v2 and becomes X-Avo-Client", () => {
+      const sent = oneSend(
+        handlerOf(newInspector({ ...defaultOptions, client: "gtm-web" }))
+      );
 
-    expect(headers["X-Avo-Client"]).toBe("web");
-  });
-
-  test("AvoInspectorLite forwards a client option to the header", () => {
-    const headers = headersFromOneSend(
-      handlerOf(new AvoInspectorLite({ ...defaultOptions, client: "gtm-web" }))
-    );
-
-    expect(headers["X-Avo-Client"]).toBe("gtm-web");
+      expect(sent.url).toBe(trackingEndpointV2);
+      expect(sent.headers["X-Avo-Client"]).toBe("gtm-web");
+      expect(sent.headers["api-key"]).toBe(apiKey);
+    });
   });
 });

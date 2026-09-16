@@ -30,10 +30,11 @@ const requestMsg = {
   TIMEOUT: "Request timed out"
 };
 
-const trackingEndpoint = "https://api.avo.app/inspector/v2/track";
+// The v1 endpoint, used whenever no client is configured — as in 3.2.0.
+const trackingEndpoint = "https://api.avo.app/inspector/v1/track";
 
-// Default value of the X-Avo-Client header when no `client` option is given.
-const defaultAvoClient = "web";
+// The v2 endpoint, used only when a client is configured.
+const trackingEndpointV2 = "https://api.avo.app/inspector/v2/track";
 
 const sessionTimeMs = 5 * 60 * 1000;
 
@@ -49,7 +50,6 @@ const type = {
 };
 
 export {
-  defaultAvoClient,
   defaultOptions,
   error,
   mockedReturns,
@@ -57,5 +57,6 @@ export {
   requestMsg,
   sessionTimeMs,
   type,
-  trackingEndpoint
+  trackingEndpoint,
+  trackingEndpointV2
 };

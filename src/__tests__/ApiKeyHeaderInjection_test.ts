@@ -22,6 +22,11 @@
  * mistyped api key silently ended all telemetry rather than failing one send.
  * The last test here is the one that covers that.
  *
+ * Only v2 puts the key in a header, and v2 is selected by a configured client,
+ * so the header tests below configure one. Without a client the SDK is on v1,
+ * where the key travels only in the body as it did in 3.2.0; the last block
+ * pins that.
+ *
  * Deliberately no import of `../__mocks__/xhr`: these tests run against jsdom's
  * real XMLHttpRequest, so the validation being relied on is the platform's own
  * rather than an emulation of it. Only `send` is stubbed, to keep the suite off
@@ -44,15 +49,28 @@ const crlfKey = "api-key-xxx\r\nX-Injected: yes";
  * ever reaches the network — which is what the control test at the end exists
  * to catch.
  */
-const flushingInspector = (apiKey: string): AvoInspector => {
-  const inspector = new AvoInspector({ ...defaultOptions, apiKey });
+const flushingInspector = (apiKey: string): AvoInspector =>
+  flushingInspectorWith({ ...defaultOptions, apiKey, client: "gtm-web" });
+
+/** No client, so v1: the key travels only in the body. */
+const flushingV1Inspector = (apiKey: string): AvoInspector =>
+  flushingInspectorWith({ ...defaultOptions, apiKey });
+
+const flushingInspectorWith = (
+  options: ConstructorParameters<typeof AvoInspector>[0]
+): AvoInspector => {
+  const inspector = new AvoInspector(options);
   inspector.enableLogging(false);
   AvoInspector.batchSize = 1;
   return inspector;
 };
 
 const flushingLiteInspector = (apiKey: string): AvoInspectorLite => {
-  const inspector = new AvoInspectorLite({ ...defaultOptions, apiKey });
+  const inspector = new AvoInspectorLite({
+    ...defaultOptions,
+    apiKey,
+    client: "gtm-web"
+  });
   inspector.enableLogging(false);
   AvoInspectorLite.batchSize = 1;
   return inspector;
@@ -102,7 +120,7 @@ describe("the platform rejects a header value that could inject", () => {
   });
 });
 
-describe("an unusable api key does not throw at the caller", () => {
+describe("an unusable api key does not throw at the caller (v2, client set)", () => {
   test("full build: trackSchemaFromEvent resolves instead of rejecting", async () => {
     const inspector = flushingInspector(crlfKey);
 
@@ -200,5 +218,37 @@ describe("an unusable api key does not throw at the caller", () => {
     await inspector.trackSchemaFromEvent("Ev", { a: 1 });
 
     expect(sendSpy).toHaveBeenCalled();
+  });
+});
+
+describe("without a client the key never becomes a header (v1)", () => {
+  test("a CR/LF key is sent in the JSON body, escaped, with no api-key header — as in 3.2.0", async () => {
+    const headerSpy = jest.spyOn(XMLHttpRequest.prototype, "setRequestHeader");
+    const inspector = flushingV1Inspector(crlfKey);
+
+    await expect(
+      inspector.trackSchemaFromEvent("Ev", { a: 1 })
+    ).resolves.toBeDefined();
+
+    expect(headerSpy.mock.calls).toEqual([["Content-Type", "text/plain"]]);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    const raw = sendSpy.mock.calls[0][0] as string;
+    // JSON escapes the control characters, so nothing breaks framing.
+    expect(raw).toContain('"apiKey":"api-key-xxx\\r\\nX-Injected: yes"');
+    expect(JSON.parse(raw)[0].apiKey).toBe(crlfKey);
+    headerSpy.mockRestore();
+  });
+
+  test("a key with surrounding whitespace is trimmed in the body on v1 too", async () => {
+    // Trimming happens once in the constructor, before the transport matters.
+    // On v1 that is a change from 3.2.0, which sent the raw value — and which
+    // v1 then failed to look up, since it does not trim the body key.
+    const inspector = flushingV1Inspector("  api-key-xxx\n");
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 });
+
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(sendSpy.mock.calls[0][0] as string);
+    expect(body[0].apiKey).toBe("api-key-xxx");
   });
 });

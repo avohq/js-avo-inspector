@@ -329,10 +329,12 @@ describe("TrackOptions on the validated/immediate-send path", () => {
   });
 
   test("bodyForEventSchemaCall is called with options as the 7th arg and the immediately-sent body carries the hint fields", async () => {
+    // A configured client selects v2, the only transport that sends the hints.
     const inspector = new AvoInspector({
       apiKey: "test-key",
       env: AvoInspectorEnv.Dev,
-      version: "1.0.0"
+      version: "1.0.0",
+      client: "gtm-web"
     });
 
     const bodyForEventSchemaCallSpy = jest.spyOn(
@@ -368,6 +370,34 @@ describe("TrackOptions on the validated/immediate-send path", () => {
     expect(eventBody.originHint).toBe("web");
 
     bodyForEventSchemaCallSpy.mockRestore();
+  });
+
+  test("without a client the immediately-sent body leaves the hint fields out (v1)", async () => {
+    const inspector = new AvoInspector({
+      apiKey: "test-key",
+      env: AvoInspectorEnv.Dev,
+      version: "1.0.0"
+    });
+
+    const callInspectorImmediatelySpy = jest
+      .spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      )
+      .mockImplementation((...args: any[]) => {
+        args[1](null);
+      });
+
+    await inspector.trackSchemaFromEvent(
+      "test_event",
+      { required_prop: "test_value" },
+      { outputReference: "meta-x7k2q", originHint: "web" }
+    );
+
+    expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
+    const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+    expect(Object.prototype.hasOwnProperty.call(eventBody, "outputReference")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(eventBody, "originHint")).toBe(false);
   });
 
   test("when the immediate send fails, the fallback avoBatcher.handleTrackSchema is called with options as the 6th arg and undefined eventSpecMetadata", async () => {

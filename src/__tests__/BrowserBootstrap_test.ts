@@ -2,20 +2,23 @@
  * The script-tag bootstrap, `src/browser.js`.
  *
  * The web GTM tag template never makes the HTTP call itself — it forwards to
- * this SDK — so it cannot set `X-Avo-Client` directly. Instead it writes
- * `window.inspector.__CLIENT__ = "gtm-web"` before the bundle loads, alongside
- * the `__API_KEY__` / `__ENV__` / `__VERSION__` / `__APP_NAME__` values it
- * already passes the same way. The bootstrap below is the only place that value
- * is ever read.
+ * this SDK — so it cannot pick the transport or set `X-Avo-Client` directly.
+ * Instead it writes `window.inspector.__CLIENT__ = "gtm-web"` before the bundle
+ * loads, alongside the `__API_KEY__` / `__ENV__` / `__VERSION__` /
+ * `__APP_NAME__` values it already passes the same way. The bootstrap below is
+ * the only place that value is ever read.
  *
- * That makes it a cross-repo handshake with nothing to fail loudly if it
- * breaks: drop the read and every GTM-originated browser event silently
- * reports as plain `"web"`, and the traffic can no longer be told apart at the
- * edge. These tests pin the read, its default, and the header it produces.
+ * `__CLIENT__` does two things. It is the only way a script-tag page reaches
+ * the v2 transport, and it is the attribution v2 sends. A page that does not
+ * set it — every direct script-tag install — stays on v1 exactly as 3.2.0 sent
+ * it. That makes it a cross-repo handshake with nothing to fail loudly if it
+ * breaks: drop the read and every GTM-originated browser event silently goes
+ * back to v1 and loses its gateway hints. These tests pin the read, the v1
+ * default, and the request each produces.
  */
 import xhrMock from "../__mocks__/xhr";
 
-import { defaultAvoClient } from "./constants";
+import { trackingEndpoint, trackingEndpointV2 } from "./constants";
 
 /** The `__`-prefixed values the script-tag snippet hangs off `window.inspector`. */
 type QueueProps = Partial<{
@@ -23,7 +26,7 @@ type QueueProps = Partial<{
   __ENV__: string;
   __VERSION__: string;
   __APP_NAME__: string;
-  __CLIENT__: string;
+  __CLIENT__: unknown;
 }>;
 
 /** What a page sets before loading the bundle, minus the client override. */
@@ -55,32 +58,35 @@ const bootstrap = (props: QueueProps = {}): any => {
   return (window as any).inspector;
 };
 
-/** Header name → value, collapsed from the mock's setRequestHeader calls. */
-const sentHeaders = (): Record<string, string> => {
-  const headers: Record<string, string> = {};
-  xhrMock.setRequestHeader.mock.calls.forEach(
-    ([name, value]: [string, string]) => {
-      headers[name] = value;
-    }
-  );
-  return headers;
-};
+interface SentRequest {
+  url: string;
+  headers: Record<string, string>;
+  headerCalls: Array<[string, string]>;
+  body: any;
+}
 
 /**
  * Bootstraps, then sends one session-started body through the inspector the
- * bootstrap built, and returns the headers that went out. Asserting on the wire
- * rather than on a field is deliberate: `X-Avo-Client` is what the edge reads.
+ * bootstrap built, and returns the request that went out. Asserting on the wire
+ * rather than on a field is deliberate: the URL and `X-Avo-Client` are what the
+ * edge reads.
  */
-const headersAfterBootstrap = (
-  props: QueueProps = {}
-): Record<string, string> => {
+const requestAfterBootstrap = (props: QueueProps = {}): SentRequest => {
   const handler = bootstrap(props).avoNetworkCallsHandler;
   const events = [handler.bodyForSessionStartedCall()];
 
   jest.clearAllMocks();
   handler.callInspectorWithBatchBody(events, jest.fn());
 
-  return sentHeaders();
+  const headerCalls = xhrMock.setRequestHeader.mock.calls.map(
+    ([name, value]: [string, string]) => [name, value] as [string, string]
+  );
+  return {
+    url: xhrMock.open.mock.calls[0][1],
+    headers: Object.fromEntries(headerCalls),
+    headerCalls,
+    body: JSON.parse(xhrMock.send.mock.calls[0][0])
+  };
 };
 
 afterEach(() => {
@@ -113,8 +119,15 @@ describe("script-tag bootstrap", () => {
     expect(AvoInspector.batchSize).toBe(11);
   });
 
-  test("forwards the api key and env the snippet carries", () => {
-    const headers = headersAfterBootstrap();
+  test("forwards the api key and env the snippet carries, in the body on v1", () => {
+    const { body } = requestAfterBootstrap();
+
+    expect(body[0].apiKey).toBe(baseQueueProps.__API_KEY__);
+    expect(body[0].env).toBe(baseQueueProps.__ENV__);
+  });
+
+  test("forwards the api key and env the snippet carries, in headers on v2", () => {
+    const { headers } = requestAfterBootstrap({ __CLIENT__: "gtm-web" });
 
     expect(headers["api-key"]).toBe(baseQueueProps.__API_KEY__);
     expect(headers.env).toBe(baseQueueProps.__ENV__);
@@ -122,35 +135,47 @@ describe("script-tag bootstrap", () => {
 });
 
 describe("__CLIENT__ handshake with the web GTM tag template", () => {
-  test("sends X-Avo-Client: gtm-web when the template declared it", () => {
+  test("gtm-web selects v2 and sends X-Avo-Client: gtm-web", () => {
     // The exact value the web GTM tag template writes via setInWindow. If this
-    // assertion ever fails, GTM traffic has stopped being attributable.
-    expect(headersAfterBootstrap({ __CLIENT__: "gtm-web" })["X-Avo-Client"]).toBe(
-      "gtm-web"
-    );
+    // assertion ever fails, GTM traffic has stopped reaching v2.
+    const sent = requestAfterBootstrap({ __CLIENT__: "gtm-web" });
+
+    expect(sent.url).toBe(trackingEndpointV2);
+    expect(sent.headerCalls).toEqual([
+      ["Content-Type", "application/json"],
+      ["api-key", baseQueueProps.__API_KEY__],
+      ["env", baseQueueProps.__ENV__],
+      ["X-Avo-Client", "gtm-web"]
+    ]);
   });
 
-  test("defaults to web for a direct script-tag install", () => {
-    // No __CLIENT__ at all: the ordinary case, a page that installed the SDK
-    // itself rather than through a tag manager.
-    expect(headersAfterBootstrap()["X-Avo-Client"]).toBe(defaultAvoClient);
-    expect(headersAfterBootstrap()["X-Avo-Client"]).toBe("web");
+  test("a direct script-tag install without __CLIENT__ stays on v1", () => {
+    // The ordinary case: a page that installed the SDK itself rather than
+    // through a tag manager. The byte-level pin is in V1WireBaseline_test.ts.
+    const sent = requestAfterBootstrap();
+
+    expect(sent.url).toBe(trackingEndpoint);
+    expect(sent.headerCalls).toEqual([["Content-Type", "text/plain"]]);
   });
 
-  test("an empty or absent __CLIENT__ is not an override", () => {
-    expect(headersAfterBootstrap({ __CLIENT__: "" })["X-Avo-Client"]).toBe(
-      "web"
-    );
-    expect(
-      headersAfterBootstrap({ __CLIENT__: undefined })["X-Avo-Client"]
-    ).toBe("web");
+  test.each([
+    ["empty", ""],
+    ["absent", undefined],
+    ["whitespace only", "   "],
+    ["a lone newline", "\n"]
+  ])("a %s __CLIENT__ is not a client, so v1", (_description, client) => {
+    const sent = requestAfterBootstrap({ __CLIENT__: client });
+
+    expect(sent.url).toBe(trackingEndpoint);
+    expect(sent.headerCalls).toEqual([["Content-Type", "text/plain"]]);
   });
 
   test("passes any token through verbatim, not just the GTM one", () => {
     // The bootstrap must not special-case "gtm-web": other Avo integrations
-    // that embed this bundle get their own token the same way.
-    expect(
-      headersAfterBootstrap({ __CLIENT__: "some-other-embed" })["X-Avo-Client"]
-    ).toBe("some-other-embed");
+    // that embed this bundle get v2 and their own token the same way.
+    const sent = requestAfterBootstrap({ __CLIENT__: "some-other-embed" });
+
+    expect(sent.url).toBe(trackingEndpointV2);
+    expect(sent.headers["X-Avo-Client"]).toBe("some-other-embed");
   });
 });

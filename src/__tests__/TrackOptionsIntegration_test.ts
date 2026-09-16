@@ -9,6 +9,11 @@ import type {
 
 import { defaultOptions } from "./constants";
 
+// outputReference and originHint are sent only on the v2 transport, which a
+// configured client selects. The v1 side of each rule is in
+// TrackOptionsTransport_test.ts.
+const v2Options = { ...defaultOptions, client: "gtm-web" };
+
 /** Type extracted for a property, or undefined when the property is absent. */
 const typeOf = (
   properties: EventProperty[],
@@ -31,7 +36,7 @@ const storedEvents = (): EventSchemaBody[] => {
 
 describe("TrackOptions - property-name collision", () => {
   test("event properties literally named outputReference/originHint/appVersion stay in eventProperties with their extracted types, while the top-level fields come from options", async () => {
-    const inspector = new AvoInspector(defaultOptions);
+    const inspector = new AvoInspector(v2Options);
     inspector.enableLogging(false);
     // avoStorage is a static set by the constructor, so clear it only after one exists.
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -71,8 +76,45 @@ describe("TrackOptions - property-name collision", () => {
     );
   });
 
-  test("options do not leak into eventProperties when the event has no colliding properties", async () => {
+  test("without a client the colliding properties are still ordinary properties, and no top-level hint appears", async () => {
     const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    await inspector.trackSchemaFromEvent(
+      "Gateway Event",
+      {
+        outputReference: "a property, not an option",
+        originHint: 42,
+        appVersion: true
+      },
+      { outputReference: "meta-x7k2q", originHint: "web" }
+    );
+
+    const events = storedEvents();
+    expect(events.length).toEqual(1);
+
+    const body = events[0];
+    expect(body.eventProperties.length).toEqual(3);
+    expect(typeOf(body.eventProperties, "outputReference")).toEqual("string");
+    expect(typeOf(body.eventProperties, "originHint")).toEqual("int");
+    expect(typeOf(body.eventProperties, "appVersion")).toEqual("boolean");
+
+    // v1: the hints are left out, and nothing from the event data takes their place.
+    expect(Object.prototype.hasOwnProperty.call(body, "outputReference")).toEqual(
+      false
+    );
+    expect(Object.prototype.hasOwnProperty.call(body, "originHint")).toEqual(
+      false
+    );
+    // The origin-scoped null is v2-only (the previous test is its positive
+    // control): on v1 the event keeps the configured version, since v1 drops an
+    // event whose appVersion is null.
+    expect(body.appVersion).toEqual(defaultOptions.version);
+  });
+
+  test("options do not leak into eventProperties when the event has no colliding properties", async () => {
+    const inspector = new AvoInspector(v2Options);
     inspector.enableLogging(false);
     // avoStorage is a static set by the constructor, so clear it only after one exists.
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -95,7 +137,7 @@ describe("TrackOptions - property-name collision", () => {
 
 describe("TrackOptions - primary use case: several outputReferences for the same event", () => {
   test("two trackSchemaFromEvent calls in the same tick, same event and deep-equal properties, different outputReference, produce two bodies with identical eventProperties and their own outputReference", async () => {
-    const inspector = new AvoInspector(defaultOptions);
+    const inspector = new AvoInspector(v2Options);
     inspector.enableLogging(false);
     // avoStorage is a static set by the constructor, so clear it only after one exists.
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
@@ -133,7 +175,7 @@ describe("TrackOptions - primary use case: several outputReferences for the same
   });
 
   test("the same holds for trackSchema", async () => {
-    const inspector = new AvoInspector(defaultOptions);
+    const inspector = new AvoInspector(v2Options);
     inspector.enableLogging(false);
     // avoStorage is a static set by the constructor, so clear it only after one exists.
     AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);

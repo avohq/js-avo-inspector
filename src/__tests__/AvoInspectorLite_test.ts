@@ -137,7 +137,11 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     // which is exactly why the ordering has to be right rather than merely lucky.
     AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
 
-    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    // A configured client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspectorLite({
+      ...defaultLiteOptions,
+      client: "gtm-web"
+    });
     inspector.enableLogging(false);
 
     await inspector.trackSchemaFromEvent(
@@ -158,7 +162,7 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     }
   });
 
-  test("trackSchemaFromEvent with originHint set and no appVersion stores body appVersion as null", async () => {
+  test("with a client, trackSchemaFromEvent with originHint set and no appVersion stores body appVersion as null", async () => {
     // Clear the cache BEFORE constructing. AvoBatcherLite's constructor starts an
     // async restore whose read of the cache happens during construction, with only
     // the concat deferred to a microtask — so a removeItem afterwards cannot stop
@@ -166,7 +170,11 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
     // which is exactly why the ordering has to be right rather than merely lucky.
     AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
 
-    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    // The origin-scoped null is v2-only, so this needs a client.
+    const inspector = new AvoInspectorLite({
+      ...defaultLiteOptions,
+      client: "gtm-web"
+    });
     inspector.enableLogging(false);
 
     await inspector.trackSchemaFromEvent(
@@ -184,6 +192,27 @@ describe("AvoInspectorLite - hint omission end-to-end", () => {
       expect(events.length).toEqual(1);
       expect(events[0].appVersion).toBeNull();
       expect(Object.prototype.hasOwnProperty.call(events[0], "appVersion")).toEqual(true);
+    }
+  });
+
+  test("without a client, the same call stores the configured version, not null", async () => {
+    // Positive control is the test above: the same call with a client stores null.
+    AvoInspectorLite.avoStorage.removeItem(AvoBatcherLite.cacheKey);
+
+    const inspector = new AvoInspectorLite(defaultLiteOptions);
+    inspector.enableLogging(false);
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 }, { originHint: "ios" });
+
+    const events = AvoInspectorLite.avoStorage.getItem<any[]>(
+      AvoBatcherLite.cacheKey
+    );
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect(events[0].appVersion).toEqual(defaultLiteOptions.version);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "originHint")).toEqual(false);
     }
   });
 });

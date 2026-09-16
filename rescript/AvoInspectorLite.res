@@ -11,9 +11,9 @@ type options = {
   env: env,
   version: string,
   /**
-   * Value of the `X-Avo-Client` header. Defaults to `"web"` when omitted; set it
-   * only when embedding this SDK in another Avo integration that needs its own
-   * attribution.
+   * Identifies the Avo integration embedding this SDK (e.g. `"gtm-web"`). Setting
+   * it selects the v2 transport and becomes the `X-Avo-Client` header; leave it
+   * unset to stay on `/inspector/v1/track` exactly as 3.2.0 did.
    */
   client?: string,
 }
@@ -25,9 +25,11 @@ external make: options => t = "AvoInspector"
  * Per-call gateway coordinates. Omitted fields are omitted from the emitted JS
  * object, which is exactly how the SDK expects an absent option.
  *
- * `POST /inspector/v2/track`, the endpoint the SDK posts to, decodes both
- * `outputReference` and `originHint` and accepts a null `appVersion`, so no
- * field here has to be paired with another.
+ * `outputReference` and `originHint` are sent only when `client` is set (the v2
+ * transport). There, `originHint` without `appVersion` sends a null
+ * `appVersion`, recorded as "unversioned". Without a client the SDK is on v1,
+ * which has no such fields: both are left out and the event keeps the
+ * configured version unless `appVersion` is given.
  */
 type trackOptions = {
   outputReference?: string,

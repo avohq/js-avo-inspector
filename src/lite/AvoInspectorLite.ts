@@ -60,10 +60,12 @@ export class AvoInspectorLite {
     appName?: string;
     suffix?: string;
     /**
-     * Value of the `X-Avo-Client` header, which tells the Inspector API which
-     * kind of client sent the traffic. Defaults to `"web"`. Set it only when
-     * this SDK is embedded in another Avo integration that needs its own
-     * attribution — the web GTM tag template passes `"gtm-web"`.
+     * Identifies the Avo integration this SDK is embedded in — the web GTM tag
+     * template passes `"gtm-web"`. Setting it opts into the v2 transport
+     * (`/inspector/v2/track`, with this value as the `X-Avo-Client` header),
+     * which is the only one that sends `TrackOptions.outputReference` and
+     * `originHint`. Leave it unset otherwise: without it the SDK sends to
+     * `/inspector/v1/track` exactly as 3.2.0 did. A blank value counts as unset.
      */
     client?: string;
   }) {
@@ -86,9 +88,11 @@ export class AvoInspectorLite {
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
-      // Trimmed once, here, so only the trimmed value is ever stored. A key
-      // pasted out of a config file or read from an env var keeps its trailing
-      // newline, which on v2 has to survive being a request header.
+      // Trimmed once, here, so only the trimmed value is ever stored — on both
+      // transports. A key pasted out of a config file or read from an env var
+      // keeps its trailing newline, which on v2 has to survive being a request
+      // header. (On v1 the body is the only copy; v1 does not trim it either, so
+      // the untrimmed 3.2.0 behaviour was a failed key lookup, not a working send.)
       //
       // This is deliberately not a duplicate of what the platform already does.
       // XMLHttpRequest strips surrounding whitespace from a header value before

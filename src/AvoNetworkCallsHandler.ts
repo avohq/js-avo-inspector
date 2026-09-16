@@ -54,9 +54,13 @@ export interface SessionStartedBody extends BaseBody {
  * data. Every value is trimmed; empty, whitespace-only and non-string values are
  * treated as absent.
  *
- * The endpoint this SDK posts to, `POST /inspector/v2/track`, decodes both
- * `outputReference` and `originHint` and accepts a literal `appVersion: null`
- * (stored as "unversioned"), so no field here has to be paired with another.
+ * `outputReference` and `originHint` are v2 fields, sent only when a client is
+ * configured. `POST /inspector/v2/track` decodes both and accepts a literal
+ * `appVersion: null` (stored as "unversioned"). Without a client the SDK is on
+ * `POST /inspector/v1/track`, which has neither field and drops an event whose
+ * `appVersion` is null, so both hints are left out of the body there, the
+ * origin-scoped null never applies, and `appVersion` is the only option that
+ * has an effect.
  *
  * Defined locally (not imported) in both AvoNetworkCallsHandler.ts and
  * AvoNetworkCallsHandlerLite.ts to keep the lite-sync diff flat.
@@ -66,7 +70,7 @@ export interface TrackOptions {
   outputReference?: string;
   /** Low-cardinality hint identifying the event's upstream source (e.g. "web", "ios"). Never a user identifier. */
   originHint?: string;
-  /** App version of the source that produced the event. With originHint set, replaces the SDK's configured version (literal null when omitted); without originHint, overrides it only when provided. */
+  /** App version of the source that produced the event. With originHint set and a client configured (v2), replaces the SDK's configured version (literal null when omitted); otherwise overrides it only when provided. */
   appVersion?: string;
 }
 
@@ -84,22 +88,26 @@ function normalizeHint(value: unknown): string | undefined {
 const clientTokenPattern = /^[A-Za-z0-9._-]{1,64}$/;
 
 /**
- * Normalizes the X-Avo-Client value. Unlike the hint fields this one becomes a
- * request header, so an unusable value is not merely dropped from a body — it
- * makes setRequestHeader throw during synchronous request setup. That throw
- * would escape callInspectorWithBatchBody, which clears its `sending`
- * re-entrancy guard only from the completion callback, latching the guard and
- * silently cancelling every later batch for the lifetime of the page.
+ * Normalizes the client, which is also what selects the transport: it returns
+ * undefined — v1, exactly as 3.2.0 sent it — unless the client is a string that
+ * is still non-empty after trimming, and the X-Avo-Client value for v2 otherwise.
+ *
+ * Unlike the hint fields that value becomes a request header, so an unusable one
+ * is not merely dropped from a body — it makes setRequestHeader throw during
+ * synchronous request setup. That throw would escape callInspectorWithBatchBody,
+ * which clears its `sending` re-entrancy guard only from the completion callback,
+ * latching the guard and silently cancelling every later batch for the lifetime
+ * of the page.
  *
  * The value arrives from a constructor option or, in the script-tag build, from
  * `window.inspector.__CLIENT__` — so a token copied out of a config with a
- * trailing newline is entirely plausible. Falling back to "web" loses one
- * attribution label; letting it through would lose all the events.
+ * trailing newline is entirely plausible. A non-blank value that is not a usable
+ * token still asked for v2, so it keeps v2 and falls back to "web": that loses
+ * one attribution label, where letting it through would lose all the events.
  */
-function normalizeClient(client: string | undefined): string {
-  if (typeof client !== "string") return "web";
-  const trimmed = client.trim();
-  if (trimmed === "") return "web";
+function normalizeClient(client: unknown): string | undefined {
+  const trimmed = normalizeHint(client);
+  if (trimmed === undefined) return undefined;
   if (!clientTokenPattern.test(trimmed)) {
     if (AvoInspector.shouldLog) {
       console.warn(
@@ -110,6 +118,17 @@ function normalizeClient(client: string | undefined): string {
   }
   return trimmed;
 }
+
+/**
+ * One-shot latch for the warning a handler without a client (v1) gives when
+ * TrackOptions hints are left out. v1 answers 200 regardless and has no
+ * outputReference/originHint fields, so the gap is not visible from here. v2
+ * never warns. The latch is per module, so each build emits the warning at most
+ * once per page/process no matter how many such events are tracked. The full
+ * and lite builds latch independently, so an app that loads both can see one
+ * from each.
+ */
+let warnedAboutOmittedHints = false;
 
 export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
   type: "event";
@@ -137,9 +156,9 @@ export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
   /** Branch ID from getEventSpec response when value validation was performed */
   validatedBranchId?: string;
 
-  /** Gateway output this observation was bound for; absent = gateway checkpoint. */
+  /** Gateway output this observation was bound for; absent = gateway checkpoint. v2 only. */
   outputReference?: string;
-  /** Low-cardinality hint identifying the event's upstream source. */
+  /** Low-cardinality hint identifying the event's upstream source. v2 only. */
   originHint?: string;
 }
 
@@ -188,12 +207,15 @@ export class AvoNetworkCallsHandler {
   private readonly appVersion: string;
   private readonly libVersion: string;
   private readonly publicEncryptionKey?: string;
-  private readonly client: string;
+  /**
+   * The X-Avo-Client value, or undefined when no client is configured. It is
+   * also the transport switch, decided once in the constructor: undefined keeps
+   * the v1 request byte for byte as 3.2.0 sent it; a client selects v2.
+   */
+  private readonly client: string | undefined;
+  private readonly trackingEndpoint: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
-
-  private static readonly trackingEndpoint =
-    "https://api.avo.app/inspector/v2/track";
 
   constructor(
     apiKey: string,
@@ -211,6 +233,10 @@ export class AvoNetworkCallsHandler {
     this.libVersion = libVersion;
     this.publicEncryptionKey = publicEncryptionKey;
     this.client = normalizeClient(client);
+    this.trackingEndpoint =
+      this.client === undefined
+        ? "https://api.avo.app/inspector/v1/track"
+        : "https://api.avo.app/inspector/v2/track";
   }
 
   callInspectorWithBatchBody(
@@ -329,20 +355,37 @@ export class AvoNetworkCallsHandler {
       eventSchemaBody.validatedBranchId = validatedBranchId;
     }
 
-    // Set gateway hints if provided and non-empty after normalization
+    // Set gateway hints if provided and non-empty after normalization. The
+    // hints are v2 fields, so without a client they are left out of the body.
     const outputReference = normalizeHint(options?.outputReference);
     const originHint = normalizeHint(options?.originHint);
     const appVersion = normalizeHint(options?.appVersion);
-    if (outputReference !== undefined) {
+    const isV2 = this.client !== undefined;
+    if (outputReference !== undefined && isV2) {
       eventSchemaBody.outputReference = outputReference;
     }
-    if (originHint !== undefined) {
+    if (originHint !== undefined && isV2) {
       eventSchemaBody.originHint = originHint;
       // An origin hint marks an event from another source, whose app version is
       // unrelated to this SDK instance's configured version.
       eventSchemaBody.appVersion = appVersion !== undefined ? appVersion : null;
     } else if (appVersion !== undefined) {
+      // v1 leaves the hint out, so the event keeps a string version: v1 drops an
+      // event whose appVersion is null.
       eventSchemaBody.appVersion = appVersion;
+    }
+    // shouldLog is checked before the latch is set so a call made while logging
+    // is off does not swallow the one warning a later logging-on call deserves.
+    if (
+      (outputReference !== undefined || originHint !== undefined) &&
+      !isV2 &&
+      !warnedAboutOmittedHints &&
+      AvoInspector.shouldLog
+    ) {
+      warnedAboutOmittedHints = true;
+      console.warn(
+        "[Avo Inspector] outputReference and originHint are sent only when a client is configured, so they were left out of this event."
+      );
     }
 
     return eventSchemaBody;
@@ -458,18 +501,25 @@ export class AvoNetworkCallsHandler {
     let xmlhttp: XMLHttpRequest;
     try {
       xmlhttp = new XMLHttpRequest();
-      xmlhttp.open("POST", AvoNetworkCallsHandler.trackingEndpoint, true);
-      // v2 reads the api key and env from headers (the body keeps carrying both,
-      // so one body shape serves every endpoint version) and attributes traffic by
-      // X-Avo-Client without decoding a body. None of the three is CORS-safelisted,
-      // so a browser preflights every send — which is why the body is no longer
-      // `text/plain`: that content type existed only to stay inside the safelist and
-      // dodge the preflight, a saving custom headers cancel out, and v2's body reader
-      // parses a text/plain body twice and throws.
-      xmlhttp.setRequestHeader("Content-Type", "application/json");
-      xmlhttp.setRequestHeader("api-key", this.apiKey);
-      xmlhttp.setRequestHeader("env", this.envName);
-      xmlhttp.setRequestHeader("X-Avo-Client", this.client);
+      xmlhttp.open("POST", this.trackingEndpoint, true);
+      if (this.client === undefined) {
+        // v1, byte for byte the 3.2.0 request: the api key and env travel only in
+        // the body, and text/plain keeps an uncompressed send inside the CORS
+        // safelist, so it is not preflighted.
+        xmlhttp.setRequestHeader("Content-Type", "text/plain");
+      } else {
+        // v2 reads the api key and env from headers (the body keeps carrying both,
+        // so one body shape serves every endpoint version) and attributes traffic
+        // by X-Avo-Client without decoding a body. None of the three is
+        // CORS-safelisted, so a browser preflights every v2 send — which is why the
+        // body is not `text/plain` here: that content type existed only to stay
+        // inside the safelist and dodge the preflight, a saving custom headers
+        // cancel out, and v2's body reader parses a text/plain body twice and throws.
+        xmlhttp.setRequestHeader("Content-Type", "application/json");
+        xmlhttp.setRequestHeader("api-key", this.apiKey);
+        xmlhttp.setRequestHeader("env", this.envName);
+        xmlhttp.setRequestHeader("X-Avo-Client", this.client);
+      }
       if (isGzipped) {
         xmlhttp.setRequestHeader("Content-Encoding", "gzip");
       }

@@ -509,11 +509,17 @@ describe("Validation Integration", () => {
       }));
     });
 
-    test("should validate events from Avo Functions (_avoFunctionTrackSchemaFromEvent)", async () => {
+    // On both transports: the Codegen path follows the same transport selection
+    // and never carries the hint fields.
+    test.each([
+      ["no client (v1)", undefined],
+      ["a client (v2)", "gtm-web"]
+    ])("should validate events from Avo Functions (_avoFunctionTrackSchemaFromEvent), with %s", async (_transport, client) => {
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0"
+        version: "1.0.0",
+        client
       });
 
       callInspectorImmediatelySpy = jest
@@ -588,10 +594,12 @@ describe("Validation Integration", () => {
     });
 
     test("trackSchemaFromEvent with options on the validated path includes both hint fields (contrast with Avo Functions path above)", async () => {
+      // A configured client selects v2, the only transport that sends the hints.
       const inspector = new AvoInspector({
         apiKey: "test-key",
         env: AvoInspectorEnv.Dev,
-        version: "1.0.0"
+        version: "1.0.0",
+        client: "gtm-web"
       });
 
       callInspectorImmediatelySpy = jest
