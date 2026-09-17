@@ -11,16 +11,14 @@
  * and throws rather than serializing it, so nothing can be injected. This file
  * pins that, and pins what happens to the send once it faults.
  *
- * Two separate protections are involved, and it is worth not confusing them.
- * The caller never sees the fault, but that is the outer `try`/`catch` in
- * `trackSchemaFromEvent` and `trackSchema` doing it, which predates the header
- * migration: it logs and returns an empty schema. What the migration did break
- * is recovery. The throw escaped `sendTrackingRequest`, and since the `sending`
- * re-entrancy guard is cleared only from the completion callback, it latched
- * and every later batch was cancelled for the lifetime of the page. The outer
- * catch hid the exception from the app but could not clear that guard, so one
- * mistyped api key silently ended all telemetry rather than failing one send.
- * The last test here is the one that covers that.
+ * Three separate protections are involved, and it is worth not confusing them.
+ * The caller never sees a fault: that is the outer `try`/`catch` in
+ * `trackSchemaFromEvent` and `trackSchema`, which predates the header migration.
+ * A thrown header must not end telemetry for the page: the send path's own
+ * `try`/`catch` reports it through the completion callback, so the `sending`
+ * re-entrancy guard is released (pinned in TrackingHeaders_test.ts). And a key
+ * the browser refuses would fail every send, so v2 now stops at construction
+ * and never sets the header at all (V2StopSending_test.ts).
  *
  * Only v2 puts the key in a header, and v2 is selected by the internal client
  * (the web GTM template's), so the header tests below configure one. Without a client the SDK is on v1,
@@ -155,20 +153,18 @@ describe("an unusable api key does not throw at the caller (v2, client set)", ()
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
-  test("the failed send does not wedge the SDK for later events", async () => {
-    // The property the outer catch cannot provide, and the reason the handler
-    // needs its own. If `sending` latches, the second event never reaches the
-    // request setup at all and the SDK is silently finished for this page.
+  test("v2 stops before any send attempt, so the header is never set", async () => {
+    // The key would be refused on every send, so the handler stops at
+    // construction rather than retrying (V2StopSending_test.ts). Later events do
+    // not reach request setup either.
     const headerSpy = jest.spyOn(XMLHttpRequest.prototype, "setRequestHeader");
     const inspector = flushingInspector(crlfKey);
 
     await inspector.trackSchemaFromEvent("Ev one", { a: 1 });
-    const attemptsAfterFirst = headerSpy.mock.calls.length;
-
     await inspector.trackSchemaFromEvent("Ev two", { b: 2 });
 
-    expect(attemptsAfterFirst).toBeGreaterThan(0);
-    expect(headerSpy.mock.calls.length).toBeGreaterThan(attemptsAfterFirst);
+    expect(headerSpy).not.toHaveBeenCalled();
+    expect(sendSpy).not.toHaveBeenCalled();
     headerSpy.mockRestore();
   });
 

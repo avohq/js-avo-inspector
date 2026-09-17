@@ -55,6 +55,9 @@ export class AvoBatcher implements AvoBatcherType {
   }
 
   handleSessionStarted(): void {
+    if (this.networkCallsHandler.isSendingDisabled()) {
+      return;
+    }
     this.events.push(this.networkCallsHandler.bodyForSessionStartedCall());
     this.saveEvents();
 
@@ -69,6 +72,11 @@ export class AvoBatcher implements AvoBatcherType {
     eventSpecMetadata?: EventSpecMetadata,
     options?: TrackOptions
   ): void {
+    // v2 only: once the handler has stopped sending for this page, queueing would
+    // only grow the stored queue.
+    if (this.networkCallsHandler.isSendingDisabled()) {
+      return;
+    }
     this.events.push(
       this.networkCallsHandler.bodyForEventSchemaCall(
         eventName,
@@ -112,9 +120,16 @@ export class AvoBatcher implements AvoBatcherType {
       avoBatcher.events = [];
       this.networkCallsHandler.callInspectorWithBatchBody(
         sendingEvents,
-        function (error: Error | null): any {
+        function (
+          error: Error | null,
+          retryEvents?: Array<SessionStartedBody | EventSchemaBody>
+        ): any {
           if (error != null) {
-            avoBatcher.events = avoBatcher.events.concat(sendingEvents);
+            // v2 names the events worth retrying (it drops what can never pass);
+            // otherwise the whole batch goes back.
+            avoBatcher.events = avoBatcher.events.concat(
+              retryEvents !== undefined ? retryEvents : sendingEvents
+            );
 
             if (AvoInspector.shouldLog) {
               console.log(

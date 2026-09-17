@@ -15,7 +15,10 @@ The public API is unchanged from 3.2.0: the same exports, constructor options an
   - sends to `POST https://api.avo.app/inspector/v2/track` with `Content-Type: application/json` and the `api-key`, `env` and `X-Avo-Client: gtm-web` headers (the api key and env stay in the body too);
   - accepts per-event gateway fields — `outputReference`, `originHint`, `appVersion` — as a third argument to `window.inspector.trackSchemaFromEvent` / `trackSchema`, including calls queued on the loader stub before the bundle loads. With `originHint` set and no `appVersion`, the event's `appVersion` is sent as `null`, which v2 records as `"unversioned"`. Avo Codegen events never carry these fields.
 
-  Without that client, a third argument is ignored entirely, `appVersion` included.
+  - sends each queued event under the api key and env it was queued with — one request per pair — so events persisted by a GTM Preview page and flushed by a published one (or the reverse) keep their env;
+  - stops sending and queueing for the page, with one `console.error`, when the api key cannot be a request header, or after the API refuses the page's own events three times in a row (a 4xx other than 408/429, or a request the browser refuses to build). Network errors, timeouts and 5xx keep retrying.
+
+  Without that client, a third argument is ignored entirely, `appVersion` included, and nothing above applies: v1 sends and retries exactly as 3.2.0.
 
 ### Fixed
 

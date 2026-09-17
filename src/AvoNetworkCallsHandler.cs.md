@@ -37,6 +37,10 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 
 `normalizeClient(client: unknown): string | undefined` — `"gtm-web"` iff `normalizeHint(client) === "gtm-web"`, else `undefined`. Absent, blank, non-string, `"web"`, `"gtm-server"`, `"GTM-WEB"` all → `undefined`. Never logs; only the constant can become a header.
 
+`isHeaderValue(value: unknown): value is string` — a string with no NUL, CR or LF and no code point above U+00FF, i.e. a value browsers accept in `setRequestHeader` as-is.
+
+`maxConsecutivePermanentFailures = 3`; instance fields `permanentFailures` (own-event permanent failures in a row) and `sendingDisabled` (set at most once) — v2 only.
+
 `client: string | undefined` (instance, set once in the constructor via `normalizeClient`) — the **transport switch**: `undefined` → v1, `"gtm-web"` → v2.
 
 `trackingEndpoint` (instance, set once) — `https://api.avo.app/inspector/v1/track` when `client` is `undefined`, else `https://api.avo.app/inspector/v2/track`.
@@ -45,8 +49,10 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 
 ## Functional requirements
 
-- `constructor(apiKey, envName, appName, appVersion, libVersion, publicEncryptionKey?, client?)`.
-- `callInspectorWithBatchBody(events, onCompleted)` — rejects re-entrant sends while one is in flight (Error callback, no send); filters null events; reconciles stream ids; returns silently on an empty list; may drop the batch by sampling; sets `sending`, sends, and clears `sending` before forwarding to `onCompleted`.
+- `constructor(apiKey, envName, appName, appVersion, libVersion, publicEncryptionKey?, client?)` — on v2, if `apiKey` or `envName` is not an `isHeaderValue`, stops sending immediately.
+- `isSendingDisabled(): boolean` — `true` once v2 has stopped sending for this page; always `false` on v1. The batcher stops queueing when it is `true`.
+- `disableSending(reason)` (private) — sets `sendingDisabled` and logs once: `console.error("[Avo Inspector] Stopped sending events on this page: <reason>.")`. Reasons: `the api key cannot be sent as a request header` (constructor) and `the Avo Inspector API refused its events 3 times in a row` (runtime). The key value is never logged.
+- `callInspectorWithBatchBody(events, onCompleted: (error, retryEvents?) => any)` — rejects re-entrant sends while one is in flight (Error callback, no send); filters null events; reconciles stream ids; returns silently on an empty list; may drop the batch by sampling; sets `sending`, sends, and clears `sending` before forwarding to `onCompleted` — with `retryEvents` only when the send supplied them (v2), otherwise with the error alone.
 - `callInspectorImmediately(eventBody, onCompleted)` — single-event send bypassing batching and sampling; reconciles an `"unknown"` stream id.
 - `bodyForSessionStartedCall()` / `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — construct the typed bodies from instance config; the event body then applies the gateway rules below.
 - `fixStreamIds(events)` — replaces `"unknown"` stream ids with the first known id in the batch, else `AvoStreamId.streamId`.
@@ -67,18 +73,28 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 - No `options` or `{}` → the pre-existing key set and values on either transport.
 - Codegen bodies (`eventId` non-null) are built without `options`; `avoFunction`/`eventId`/`eventHash` are set as before on both transports.
 
-### Send path (`callInspectorApi` → `sendTrackingRequest`)
+### Send path (`callInspectorApi` → `sendEvents` → `sendTrackingRequest`)
 
-1. `body = JSON.stringify(events)`.
+0. **v1:** `sendEvents(events, this.apiKey, this.envName, …)` and forward the error alone — one request, as before.
+   **v2 — one request per queued api key and env:** events are grouped by their own `apiKey`/`env` body fields, in order of first appearance, and the groups are sent **sequentially** (the next request opens when the previous completes). Each group's headers come from its bodies, so events persisted by an earlier page with another configuration (a published container's prod queue flushed by a GTM Preview load, or the reverse) are attributed as queued. A group is *own* when its api key and env equal this instance's. Per group:
+   - `sendingDisabled` → not sent; kept for retry.
+   - api key or env not an `isHeaderValue` → not sent; permanent failure.
+   - otherwise sent via `sendEvents`.
+   - success → own groups reset `permanentFailures`.
+   - transient failure → kept for retry.
+   - permanent failure → own groups are kept for retry and increment `permanentFailures`, stopping sending when it reaches `maxConsecutivePermanentFailures`; another configuration's groups are **dropped** (their key and env cannot change on retry).
+   
+   After the last group: `onCompleted(null)` when every group succeeded, else `onCompleted(firstError, retryEvents)`.
+1. `sendEvents` serializes the group: `body = JSON.stringify(events)`.
 2. **Uncompressed fast path (synchronous):** `CompressionStream` undefined OR `body.length < gzipMinBodyLength` → `sendTrackingRequest(body, false, …)`.
 3. **Compressed path (async):** `gzip(body)`; success → send the `Uint8Array` with `isGzipped=true`; `null` → send the string uncompressed.
-4. `sendTrackingRequest(body, isGzipped, onCompleted)` — async POST to `this.trackingEndpoint`, headers in order:
+4. `sendTrackingRequest(body, isGzipped, apiKey, env, onCompleted: (error, permanent?) => any)` — async POST to `this.trackingEndpoint`, headers in order:
    - **v1:** `Content-Type: text/plain` only.
-   - **v2:** `Content-Type: application/json`, `api-key: <apiKey>`, `env: <envName>`, `X-Avo-Client: gtm-web`.
+   - **v2:** `Content-Type: application/json`, `api-key: <group apiKey>`, `env: <group env>`, `X-Avo-Client: gtm-web`.
    - Both: `Content-Encoding: gzip` only when `isGzipped`; `timeout = AvoInspector.networkTimeout`.
    
-   IMPORTANT: construction, `open`, every `setRequestHeader`, `timeout` and `send` run inside one `try`/`catch`; a throw calls `onCompleted(new Error("Failed to send request: …"))` and returns. No synchronous XHR setup step escapes the method on either path. A throw from `onCompleted` itself still propagates (on the gzipped path as an unhandled rejection); `sending` is already cleared by then. `onload`/`onerror`/`ontimeout` are assigned after the `try`.
-5. `onload`: non-200 → Error; 200 → parse JSON (failure → Error), adopt a numeric non-NaN `response.samplingRate`, `onCompleted(null)`. `onerror` / `ontimeout` → corresponding Errors.
+   IMPORTANT: construction, `open`, every `setRequestHeader`, `timeout` and `send` run inside one `try`/`catch`; a throw calls `onCompleted(new Error("Failed to send request: …"), true)` (permanent) and returns. No synchronous XHR setup step escapes the method on either path. A throw from `onCompleted` itself still propagates (on the gzipped path as an unhandled rejection); `sending` is already cleared by then. `onload`/`onerror`/`ontimeout` are assigned after the `try`.
+5. `onload`: non-200 → Error, **permanent** for a 4xx other than 408 and 429; 200 → parse JSON (failure → Error), adopt a numeric non-NaN `response.samplingRate`, `onCompleted(null)`. `onerror` / `ontimeout` → corresponding transient Errors.
 
 `gzip(body)` — UTF-8 encode → `"gzip"` `CompressionStream` → one concatenated `Uint8Array`; `null` on any throw.
 
@@ -87,7 +103,8 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 - **v1 compatibility invariant:** without the `"gtm-web"` client, URL, header list and body bytes are the pre-v2 request (`libVersion` aside), whatever `options` were passed; pinned in `src/__tests__/V1WireBaseline_test.ts`. Emitted typings for both entry points are unchanged; pinned in `src/__tests__/PublicSurface_test.ts`.
 - **Re-entrancy guard must always clear:** `sending` is cleared only in the completion callback, so any exception escaping synchronous request setup would latch it and cancel every later batch for the page's lifetime. The setup `try`/`catch` closes that path; a failed send re-queues via the batcher's error branch.
 - **CORS:** v1 `text/plain` stays CORS-safelisted, so only gzipped v1 sends are preflighted. On v2, `api-key`, `env`, `X-Avo-Client` are not safelisted, so every v2 POST is preflighted; the server must allow `Content-Type`, `api-key`, `env`, `X-Avo-Client` and `Content-Encoding`.
-- **Body shape:** `apiKey` and `env` stay in every body; v2 reads the headers.
+- **Body shape:** `apiKey` and `env` stay in every body; v2 reads the headers, which are built from the bodies' own values.
+- **Stopping (v2 only):** a stopped handler opens no request for the rest of the page and hands every event back for retry, so events already queued stay stored for a later page load. v1 never stops: it retries every failure, as before. A partial v2 failure hands back only the retryable groups, so successful groups are not sent twice.
 - **Wire-shape invariant:** a gzipped body gunzips to the exact `JSON.stringify(events)` string. Fallbacks (no `CompressionStream`, compression failure, sub-1 KB) send the identical uncompressed body.
 - **Lite-sync invariant:** the transport, gateway and send-path code is textually identical to `src/lite/AvoNetworkCallsHandlerLite.ts`; `verify:lite-sync` drift is 49 of a 55-line threshold.
 - **Logging:** nothing added here logs, on either transport. `samplingRate` is mutated from server responses on both transports.

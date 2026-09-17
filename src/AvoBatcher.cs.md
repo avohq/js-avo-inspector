@@ -26,9 +26,9 @@ export interface AvoBatcherType {
 ## Functional requirements
 
 - **Constructor:** stores the handler, stamps `batchFlushAttemptTimestamp = now`, asynchronously reads `cacheKey` from `AvoInspector.avoStorage`; non-null saved bodies are appended to `events` and a flush check runs. Read errors are logged with `console.error`.
-- `handleSessionStarted()` — pushes `bodyForSessionStartedCall()`, saves, checks flush.
-- `handleTrackSchema(eventName, schema, eventId, eventHash, eventSpecMetadata?, options?)` — pushes `bodyForEventSchemaCall(eventName, schema, eventId, eventHash, eventSpecMetadata, undefined, options)` (no `validatedBranchId` on the batched path), saves, logs when `shouldLog`, checks flush. `options` are the internal gateway coordinates; the handler applies them only on the v2 transport.
-- `checkIfBatchNeedsToBeSent()` — no-op on an empty queue. Flushes when `events.length % AvoInspector.batchSize == 0` OR at least `batchFlushSeconds` elapsed since the last attempt: stamps the attempt time, hands the whole queue to `callInspectorWithBatchBody` and empties `events`. On error, the sent batch is appended back onto `events` (after anything queued meanwhile); either way the queue is saved.
+- `handleSessionStarted()` — returns without queueing when the handler `isSendingDisabled()`; otherwise pushes `bodyForSessionStartedCall()`, saves, checks flush.
+- `handleTrackSchema(eventName, schema, eventId, eventHash, eventSpecMetadata?, options?)` — returns without queueing when the handler `isSendingDisabled()` (v2 only); otherwise pushes `bodyForEventSchemaCall(eventName, schema, eventId, eventHash, eventSpecMetadata, undefined, options)` (no `validatedBranchId` on the batched path), saves, logs when `shouldLog`, checks flush. `options` are the internal gateway coordinates; the handler applies them only on the v2 transport.
+- `checkIfBatchNeedsToBeSent()` — no-op on an empty queue. Flushes when `events.length % AvoInspector.batchSize == 0` OR at least `batchFlushSeconds` elapsed since the last attempt: stamps the attempt time, hands the whole queue to `callInspectorWithBatchBody` and empties `events`. On error, the handler's `retryEvents` — or, when it supplies none (v1, or a cancelled re-entrant send), the whole sent batch — are appended back onto `events` (after anything queued meanwhile); either way the queue is saved.
 - `saveEvents()` — trims the queue to the newest 1000 bodies, then writes it to storage under `cacheKey`.
 
 ## Non-functional requirements

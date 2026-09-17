@@ -109,6 +109,28 @@ function normalizeClient(client: unknown): string | undefined {
     : undefined;
 }
 
+/**
+ * Whether a value can be sent as a request header as it is. Browsers throw from
+ * setRequestHeader for a value containing NUL, CR or LF, or any code point above
+ * U+00FF. Only v2 sends the api key and env as headers.
+ */
+function isHeaderValue(value: unknown): value is string {
+  return (
+    typeof value === "string" && !/[\u0000\n\r]|[^\u0000-\u00ff]/.test(value)
+  );
+}
+
+/**
+ * v2 only: after this many permanent failures in a row for this instance's own
+ * events (a request the browser refuses to build, or a 4xx other than 408 and
+ * 429), the handler stops sending and the batcher stops queueing for the rest
+ * of the page.
+ */
+const maxConsecutivePermanentFailures = 3;
+
+/** Events of a failed send that are worth queueing again; undefined means all of them. */
+type RetryEvents = Array<SessionStartedBody | EventSchemaBody> | undefined;
+
 export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
   type: "event";
 
@@ -196,6 +218,10 @@ export class AvoNetworkCallsHandlerLite {
   private readonly trackingEndpoint: string;
   private samplingRate: number = 1.0;
   private sending: boolean = false;
+  /** v2 only: permanent failures in a row for this instance's own events. */
+  private permanentFailures: number = 0;
+  /** v2 only: set at most once, when sending can no longer succeed on this page. */
+  private sendingDisabled: boolean = false;
 
   constructor(
     apiKey: string,
@@ -215,11 +241,34 @@ export class AvoNetworkCallsHandlerLite {
       this.client === undefined
         ? "https://api.avo.app/inspector/v1/track"
         : "https://api.avo.app/inspector/v2/track";
+    // v2 sends the api key and env as headers. One the browser refuses would fail
+    // every send, so v2 stops before queueing anything instead of retrying.
+    if (
+      this.client !== undefined &&
+      !(isHeaderValue(apiKey) && isHeaderValue(envName))
+    ) {
+      this.disableSending("the api key cannot be sent as a request header");
+    }
+  }
+
+  /**
+   * v2 only: true once sending has stopped for this page (see
+   * maxConsecutivePermanentFailures). Always false on v1.
+   */
+  isSendingDisabled(): boolean {
+    return this.sendingDisabled;
+  }
+
+  private disableSending(reason: string): void {
+    this.sendingDisabled = true;
+    console.error(
+      "[Avo Inspector] Stopped sending events on this page: " + reason + "."
+    );
   }
 
   callInspectorWithBatchBody(
     inEvents: Array<SessionStartedBody | EventSchemaBody>,
-    onCompleted: (error: Error | null) => any
+    onCompleted: (error: Error | null, retryEvents?: RetryEvents) => any
   ): void {
     if (this.sending) {
       onCompleted(
@@ -263,9 +312,13 @@ export class AvoNetworkCallsHandlerLite {
     }
 
     this.sending = true;
-    this.callInspectorApi(events, (error) => {
+    this.callInspectorApi(events, (error, retryEvents) => {
       this.sending = false;
-      onCompleted(error);
+      if (retryEvents === undefined) {
+        onCompleted(error);
+      } else {
+        onCompleted(error, retryEvents);
+      }
     });
   }
 
@@ -393,7 +446,96 @@ export class AvoNetworkCallsHandlerLite {
    */
   private callInspectorApi(
     events: Array<SessionStartedBody | EventSchemaBody>,
-    onCompleted: (error: Error | null) => any
+    onCompleted: (error: Error | null, retryEvents?: RetryEvents) => any
+  ): void {
+    if (this.client === undefined) {
+      this.sendEvents(events, this.apiKey, this.envName, (error) => {
+        onCompleted(error);
+      });
+      return;
+    }
+
+    // v2 takes the api key and env from the headers, for every event in the
+    // request, so each event is sent under the ones it was queued with. They
+    // differ from this instance's only for events persisted by an earlier page
+    // with another configuration — a GTM Preview load flushing a published
+    // container's queue, or the reverse. One request per pair, in order.
+    const groups: Array<Array<SessionStartedBody | EventSchemaBody>> = [];
+    const groupKeys: string[] = [];
+    events.forEach((event) => {
+      const key = JSON.stringify([event.apiKey, event.env]);
+      let index = groupKeys.indexOf(key);
+      if (index === -1) {
+        index = groupKeys.push(key) - 1;
+        groups.push([]);
+      }
+      groups[index].push(event);
+    });
+
+    const retryEvents: Array<SessionStartedBody | EventSchemaBody> = [];
+    let firstError: Error | null = null;
+    const sendGroup = (index: number): void => {
+      if (index === groups.length) {
+        if (firstError === null) {
+          onCompleted(null);
+        } else {
+          onCompleted(firstError, retryEvents);
+        }
+        return;
+      }
+      const group = groups[index];
+      const apiKey = group[0].apiKey;
+      const env = group[0].env;
+      const own = apiKey === this.apiKey && env === this.envName;
+      const completed = (error: Error | null, permanent?: boolean): void => {
+        if (error === null) {
+          if (own) {
+            this.permanentFailures = 0;
+          }
+        } else {
+          firstError = firstError || error;
+          if (!permanent || own) {
+            Array.prototype.push.apply(retryEvents, group);
+          }
+          // A permanent failure of events queued under another configuration is
+          // dropped: they carry their own api key and env, so a retry cannot pass.
+          if (permanent && own) {
+            this.permanentFailures += 1;
+            if (
+              !this.sendingDisabled &&
+              this.permanentFailures >= maxConsecutivePermanentFailures
+            ) {
+              this.disableSending(
+                "the Avo Inspector API refused its events " +
+                  maxConsecutivePermanentFailures +
+                  " times in a row"
+              );
+            }
+          }
+        }
+        sendGroup(index + 1);
+      };
+      if (this.sendingDisabled) {
+        completed(new Error("Sending events is stopped on this page"));
+      } else if (!isHeaderValue(apiKey) || !isHeaderValue(env)) {
+        completed(
+          new Error(
+            "Failed to send request: the api key or env cannot be sent as a request header"
+          ),
+          true
+        );
+      } else {
+        this.sendEvents(group, apiKey, env, completed);
+      }
+    };
+    sendGroup(0);
+  }
+
+  private sendEvents(
+    events: Array<SessionStartedBody | EventSchemaBody>,
+    apiKey: string,
+    env: string,
+    onCompleted: (error: Error | null, permanent?: boolean) => any
   ): void {
     const body = JSON.stringify(events);
 
@@ -401,23 +543,30 @@ export class AvoNetworkCallsHandlerLite {
       typeof CompressionStream === "undefined" ||
       body.length < gzipMinBodyLength
     ) {
-      this.sendTrackingRequest(body, false, onCompleted);
+      this.sendTrackingRequest(body, false, apiKey, env, onCompleted);
       return;
     }
 
     gzip(body).then((compressed) => {
       if (compressed !== null) {
-        this.sendTrackingRequest(compressed, true, onCompleted);
+        this.sendTrackingRequest(compressed, true, apiKey, env, onCompleted);
       } else {
-        this.sendTrackingRequest(body, false, onCompleted);
+        this.sendTrackingRequest(body, false, apiKey, env, onCompleted);
       }
     });
   }
 
+  /**
+   * Reports a failure as permanent (second argument true) when retrying the same
+   * request cannot succeed: the browser refused to build it, or the API answered
+   * a 4xx other than 408 and 429.
+   */
   private sendTrackingRequest(
     body: string | Uint8Array,
     isGzipped: boolean,
-    onCompleted: (error: Error | null) => any
+    apiKey: string,
+    env: string,
+    onCompleted: (error: Error | null, permanent?: boolean) => any
   ): void {
     // Everything from construction up to and including send() runs synchronously,
     // and any of it can throw: a header value the browser rejects, or a send() the
@@ -455,8 +604,8 @@ export class AvoNetworkCallsHandlerLite {
         // inside the safelist and dodge the preflight, a saving custom headers
         // cancel out, and v2's body reader parses a text/plain body twice and throws.
         xmlhttp.setRequestHeader("Content-Type", "application/json");
-        xmlhttp.setRequestHeader("api-key", this.apiKey);
-        xmlhttp.setRequestHeader("env", this.envName);
+        xmlhttp.setRequestHeader("api-key", apiKey);
+        xmlhttp.setRequestHeader("env", env);
         xmlhttp.setRequestHeader("X-Avo-Client", this.client);
       }
       if (isGzipped) {
@@ -468,14 +617,21 @@ export class AvoNetworkCallsHandlerLite {
       onCompleted(
         new Error(
           `Failed to send request: ${e instanceof Error ? e.message : String(e)}`
-        )
+        ),
+        true
       );
       return;
     }
 
     xmlhttp.onload = () => {
       if (xmlhttp.status !== 200) {
-        onCompleted(new Error(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`));
+        onCompleted(
+          new Error(`Error ${xmlhttp.status}: ${xmlhttp.statusText}`),
+          xmlhttp.status >= 400 &&
+            xmlhttp.status < 500 &&
+            xmlhttp.status !== 408 &&
+            xmlhttp.status !== 429
+        );
       } else {
         let response: any;
         try {
