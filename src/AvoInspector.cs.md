@@ -34,10 +34,10 @@ Called by application code (npm) or by the script-tag bootstrap; only the bootst
   3. `version` empty → throws.
   4. `Dev` → `batchSize = 1`, `shouldLog = true`; otherwise `batchSize = 30`, `batchFlushSeconds = 30`, `shouldLog = false`.
   5. Creates `AvoStorage(shouldLog, suffix ?? "")`, `AvoNetworkCallsHandler(apiKey, env, appName ?? "", version, libVersion, publicEncryptionKey, options._client)`, `AvoBatcher`, `AvoDeduplicator`; reads `AvoStreamId.streamId`; when a stream id exists, creates the spec cache and fetcher.
-- `trackSchemaFromEvent(eventName, eventProperties): Promise<EventProperty[]>` — **not `async`**; returns `this._trackSchemaFromEventWithOptions(eventName, eventProperties, undefined)`.
+- `async trackSchemaFromEvent(eventName, eventProperties): Promise<EventProperty[]>` — awaits `this._trackSchemaFromEventWithOptions(eventName, eventProperties, undefined)` inside a `try`/`catch`; a throw (e.g. no receiver) logs `Avo Inspector: something went wrong…` and resolves `[]`.
 - `private async _trackSchemaFromEventWithOptions(eventName, eventProperties, options: TrackOptions | undefined)` — if the deduplicator registers the manual event: extract the schema, `fetchAndValidateEvent`; with a validation result, merge results and `sendEventWithValidation(…, options)`; otherwise `trackSchemaInternal(…, null, null, options)`. Returns the schema, or `[]` when deduplicated or on any caught error (logged).
 - `_avoFunctionTrackSchemaFromEvent(eventName, eventProperties, eventId, eventHash)` (private, Codegen) — unchanged flow; never passes `options`.
-- `trackSchema(eventName, eventSchema): Promise<void>` — **not `async`**; returns `this._trackSchemaWithOptions(eventName, eventSchema, undefined)`.
+- `async trackSchema(eventName, eventSchema): Promise<void>` — awaits `this._trackSchemaWithOptions(eventName, eventSchema, undefined)` inside a `try`/`catch`; a throw logs and resolves.
 - `private async _trackSchemaWithOptions(eventName, eventSchema, options)` — if `shouldRegisterSchemaFromManually`, prefetch the spec and `trackSchemaInternal(…, null, null, options)`; errors caught and logged.
 - `trackSchemaInternal(eventName, eventSchema, eventId, eventHash, options?)` — `avoBatcher.handleTrackSchema(eventName, eventSchema, eventId, eventHash, undefined, options)` inside a `try`/`catch`.
 - `extractSchema(eventProperties, shouldLogIfEnabled = true)` — warns when Codegen just reported the same params; delegates to `AvoSchemaParser.extractSchema(props, publicEncryptionKey, environment)`; `[]` on error.
@@ -47,7 +47,7 @@ Called by application code (npm) or by the script-tag bootstrap; only the bootst
 
 ## Non-functional requirements
 
-- Runtime errors inside the `*WithOptions` bodies are caught, logged, and resolve (`[]` / `undefined`). IMPORTANT: the public wrappers evaluate `this._…WithOptions` outside that `try`, so a call without a valid receiver (e.g. a destructured method) throws a synchronous `TypeError` instead of returning a promise.
+- IMPORTANT: public track methods never throw or reject: errors inside the `*WithOptions` bodies and a call without a receiver (e.g. a destructured method) are logged and resolve (`[]` / `undefined`), as in 3.2.0.
 - The `*WithOptions` methods are TypeScript-`private` with a line comment, so they and `_client` are absent from the emitted `.d.ts`; at runtime they are reachable from plain JavaScript.
 - Options only affect the wire when the handler's client is `"gtm-web"`; otherwise the request is the pre-v2 one.
 - In dev/staging `trackSchemaFromEvent` awaits the spec fetch (bounded by `networkTimeout`) before sending.

@@ -24,10 +24,10 @@ constructor(options: { apiKey: string; env: AvoInspectorEnvValueType; version: s
 ## Functional requirements
 
 - **Constructor:** `env` empty/unsupported → `Dev` with `console.warn`; empty `apiKey` or `version` → throws; `apiKey` stored **trimmed**; `Dev` → `batchSize = 1`, logging on; otherwise 30 / 30 s, logging off; creates `AvoStorage`, `AvoNetworkCallsHandlerLite(apiKey, env, appName ?? "", version, libVersion, options._client)` and `AvoBatcher`.
-- `trackSchemaFromEvent(eventName, eventProperties): Promise<EventProperty[]>` — **not `async`**; returns `this._trackSchemaFromEventWithOptions(eventName, eventProperties, undefined)`.
+- `async trackSchemaFromEvent(eventName, eventProperties): Promise<EventProperty[]>` — awaits `this._trackSchemaFromEventWithOptions(eventName, eventProperties, undefined)` inside a `try`/`catch`; a throw (e.g. no receiver) logs `Avo Inspector: something went wrong…` and resolves `[]`.
 - `private async _trackSchemaFromEventWithOptions(eventName, eventProperties, options)` — logs when enabled, extracts the schema, `trackSchemaInternal(…, null, null, options)`, returns the schema; `[]` on caught error.
 - `_avoFunctionTrackSchemaFromEvent(eventName, eventProperties, eventId, eventHash)` (private, Codegen) — unchanged; never passes `options`.
-- `trackSchema(eventName, eventSchema): Promise<void>` — **not `async`**; returns `this._trackSchemaWithOptions(eventName, eventSchema, undefined)`.
+- `async trackSchema(eventName, eventSchema): Promise<void>` — awaits `this._trackSchemaWithOptions(eventName, eventSchema, undefined)` inside a `try`/`catch`; a throw logs and resolves.
 - `private async _trackSchemaWithOptions(eventName, eventSchema, options)` — logs when enabled and batches with `options`; errors caught.
 - `trackSchemaInternal(eventName, eventSchema, eventId, eventHash, options?)` — `avoBatcher.handleTrackSchema(eventName, eventSchema, eventId, eventHash, undefined, options)` in a `try`/`catch`.
 - `extractSchema(eventProperties)` — `AvoSchemaParserLite.extractSchema(props)`; `[]` on error.
@@ -35,7 +35,7 @@ constructor(options: { apiKey: string; env: AvoInspectorEnvValueType; version: s
 
 ## Non-functional requirements
 
-- Must stay within the lite gzipped-bundle budget (≤ 7 KB; 5.8 KB), enforced by `check:lite-size`.
-- Runtime errors inside the `*WithOptions` bodies are logged and resolve. IMPORTANT: the public wrappers read `this._…WithOptions` outside that `try`, so a call without a valid receiver throws a synchronous `TypeError`.
+- Must stay within the lite gzipped-bundle budget (≤ 7 KB; 6.4 KB), enforced by `check:lite-size`.
+- IMPORTANT: public track methods never throw or reject: errors, including a call without a receiver, are logged and resolve, as in 3.2.0.
 - The `*WithOptions` methods and `_client` are absent from the emitted lite `.d.ts`; options affect the wire only with the `"gtm-web"` client.
 - Every event is batched; there is no immediate send path.

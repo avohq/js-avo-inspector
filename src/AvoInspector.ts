@@ -182,15 +182,26 @@ export class AvoInspector {
     }
   }
 
-  trackSchemaFromEvent(
+  // Not a thin delegation: 3.2.0's public methods were async with the whole body
+  // in a try/catch, so even a call without a receiver (a destructured method)
+  // logged and resolved rather than throwing, and still does.
+  async trackSchemaFromEvent(
     eventName: string,
     eventProperties: Record<string, any>
   ): Promise<EventProperty[]> {
-    return this._trackSchemaFromEventWithOptions(
-      eventName,
-      eventProperties,
-      undefined
-    );
+    try {
+      return await this._trackSchemaFromEventWithOptions(
+        eventName,
+        eventProperties,
+        undefined
+      );
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
+      return [];
+    }
   }
 
   // INTERNAL — not public API. `trackSchemaFromEvent` with the web GTM tag template's
@@ -323,7 +334,7 @@ export class AvoInspector {
     }
   }
 
-  trackSchema(
+  async trackSchema(
     eventName: string,
     eventSchema: Array<{
       propertyName: string;
@@ -332,7 +343,14 @@ export class AvoInspector {
       children?: any;
     }>
   ): Promise<void> {
-    return this._trackSchemaWithOptions(eventName, eventSchema, undefined);
+    try {
+      await this._trackSchemaWithOptions(eventName, eventSchema, undefined);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
+    }
   }
 
   // INTERNAL — not public API. `trackSchema` with the web GTM tag template's
