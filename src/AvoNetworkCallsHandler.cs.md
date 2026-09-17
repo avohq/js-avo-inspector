@@ -50,7 +50,8 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 ## Functional requirements
 
 - `constructor(apiKey, envName, appName, appVersion, libVersion, publicEncryptionKey?, client?)` — on v2, if `apiKey` or `envName` is not an `isHeaderValue`, stops sending immediately.
-- `isSendingDisabled(): boolean` — `true` once v2 has stopped sending for this page; always `false` on v1. The batcher stops queueing when it is `true`.
+- `isSendingDisabled(): boolean` — `true` once v2 has stopped sending for this page; always `false` on v1. The batcher then keeps queueing and saving, but stops attempting a flush, so the events stay stored for a later page load.
+- `isQueueingDisabled(): boolean` — `true` only for the constructor's unusable-api-key stop, where every event this instance builds would carry that key; the batcher then queues nothing. Always `false` on v1.
 - `disableSending(reason)` (private) — sets `sendingDisabled` and logs once: `console.error("[Avo Inspector] Stopped sending events on this page: <reason>.")`. Reasons: `the api key cannot be sent as a request header` (constructor) and `the Avo Inspector API refused its events 3 times in a row` (runtime). The key value is never logged.
 - `callInspectorWithBatchBody(events, onCompleted: (error, retryEvents?) => any)` — rejects re-entrant sends while one is in flight (Error callback, no send); filters null events; reconciles stream ids; returns silently on an empty list; may drop the batch by sampling; sets `sending`, sends, and clears `sending` before forwarding to `onCompleted` — with `retryEvents` only when the send supplied them (v2), otherwise with the error alone.
 - `callInspectorImmediately(eventBody, onCompleted)` — single-event send bypassing batching and sampling; reconciles an `"unknown"` stream id.
@@ -82,7 +83,7 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
    - otherwise sent via `sendEvents`.
    - success → own groups reset `permanentFailures`.
    - transient failure → kept for retry.
-   - permanent failure → own groups are kept for retry and increment `permanentFailures`, stopping sending when it reaches `maxConsecutivePermanentFailures`; another configuration's groups are **dropped** (their key and env cannot change on retry).
+   - permanent failure → own groups are kept for retry and increment `permanentFailures`, stopping sending when it reaches `maxConsecutivePermanentFailures`; another configuration's groups are kept too until `maxConsecutivePermanentFailures` permanent failures of **that** group (counted per api key and env in `foreignFailures`, reset by a success), after which they are dropped — the only events this SDK discards, since nothing on a later page can change the key they carry.
    
    After the last group: `onCompleted(null)` when every group succeeded, else `onCompleted(firstError, retryEvents)`.
 1. `sendEvents` serializes the group: `body = JSON.stringify(events)`.
@@ -104,7 +105,7 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 - **Re-entrancy guard must always clear:** `sending` is cleared only in the completion callback, so any exception escaping synchronous request setup would latch it and cancel every later batch for the page's lifetime. The setup `try`/`catch` closes that path; a failed send re-queues via the batcher's error branch.
 - **CORS:** v1 `text/plain` stays CORS-safelisted, so only gzipped v1 sends are preflighted. On v2, `api-key`, `env`, `X-Avo-Client` are not safelisted, so every v2 POST is preflighted; the server must allow `Content-Type`, `api-key`, `env`, `X-Avo-Client` and `Content-Encoding`.
 - **Body shape:** `apiKey` and `env` stay in every body; v2 reads the headers, which are built from the bodies' own values.
-- **Stopping (v2 only):** a stopped handler opens no request for the rest of the page and hands every event back for retry, so events already queued stay stored for a later page load. v1 never stops: it retries every failure, as before. A partial v2 failure hands back only the retryable groups, so successful groups are not sent twice.
+- **Stopping (v2 only):** a stopped handler opens no request for the rest of the page and hands every event back for retry, so events already queued — and, for the runtime stop, everything tracked afterwards — stay stored for a later page load. v1 never stops: it retries every failure, as before. A partial v2 failure hands back only the retryable groups, so successful groups are not sent twice.
 - **Wire-shape invariant:** a gzipped body gunzips to the exact `JSON.stringify(events)` string. Fallbacks (no `CompressionStream`, compression failure, sub-1 KB) send the identical uncompressed body.
 - **Lite-sync invariant:** the transport, gateway and send-path code is textually identical to `src/lite/AvoNetworkCallsHandlerLite.ts`; `verify:lite-sync` drift is 49 of a 55-line threshold.
 - **Logging:** nothing added here logs, on either transport. `samplingRate` is mutated from server responses on both transports.

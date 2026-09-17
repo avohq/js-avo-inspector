@@ -121,10 +121,13 @@ function isHeaderValue(value: unknown): value is string {
 }
 
 /**
- * v2 only: after this many permanent failures in a row for this instance's own
- * events (a request the browser refuses to build, or a 4xx other than 408 and
- * 429), the handler stops sending and the batcher stops queueing for the rest
- * of the page.
+ * v2 only: after this many permanent failures in a row (a request the browser
+ * refuses to build, or a 4xx other than 408 and 429), the handler stops trying.
+ * For this instance's own events it stops sending for the rest of the page,
+ * while the batcher keeps queueing them, so a later page load can still deliver
+ * them. For events queued under another api key and env it drops that group,
+ * which is the only case where events are discarded: nothing on a later page can
+ * change the key they carry.
  */
 const maxConsecutivePermanentFailures = 3;
 
@@ -220,8 +223,12 @@ export class AvoNetworkCallsHandlerLite {
   private sending: boolean = false;
   /** v2 only: permanent failures in a row for this instance's own events. */
   private permanentFailures: number = 0;
+  /** v2 only: permanent failures in a row per other api key and env, keyed as the send groups are. */
+  private readonly foreignFailures: Record<string, number> = {};
   /** v2 only: set at most once, when sending can no longer succeed on this page. */
   private sendingDisabled: boolean = false;
+  /** v2 only: set when the events themselves can never be sent, so queueing them would only grow the stored queue. */
+  private queueingDisabled: boolean = false;
 
   constructor(
     apiKey: string,
@@ -248,6 +255,8 @@ export class AvoNetworkCallsHandlerLite {
       !(isHeaderValue(apiKey) && isHeaderValue(envName))
     ) {
       this.disableSending("the api key cannot be sent as a request header");
+      // Every event this instance builds would carry that key, so queueing is pointless too.
+      this.queueingDisabled = true;
     }
   }
 
@@ -257,6 +266,14 @@ export class AvoNetworkCallsHandlerLite {
    */
   isSendingDisabled(): boolean {
     return this.sendingDisabled;
+  }
+
+  /**
+   * v2 only: true when queueing events would only grow the stored queue, because
+   * they could never be sent under any configuration. Always false on v1.
+   */
+  isQueueingDisabled(): boolean {
+    return this.queueingDisabled;
   }
 
   private disableSending(reason: string): void {
@@ -484,6 +501,7 @@ export class AvoNetworkCallsHandlerLite {
         return;
       }
       const group = groups[index];
+      const groupKey = groupKeys[index];
       const apiKey = group[0].apiKey;
       const env = group[0].env;
       const own = apiKey === this.apiKey && env === this.envName;
@@ -491,15 +509,18 @@ export class AvoNetworkCallsHandlerLite {
         if (error === null) {
           if (own) {
             this.permanentFailures = 0;
+          } else {
+            delete this.foreignFailures[groupKey];
           }
         } else {
           firstError = firstError || error;
-          if (!permanent || own) {
+          if (!permanent) {
             Array.prototype.push.apply(retryEvents, group);
-          }
-          // A permanent failure of events queued under another configuration is
-          // dropped: they carry their own api key and env, so a retry cannot pass.
-          if (permanent && own) {
+          } else if (own) {
+            // Kept: the api key and env are this page's, and a later page load —
+            // or the server catching up on a key it has not seen yet — can still
+            // deliver them. Sending stops, queueing does not.
+            Array.prototype.push.apply(retryEvents, group);
             this.permanentFailures += 1;
             if (
               !this.sendingDisabled &&
@@ -510,6 +531,15 @@ export class AvoNetworkCallsHandlerLite {
                   maxConsecutivePermanentFailures +
                   " times in a row"
               );
+            }
+          } else {
+            // Queued under another api key and env, which a retry cannot change.
+            // Retried a few times anyway, in case the refusal was about the
+            // moment rather than the key, then dropped.
+            const failures = (this.foreignFailures[groupKey] || 0) + 1;
+            this.foreignFailures[groupKey] = failures;
+            if (failures < maxConsecutivePermanentFailures) {
+              Array.prototype.push.apply(retryEvents, group);
             }
           }
         }

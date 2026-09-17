@@ -16,7 +16,8 @@ The public API is unchanged from 3.2.0: the same exports, constructor options an
   - accepts per-event gateway fields — `outputReference`, `originHint`, `appVersion` — as a third argument to `window.inspector.trackSchemaFromEvent` / `trackSchema`, including calls queued on the loader stub before the bundle loads. With `originHint` set and no `appVersion`, the event's `appVersion` is sent as `null`, which v2 records as `"unversioned"`. Avo Codegen events never carry these fields.
 
   - sends each queued event under the api key and env it was queued with — one request per pair — so events persisted by a GTM Preview page and flushed by a published one (or the reverse) keep their env;
-  - stops sending and queueing for the page, with one `console.error`, when the api key cannot be a request header, or after the API refuses the page's own events three times in a row (a 4xx other than 408/429, or a request the browser refuses to build). Network errors, timeouts and 5xx keep retrying.
+  - stops sending for the page, with one `console.error`, after the API refuses the page's own events three times in a row (a 4xx other than 408/429, or a request the browser refuses to build). Events stay queued and saved, so a later page load can still deliver them. Network errors, timeouts and 5xx keep retrying and never stop sending. Events queued under another api key and env are dropped after three permanent failures of that group, since nothing can change the key they carry;
+  - sends and queues nothing at all when the api key cannot be a request header, since every event would carry it.
 
   Without that client, a third argument is ignored entirely, `appVersion` included, and nothing above applies: v1 sends and retries exactly as 3.2.0.
 

@@ -235,42 +235,79 @@ describe.each(builds)("v2 (%s)", (_build, newHandler) => {
     expect(namesOf(onCompleted.mock.calls[0][1])).toEqual(["Dev"]);
   });
 
-  test("a 4xx for another configuration's events drops them; the same answer for this instance's events keeps them", () => {
+  test("another configuration's events are retried twice more after a 4xx, then dropped on the third", () => {
     const before = newHandler("revoked-key", "prod", "gtm-web");
+    const now = newHandler(apiKey, "prod", "gtm-web");
+    const retried: Array<string[] | undefined> = [];
+
+    [1, 2, 3].forEach(() => {
+      const onCompleted = jest.fn();
+      now.callInspectorWithBatchBody(
+        [before.bodyForEventSchemaCall("Revoked", [], null, null)],
+        onCompleted
+      );
+      respond(400);
+      retried.push(namesOf(onCompleted.mock.calls[0][1]));
+    });
+
+    expect(retried).toEqual([["Revoked"], ["Revoked"], []]);
+  });
+
+  test("a success for that configuration resets its count", () => {
+    const before = newHandler("other-key", "prod", "gtm-web");
+    const now = newHandler(apiKey, "prod", "gtm-web");
+    const attempt = (code: number): string[] | undefined => {
+      const onCompleted = jest.fn();
+      now.callInspectorWithBatchBody(
+        [before.bodyForEventSchemaCall("Other", [], null, null)],
+        onCompleted
+      );
+      respond(code);
+      return namesOf(onCompleted.mock.calls[0][1]);
+    };
+
+    attempt(400);
+    attempt(400); // one more permanent failure would drop the group
+    attempt(200); // but a success clears its count
+    expect(attempt(400)).toEqual(["Other"]);
+    expect(attempt(400)).toEqual(["Other"]);
+  });
+
+  test("this instance's own events are kept on a 4xx, so a later page load can still deliver them", () => {
     const now = newHandler(apiKey, "prod", "gtm-web");
     const onCompleted = jest.fn();
 
     now.callInspectorWithBatchBody(
-      [
-        before.bodyForEventSchemaCall("Revoked", [], null, null),
-        now.bodyForEventSchemaCall("Current", [], null, null)
-      ],
+      [now.bodyForEventSchemaCall("Current", [], null, null)],
       onCompleted
     );
     respond(400);
-    respond(400);
 
-    expect(sentRequests()).toHaveLength(2);
     expect(namesOf(onCompleted.mock.calls[0][1])).toEqual(["Current"]);
   });
 
-  test("a persisted api key that cannot be a header is dropped without opening a request", () => {
+  test("a persisted api key that cannot be a header opens no request, and is dropped after three attempts", () => {
     const before = newHandler("bad\r\nkey", "prod", undefined); // built on v1, where it is only a body field
     const now = newHandler(apiKey, "prod", "gtm-web");
-    const onCompleted = jest.fn();
+    const attempt = (): jest.Mock => {
+      const onCompleted = jest.fn();
+      now.callInspectorWithBatchBody(
+        [
+          before.bodyForEventSchemaCall("Unsendable", [], null, null),
+          now.bodyForEventSchemaCall("Current", [], null, null)
+        ],
+        onCompleted
+      );
+      respond(200); // answers this instance's own request; the other never opens one
+      return onCompleted;
+    };
 
-    now.callInspectorWithBatchBody(
-      [
-        before.bodyForEventSchemaCall("Unsendable", [], null, null),
-        now.bodyForEventSchemaCall("Current", [], null, null)
-      ],
-      onCompleted
-    );
-    respond(200);
-
+    const first = attempt();
     expect(sentRequests().map((r) => r.eventNames)).toEqual([["Current"]]);
-    expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
-    expect(onCompleted.mock.calls[0][1]).toEqual([]);
+    expect(namesOf(first.mock.calls[0][1])).toEqual(["Unsendable"]);
+
+    attempt();
+    expect(namesOf(attempt().mock.calls[0][1])).toEqual([]);
   });
 });
 
@@ -345,7 +382,7 @@ describe("through the batcher (full build)", () => {
     expect(storedNames()).toEqual([]);
   });
 
-  test("a transient failure keeps it queued; a 4xx for it drops it", async () => {
+  test("a transient failure keeps it queued, and so does a first 4xx", async () => {
     await previewLoadingPublishedQueue();
     respond(500);
     expect(storedNames()).toEqual(["Published"]);
@@ -353,6 +390,6 @@ describe("through the batcher (full build)", () => {
     jest.clearAllMocks();
     await previewLoadingPublishedQueue();
     respond(400);
-    expect(storedNames()).toEqual([]);
+    expect(storedNames()).toEqual(["Published"]);
   });
 });

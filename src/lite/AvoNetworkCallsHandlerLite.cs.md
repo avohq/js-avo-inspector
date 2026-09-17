@@ -23,12 +23,12 @@ Same shapes as the full handler, with the lite differences below:
 - `normalizeHint`, `webGtmTemplateClient = "gtm-web"`, `normalizeClient` — identical to the full handler: `client` is `"gtm-web"` only when the argument trims to exactly that string, otherwise `undefined`.
 - `client: string | undefined` and `trackingEndpoint` (v1 `https://api.avo.app/inspector/v1/track` / v2 `https://api.avo.app/inspector/v2/track`) — instance fields set once in the constructor.
 - `apiKey` — arrives trimmed from `AvoInspectorLite`.
-- `isHeaderValue`, `maxConsecutivePermanentFailures = 3`, `permanentFailures`, `sendingDisabled`, `isSendingDisabled()` — identical to the full handler.
+- `isHeaderValue`, `maxConsecutivePermanentFailures = 3`, `permanentFailures`, `foreignFailures`, `sendingDisabled`, `queueingDisabled`, `isSendingDisabled()`, `isQueueingDisabled()` — identical to the full handler.
 
 ## Functional requirements
 
 - `constructor(apiKey, envName, appName, appVersion, libVersion, client?)` — on v2, an api key or env that is not a header value stops sending immediately (one `console.error`).
-- `isSendingDisabled()` — `true` once v2 has stopped sending for this page; always `false` on v1.
+- `isSendingDisabled()` / `isQueueingDisabled()` — as in the full handler: sending stops for both triggers, queueing only for the unusable-api-key one.
 - `callInspectorWithBatchBody`, `callInspectorImmediately`, `bodyForSessionStartedCall`, `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — same guard, null filtering, empty-list short-circuit and sampling drop as the full handler. `fixStreamIds` is a no-op; `callInspectorImmediately` does not touch the stream id.
 
 ### Gateway coordinates (identical to the full handler)
@@ -42,7 +42,7 @@ Same shapes as the full handler, with the lite differences below:
 1. `body = JSON.stringify(events)`.
 2. **Uncompressed fast path (synchronous):** no `CompressionStream` OR `body.length < 1024` → string, `isGzipped=false`.
 3. **Compressed path (async):** `gzip(body)`; success → `Uint8Array`, `isGzipped=true`; `null` → uncompressed string.
-4. **v2 groups by queued api key and env** exactly as the full handler: one sequential request per group with headers from its bodies; own permanent failures (setup throw, 4xx other than 408/429) are retried and stop sending after 3 in a row; another configuration's permanent failures are dropped; the callback receives `(error, retryEvents)`. v1 sends one request and forwards the error alone. `sendTrackingRequest` POSTs to `this.trackingEndpoint`. v1: `Content-Type: text/plain` only. v2: `Content-Type: application/json`, `api-key` and `env` from the group, `X-Avo-Client: gtm-web`. Both: `Content-Encoding: gzip` only when gzipped; `timeout = AvoInspector.networkTimeout`. IMPORTANT: construction through `send` is inside a `try`/`catch` that reports `Failed to send request: …` via `onCompleted` and returns, so a rejected header cannot latch `sending`.
+4. **v2 groups by queued api key and env** exactly as the full handler: one sequential request per group with headers from its bodies; own permanent failures (setup throw, 4xx other than 408/429) are retried and stop sending after 3 in a row, while the batcher keeps queueing; another configuration's are retried too and dropped only after 3 for that group; the callback receives `(error, retryEvents)`. v1 sends one request and forwards the error alone. `sendTrackingRequest` POSTs to `this.trackingEndpoint`. v1: `Content-Type: text/plain` only. v2: `Content-Type: application/json`, `api-key` and `env` from the group, `X-Avo-Client: gtm-web`. Both: `Content-Encoding: gzip` only when gzipped; `timeout = AvoInspector.networkTimeout`. IMPORTANT: construction through `send` is inside a `try`/`catch` that reports `Failed to send request: …` via `onCompleted` and returns, so a rejected header cannot latch `sending`.
 5. `onload`: non-200 → Error; 200 → parse (failure → Error), adopt numeric `samplingRate`, `onCompleted(null)`. `onerror` / `ontimeout` → Errors.
 
 `gzip(body)` — UTF-8 → `"gzip"` `CompressionStream` → concatenated `Uint8Array`; `null` on any throw.

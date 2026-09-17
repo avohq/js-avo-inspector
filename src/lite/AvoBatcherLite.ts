@@ -55,12 +55,15 @@ export class AvoBatcher implements AvoBatcherType {
   }
 
   handleSessionStarted(): void {
-    if (this.networkCallsHandler.isSendingDisabled()) {
+    if (this.networkCallsHandler.isQueueingDisabled()) {
       return;
     }
     this.events.push(this.networkCallsHandler.bodyForSessionStartedCall());
     this.saveEvents();
 
+    if (this.networkCallsHandler.isSendingDisabled()) {
+      return;
+    }
     this.checkIfBatchNeedsToBeSent();
   }
 
@@ -72,9 +75,9 @@ export class AvoBatcher implements AvoBatcherType {
     eventSpecMetadata?: EventSpecMetadata,
     options?: TrackOptions
   ): void {
-    // v2 only: once the handler has stopped sending for this page, queueing would
-    // only grow the stored queue.
-    if (this.networkCallsHandler.isSendingDisabled()) {
+    // v2 only: when the events could never be sent under any configuration (an api
+    // key that cannot be a header), queueing would only grow the stored queue.
+    if (this.networkCallsHandler.isQueueingDisabled()) {
       return;
     }
     this.events.push(
@@ -99,6 +102,11 @@ export class AvoBatcher implements AvoBatcherType {
       );
     }
 
+    // v2 only: sending has stopped for this page, but the queue is kept and saved,
+    // so a later page load can still deliver these events.
+    if (this.networkCallsHandler.isSendingDisabled()) {
+      return;
+    }
     this.checkIfBatchNeedsToBeSent();
   }
 
