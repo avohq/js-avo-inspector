@@ -1,7 +1,50 @@
 import { AvoInspector } from "../AvoInspector";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
+import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
+import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
+import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
 
 import { error } from "../__tests__/constants";
+import {
+  trackSchemaFromEventWithOptions,
+  trackSchemaWithOptions,
+  withClient
+} from "./helpers/internalGateway";
+
+// Mocked so the validated/immediate-send path (fetchAndValidateEvent) can be
+// driven deterministically. Mirrors ValidationIntegration_test.ts's setup.
+jest.mock("../AvoStorage", () => ({
+  AvoStorage: jest.fn().mockImplementation(() => ({
+    isInitialized: jest.fn().mockReturnValue(true),
+    getItemAsync: jest.fn().mockResolvedValue(null),
+    getItem: jest.fn().mockReturnValue(null),
+    setItem: jest.fn()
+  }))
+}));
+jest.mock("../eventSpec/AvoEventSpecFetcher");
+jest.mock("../eventSpec/AvoEventSpecCache");
+
+const mockEventSpecResponse: EventSpecResponse = {
+  events: [
+    {
+      branchId: "main",
+      baseEventId: "evt_test",
+      variantIds: [],
+      props: {
+        required_prop: {
+          type: "string",
+          required: true
+        }
+      }
+    }
+  ],
+  metadata: {
+    schemaId: "schema_123",
+    branchId: "main",
+    latestActionId: "action_456"
+  }
+};
 
 describe("Initialization", () => {
   test("Api Key is set", () => {
@@ -238,5 +281,189 @@ describe("Initialization", () => {
         version
       });
     }).toThrow(error.VERSION);
+  });
+});
+
+describe("internal gateway methods (web GTM template only)", () => {
+  test("_trackSchemaFromEventWithOptions accepts gateway options and returns the schema", async () => {
+    const inspector = new AvoInspector({
+      apiKey: "test-key",
+      env: AvoInspectorEnv.Prod,
+      version: "1.0.0"
+    });
+
+    const schema = await trackSchemaFromEventWithOptions(
+      inspector,
+      "test_event",
+      { a: 1 },
+      { outputReference: "meta-x7k2q", originHint: "web" }
+    );
+
+    expect(schema).toEqual([{ propertyName: "a", propertyType: "int" }]);
+  });
+
+  test("_trackSchemaWithOptions accepts gateway options", async () => {
+    const inspector = new AvoInspector({
+      apiKey: "test-key",
+      env: AvoInspectorEnv.Prod,
+      version: "1.0.0"
+    });
+
+    await expect(
+      trackSchemaWithOptions(
+        inspector,
+        "test_event",
+        [{ propertyName: "a", propertyType: "int" }],
+        { outputReference: "meta-x7k2q", originHint: "web" }
+      )
+    ).resolves.toBeUndefined();
+  });
+
+  test("the public methods delegate to the internal ones with no options, even when JS passes a third argument", async () => {
+    const inspector = new AvoInspector({
+      apiKey: "test-key",
+      env: AvoInspectorEnv.Prod,
+      version: "1.0.0"
+    });
+    const fromEventSpy = jest.spyOn(
+      inspector as any,
+      "_trackSchemaFromEventWithOptions"
+    );
+    const schemaSpy = jest.spyOn(inspector as any, "_trackSchemaWithOptions");
+    const schema = [{ propertyName: "a", propertyType: "int" }];
+
+    await (inspector as any).trackSchemaFromEvent("Ev", { a: 1 }, { originHint: "web" });
+    await (inspector as any).trackSchema("Ev", schema, { originHint: "web" });
+
+    expect(fromEventSpy.mock.calls).toEqual([["Ev", { a: 1 }, undefined]]);
+    expect(schemaSpy.mock.calls).toEqual([["Ev", schema, undefined]]);
+  });
+});
+
+describe("TrackOptions on the validated/immediate-send path", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    (EventSpecCache as jest.Mock).mockImplementation(() => ({
+      contains: jest.fn().mockReturnValue(true),
+      get: jest.fn().mockReturnValue(mockEventSpecResponse),
+      set: jest.fn()
+    }));
+
+    jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
+      fetch: jest.fn().mockResolvedValue(mockEventSpecResponse)
+    }) as any);
+  });
+
+  test("bodyForEventSchemaCall is called with options as the 7th arg and the immediately-sent body carries the hint fields", async () => {
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(
+      withClient(
+        { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+        "gtm-web"
+      )
+    );
+
+    const bodyForEventSchemaCallSpy = jest.spyOn(
+      AvoNetworkCallsHandler.prototype as any,
+      "bodyForEventSchemaCall"
+    );
+
+    const callInspectorImmediatelySpy = jest
+      .spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      )
+      .mockImplementation((...args: any[]) => {
+        args[1](null);
+      });
+
+    const options = { outputReference: "meta-x7k2q", originHint: "web" };
+
+    await trackSchemaFromEventWithOptions(
+      inspector,
+      "test_event",
+      { required_prop: "test_value" },
+      options
+    );
+
+    // options forwarded as the 7th positional arg to bodyForEventSchemaCall
+    expect(bodyForEventSchemaCallSpy).toHaveBeenCalledTimes(1);
+    expect(bodyForEventSchemaCallSpy.mock.calls[0][6]).toEqual(options);
+
+    // ...and the body that was actually sent immediately carries the hints
+    expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
+    const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+    expect(eventBody.outputReference).toBe("meta-x7k2q");
+    expect(eventBody.originHint).toBe("web");
+
+    bodyForEventSchemaCallSpy.mockRestore();
+  });
+
+  test("without a client the immediately-sent body leaves the hint fields out (v1)", async () => {
+    const inspector = new AvoInspector({
+      apiKey: "test-key",
+      env: AvoInspectorEnv.Dev,
+      version: "1.0.0"
+    });
+
+    const callInspectorImmediatelySpy = jest
+      .spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      )
+      .mockImplementation((...args: any[]) => {
+        args[1](null);
+      });
+
+    await trackSchemaFromEventWithOptions(
+      inspector,
+      "test_event",
+      { required_prop: "test_value" },
+      { outputReference: "meta-x7k2q", originHint: "web" }
+    );
+
+    expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
+    const eventBody = callInspectorImmediatelySpy.mock.calls[0][0] as any;
+    expect(Object.prototype.hasOwnProperty.call(eventBody, "outputReference")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(eventBody, "originHint")).toBe(false);
+  });
+
+  test("when the immediate send fails, the fallback avoBatcher.handleTrackSchema is called with options as the 6th arg and undefined eventSpecMetadata", async () => {
+    const inspector = new AvoInspector({
+      apiKey: "test-key",
+      env: AvoInspectorEnv.Dev,
+      version: "1.0.0"
+    });
+
+    jest
+      .spyOn(
+        (inspector as any).avoNetworkCallsHandler,
+        "callInspectorImmediately"
+      )
+      .mockImplementation((...args: any[]) => {
+        args[1](new Error("Network error"));
+      });
+
+    const batcherHandleTrackSchemaSpy = jest.spyOn(
+      inspector.avoBatcher,
+      "handleTrackSchema"
+    );
+
+    const options = { outputReference: "meta-x7k2q", originHint: "web" };
+
+    await trackSchemaFromEventWithOptions(
+      inspector,
+      "test_event",
+      { required_prop: "test_value" },
+      options
+    );
+
+    expect(batcherHandleTrackSchemaSpy).toHaveBeenCalledTimes(1);
+    const call = batcherHandleTrackSchemaSpy.mock.calls[0];
+    // eventSpecMetadata slot (5th arg, index 4) stays undefined on this fallback
+    expect(call[4]).toBeUndefined();
+    // options threaded as the 6th arg (index 5) so the hints aren't dropped
+    expect(call[5]).toEqual(options);
   });
 });

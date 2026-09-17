@@ -1,7 +1,7 @@
 import { AvoInspectorEnv, type AvoInspectorEnvValueType } from "../AvoInspectorEnv";
 import { AvoSchemaParserLite as AvoSchemaParser } from "./AvoSchemaParserLite";
 import { AvoBatcher } from "./AvoBatcherLite";
-import { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler, type EventProperty } from "./AvoNetworkCallsHandlerLite";
+import { AvoNetworkCallsHandlerLite as AvoNetworkCallsHandler, type EventProperty, type TrackOptions } from "./AvoNetworkCallsHandlerLite";
 import { AvoStorage } from "../AvoStorage";
 import { isValueEmpty } from "../utils";
 
@@ -79,7 +79,27 @@ export class AvoInspectorLite {
         "[Avo Inspector] No API key provided. Inspector can't operate without API key."
       );
     } else {
-      this.apiKey = options.apiKey;
+      // Trimmed once, here, so only the trimmed value is ever stored — on both
+      // transports. A key pasted out of a config file or read from an env var
+      // keeps its trailing newline, which on v2 has to survive being a request
+      // header. (On v1 the body is the only copy; v1 does not trim it either, so
+      // the untrimmed 3.2.0 behaviour was a failed key lookup, not a working send.)
+      //
+      // This is deliberately not a duplicate of what the platform already does.
+      // XMLHttpRequest strips surrounding whitespace from a header value before
+      // validating it, so a trailing-newline key reaches the server trimmed with
+      // no error — verified against a real server, not read off the spec. But it
+      // does that to the header only. The same key also travels in the request
+      // body, which nothing trims, so leaning on the platform is what would
+      // CREATE a divergence rather than avoid one: the header would carry "key"
+      // while the body carried the raw value. v2 reads the header and ignores
+      // the body copy, but that copy exists precisely so one body shape also
+      // serves v1 — and v1 reads its api key from the body.
+      //
+      // Trimming at the single source keeps the two identical, for 3 bytes
+      // gzipped. It is not a substitute for the send path's try/catch: an
+      // embedded control character survives trim and is still caught there.
+      this.apiKey = options.apiKey.trim();
     }
 
     if (isValueEmpty(options.version)) {
@@ -109,14 +129,49 @@ export class AvoInspectorLite {
       this.environment.toString(),
       options.appName || "",
       this.version,
-      libVersion
+      libVersion,
+      // INTERNAL: the web GTM tag template's client, which selects the v2
+      // transport. Only the script-tag bootstrap sets it (src/browser.js, from
+      // window.inspector.__CLIENT__), so it is deliberately not in the options
+      // type. Without it the SDK stays on v1 exactly as 3.2.0.
+      (options as typeof options & { _client?: string })._client
     );
     this.avoBatcher = new AvoBatcher(this.avoNetworkCallsHandler);
   }
 
+  // Not a thin delegation: 3.2.0's public methods were async with the whole body
+  // in a try/catch, so even a call without a receiver (a destructured method)
+  // logged and resolved rather than throwing, and still does.
   async trackSchemaFromEvent(
     eventName: string,
     eventProperties: Record<string, any>
+  ): Promise<EventProperty[]> {
+    try {
+      return await this._trackSchemaFromEventWithOptions(
+        eventName,
+        eventProperties,
+        undefined
+      );
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
+      return [];
+    }
+  }
+
+  // INTERNAL — not public API. `trackSchemaFromEvent` with the web GTM tag template's
+  // gateway options, mirroring the full build's internal method (the script-tag
+  // bootstrap uses the full build). Private and underscore-named like
+  // `_avoFunctionTrackSchemaFromEvent`, so it stays out of the typings (a line
+  // comment, not JSDoc, so none of this is emitted into the .d.ts either). The
+  // options have an effect only when the instance has a client (v2); without
+  // one they are ignored entirely.
+  private async _trackSchemaFromEventWithOptions(
+    eventName: string,
+    eventProperties: Record<string, any>,
+    options: TrackOptions | undefined
   ): Promise<EventProperty[]> {
     try {
       if (AvoInspectorLite.shouldLog) {
@@ -129,7 +184,7 @@ export class AvoInspectorLite {
       }
 
       const eventSchema = await this.extractSchema(eventProperties, false);
-      this.trackSchemaInternal(eventName, eventSchema, null, null);
+      this.trackSchemaInternal(eventName, eventSchema, null, null, options);
       return eventSchema;
     } catch (e) {
       console.error(
@@ -178,6 +233,33 @@ export class AvoInspectorLite {
     }>
   ): Promise<void> {
     try {
+      await this._trackSchemaWithOptions(eventName, eventSchema, undefined);
+    } catch (e) {
+      console.error(
+        "Avo Inspector: something went wrong. Please report to support@avo.app.",
+        e
+      );
+    }
+  }
+
+  // INTERNAL — not public API. `trackSchema` with the web GTM tag template's
+  // gateway options, mirroring the full build's internal method (the script-tag
+  // bootstrap uses the full build). Private and underscore-named like
+  // `_avoFunctionTrackSchemaFromEvent`, so it stays out of the typings (a line
+  // comment, not JSDoc, so none of this is emitted into the .d.ts either). The
+  // options have an effect only when the instance has a client (v2); without
+  // one they are ignored entirely.
+  private async _trackSchemaWithOptions(
+    eventName: string,
+    eventSchema: Array<{
+      propertyName: string;
+      propertyType: string;
+      encryptedPropertyValue?: string;
+      children?: any;
+    }>,
+    options: TrackOptions | undefined
+  ): Promise<void> {
+    try {
       if (AvoInspectorLite.shouldLog) {
         console.log(
           "Avo Inspector: supplied event " +
@@ -187,7 +269,7 @@ export class AvoInspectorLite {
         );
       }
 
-      this.trackSchemaInternal(eventName, eventSchema, null, null);
+      this.trackSchemaInternal(eventName, eventSchema, null, null, options);
     } catch (e) {
       console.error(
         "Avo Inspector: something went wrong. Please report to support@avo.app.",
@@ -205,14 +287,17 @@ export class AvoInspectorLite {
       children?: any;
     }>,
     eventId: string | null,
-    eventHash: string | null
+    eventHash: string | null,
+    options?: TrackOptions
   ): void {
     try {
       this.avoBatcher.handleTrackSchema(
         eventName,
         eventSchema,
         eventId,
-        eventHash
+        eventHash,
+        undefined,
+        options
       );
     } catch (e) {
       console.error(

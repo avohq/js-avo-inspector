@@ -273,6 +273,14 @@ You can control the network timeout for the SDK. Default is 2 seconds.
 Inspector.AvoInspector.networkTimeout = 5000;
 ```
 
+# Maintainers: web GTM template support is internal
+
+The Avo web GTM tag template reaches features that are not part of this SDK's public API: the
+`/inspector/v2/track` transport and per-event gateway fields. They are reachable only through the
+script-tag build, when `window.inspector.__CLIENT__` is `"gtm-web"`. Everything else — npm full,
+npm lite and a regular script tag — sends to `/inspector/v1/track` exactly as 3.2.0 did. See
+`src/browser.js` and `src/AvoNetworkCallsHandler.cs.md`. Don't document these for SDK users.
+
 ## Author
 
 Avo (https://www.avo.app), friends@avo.app

@@ -5,6 +5,7 @@ import { AvoStorage } from "../AvoStorage";
 import { AvoStreamId } from "../AvoStreamId";
 
 import { defaultOptions, networkCallType } from "./constants";
+import { trackSchemaWithOptions, withClient } from "./helpers/internalGateway";
 
 const inspectorVersion = process.env.npm_package_version || "";
 
@@ -113,6 +114,98 @@ describe("Batcher", () => {
     inspector.avoBatcher.handleSessionStarted();
 
     expect(checkBatchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("handleTrackSchema forwards options to bodyForEventSchemaCall with validatedBranchId explicitly undefined", () => {
+    const bodyForEventSchemaCallSpy = jest.spyOn(
+      AvoNetworkCallsHandler.prototype as any,
+      "bodyForEventSchemaCall"
+    );
+
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { outputReference: "meta-x7k2q" }
+    );
+
+    expect(bodyForEventSchemaCallSpy).toHaveBeenCalledWith(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      undefined,
+      { outputReference: "meta-x7k2q" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).outputReference).toEqual("meta-x7k2q");
+      expect(Object.prototype.hasOwnProperty.call(events[0], "originHint")).toEqual(false);
+    }
+
+    bodyForEventSchemaCallSpy.mockRestore();
+  });
+
+  test("handleTrackSchema forwards options to storage with only originHint set (outputReference stays absent)", () => {
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "android" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).originHint).toEqual("android");
+      expect(Object.prototype.hasOwnProperty.call(events[0], "outputReference")).toEqual(false);
+    }
+  });
+
+  test("trackSchema entered through the internal AvoInspector method threads options through to the storage round trip", async () => {
+    // The internal client selects v2, the only transport that sends the hints.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    await trackSchemaWithOptions(
+      inspector,
+      "event name",
+      [{ propertyName: "prop0", propertyType: "string" }],
+      { outputReference: "meta-x7k2q" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).outputReference).toEqual("meta-x7k2q");
+    }
   });
 
   test("checkIfBatchNeedsToBeSent is called on handleTrackSchema", () => {
@@ -273,6 +366,83 @@ describe("Batcher", () => {
 
     dateNowSpy.mockRestore();
     streamIdSpy.mockRestore();
+  });
+
+  test("handleTrackSchema storage round trip with a client: originHint + appVersion set -> stored event appVersion is the given appVersion", () => {
+    // Options apply only on v2, so this needs the internal client.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios", appVersion: "5.1.0" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toEqual("5.1.0");
+    }
+  });
+
+  test("handleTrackSchema storage round trip with a client: originHint set, appVersion absent -> stored event appVersion is null (JSON storage keeps null)", () => {
+    // The origin-scoped null is v2-only, so this needs a client.
+    const inspector = new AvoInspector(withClient(defaultOptions, "gtm-web"));
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toBeNull();
+      expect(Object.prototype.hasOwnProperty.call(events[0], "appVersion")).toEqual(true);
+    }
+  });
+
+  test("handleTrackSchema storage round trip without a client: originHint set, appVersion absent -> options ignored, stored event keeps the configured version", () => {
+    // Positive control is the test above: with a client the same call stores null.
+    const inspector = new AvoInspector(defaultOptions);
+    inspector.enableLogging(false);
+
+    AvoInspector.avoStorage.removeItem(AvoBatcher.cacheKey);
+
+    inspector.avoBatcher.handleTrackSchema(
+      "event name",
+      [],
+      null,
+      null,
+      undefined,
+      { originHint: "ios" }
+    );
+
+    const events: Array<SessionStartedBody | EventSchemaBody> | null = AvoInspector.avoStorage.getItem(AvoBatcher.cacheKey);
+
+    expect(events).not.toBeNull();
+    if (events !== null) {
+      expect(events.length).toEqual(1);
+      expect((events[0] as EventSchemaBody).appVersion).toEqual(defaultOptions.version);
+      expect(Object.prototype.hasOwnProperty.call(events[0], "originHint")).toEqual(false);
+    }
   });
 
   test("Only latest 1000 events are stored in the storage", (done) => {

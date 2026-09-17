@@ -30,7 +30,11 @@ const requestMsg = {
   TIMEOUT: "Request timed out"
 };
 
+// The v1 endpoint, used whenever no client is configured — as in 3.2.0.
 const trackingEndpoint = "https://api.avo.app/inspector/v1/track";
+
+// The v2 endpoint, used only when a client is configured.
+const trackingEndpointV2 = "https://api.avo.app/inspector/v2/track";
 
 const sessionTimeMs = 5 * 60 * 1000;
 
@@ -53,5 +57,6 @@ export {
   requestMsg,
   sessionTimeMs,
   type,
-  trackingEndpoint
+  trackingEndpoint,
+  trackingEndpointV2
 };

@@ -6,7 +6,11 @@ import { AvoStreamId } from "../AvoStreamId";
 
 import xhrMock from "../__mocks__/xhr";
 
-import { defaultOptions } from "./constants";
+import {
+  defaultOptions,
+  trackingEndpoint,
+  trackingEndpointV2
+} from "./constants";
 
 // Real web-standard CompressionStream implementation from Node, installed
 // into the jsdom test environment so tests exercise real gzip compression.
@@ -30,17 +34,28 @@ afterAll(() => {
   streamIdSpy.mockRestore();
 });
 
-function newHandler(): AvoNetworkCallsHandler {
-  return new AvoNetworkCallsHandler(apiKey, env, "", version, inspectorVersion);
+// Gzip applies to both transports, as it did to v1 in 3.2.0. Handlers default to
+// no client (v1); pass one to get v2.
+function newHandler(client?: string): AvoNetworkCallsHandler {
+  return new AvoNetworkCallsHandler(
+    apiKey,
+    env,
+    "",
+    version,
+    inspectorVersion,
+    undefined, // publicEncryptionKey
+    client
+  );
 }
 
-function newLiteHandler(): AvoNetworkCallsHandlerLite {
+function newLiteHandler(client?: string): AvoNetworkCallsHandlerLite {
   return new AvoNetworkCallsHandlerLite(
     apiKey,
     env,
     "",
     version,
-    inspectorVersion
+    inspectorVersion,
+    client
   );
 }
 
@@ -124,9 +139,12 @@ describe("NetworkCallsHandler gzip compression", () => {
 
       await waitFor(() => xhrMock.send.mock.calls.length > 0);
 
-      const headers = sentHeaders();
-      expect(headers["Content-Type"]).toBe("text/plain");
-      expect(headers["Content-Encoding"]).toBe("gzip");
+      // No client: v1, whose compressed request is 3.2.0's.
+      expect(xhrMock.open).toHaveBeenCalledWith("POST", trackingEndpoint, true);
+      expect(xhrMock.setRequestHeader.mock.calls).toEqual([
+        ["Content-Type", "text/plain"],
+        ["Content-Encoding", "gzip"]
+      ]);
 
       const body = sentBody();
       expect(typeof body).not.toBe("string");
@@ -265,6 +283,123 @@ describe("NetworkCallsHandler gzip compression", () => {
       expect(customCallback).toHaveBeenCalledTimes(1);
       expect(customCallback).toHaveBeenCalledWith(new Error("Request timed out"));
     });
+
+    test("a rejected header on the compressed path still reports through onCompleted", async () => {
+      // The compressed send runs inside gzip(...).then(...), which has no
+      // rejection handler. A synchronous failure there has to come back through
+      // onCompleted anyway, or the `sending` guard latches and the batcher stops
+      // for the rest of the page — the same deadlock as on the sync path, but
+      // arriving as an unhandled rejection instead of a thrown error.
+      const handler = newHandler();
+      const onCompleted = jest.fn();
+
+      xhrMock.setRequestHeader.mockImplementationOnce(() => {
+        throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      });
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), onCompleted);
+      await waitFor(() => onCompleted.mock.calls.length > 0);
+
+      expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(xhrMock.send).not.toHaveBeenCalled();
+
+      // The guard was cleared, so the next batch still goes out.
+      handler.callInspectorWithBatchBody(smallEvents(handler), jest.fn());
+      expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    });
+
+    test("the lite handler behaves the same on the compressed path", async () => {
+      const handler = newLiteHandler();
+      const onCompleted = jest.fn();
+
+      xhrMock.setRequestHeader.mockImplementationOnce(() => {
+        throw new SyntaxError("Failed to execute 'setRequestHeader'");
+      });
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), onCompleted);
+      await waitFor(() => onCompleted.mock.calls.length > 0);
+
+      expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+
+      handler.callInspectorWithBatchBody(smallEvents(handler), jest.fn());
+      expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("with a client (v2)", () => {
+    test("large payloads are gzipped and sent to v2 with the v2 headers plus Content-Encoding: gzip", async () => {
+      const handler = newHandler("gtm-web");
+      const events = largeEvents(handler);
+      const expectedJson = JSON.stringify(events);
+      expect(expectedJson.length).toBeGreaterThan(1024);
+
+      handler.callInspectorWithBatchBody(events, customCallback);
+
+      await waitFor(() => xhrMock.send.mock.calls.length > 0);
+
+      expect(xhrMock.open).toHaveBeenCalledWith(
+        "POST",
+        trackingEndpointV2,
+        true
+      );
+      expect(xhrMock.setRequestHeader.mock.calls).toEqual([
+        ["Content-Type", "application/json"],
+        ["api-key", apiKey],
+        ["env", env],
+        ["X-Avo-Client", "gtm-web"],
+        ["Content-Encoding", "gzip"]
+      ]);
+      expect(gunzipToString(sentBody())).toBe(expectedJson);
+    });
+
+    test("the same events gunzip to the same body on v1 and v2", async () => {
+      // Positive control for the pair: gzip compresses whatever body the
+      // transport built, and with no options the two bodies are identical.
+      const v1 = newHandler();
+      const v2 = newHandler("gtm-web");
+
+      // messageId and createdAt are per body, so they are blanked.
+      const comparable = (json: string) =>
+        JSON.parse(json).map((event: any) => ({
+          ...event,
+          messageId: "",
+          createdAt: ""
+        }));
+
+      v1.callInspectorWithBatchBody(largeEvents(v1), customCallback);
+      await waitFor(() => xhrMock.send.mock.calls.length > 0);
+      const v1Events = comparable(gunzipToString(xhrMock.send.mock.calls[0][0]));
+      xhrMock.onload();
+      jest.clearAllMocks();
+
+      v2.callInspectorWithBatchBody(largeEvents(v2), customCallback);
+      await waitFor(() => xhrMock.send.mock.calls.length > 0);
+
+      expect(comparable(gunzipToString(sentBody()))).toEqual(v1Events);
+    });
+
+    test("a rejected v2 header on the compressed path still reports through onCompleted", async () => {
+      const handler = newHandler("gtm-web");
+      const onCompleted = jest.fn();
+
+      // The X-Avo-Client call is the fourth setRequestHeader on v2.
+      xhrMock.setRequestHeader
+        .mockImplementationOnce(() => {})
+        .mockImplementationOnce(() => {})
+        .mockImplementationOnce(() => {})
+        .mockImplementationOnce(() => {
+          throw new SyntaxError("Failed to execute 'setRequestHeader'");
+        });
+
+      handler.callInspectorWithBatchBody(largeEvents(handler), onCompleted);
+      await waitFor(() => onCompleted.mock.calls.length > 0);
+
+      expect(onCompleted.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(xhrMock.send).not.toHaveBeenCalled();
+
+      handler.callInspectorWithBatchBody(smallEvents(handler), jest.fn());
+      expect(xhrMock.send).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("when CompressionStream is unavailable", () => {
@@ -309,10 +444,33 @@ describe("NetworkCallsHandlerLite gzip compression", () => {
 
     await waitFor(() => xhrMock.send.mock.calls.length > 0);
 
-    const headers = sentHeaders();
-    expect(headers["Content-Type"]).toBe("text/plain");
-    expect(headers["Content-Encoding"]).toBe("gzip");
+    // No client: v1, whose compressed request is 3.2.0's.
+    expect(xhrMock.open).toHaveBeenCalledWith("POST", trackingEndpoint, true);
+    expect(xhrMock.setRequestHeader.mock.calls).toEqual([
+      ["Content-Type", "text/plain"],
+      ["Content-Encoding", "gzip"]
+    ]);
 
+    expect(gunzipToString(sentBody())).toBe(expectedJson);
+  });
+
+  test("with a client, large payloads are gzipped and sent to v2 with the v2 headers", async () => {
+    const handler = newLiteHandler("gtm-web");
+    const events = largeEvents(handler);
+    const expectedJson = JSON.stringify(events);
+
+    handler.callInspectorWithBatchBody(events, customCallback);
+
+    await waitFor(() => xhrMock.send.mock.calls.length > 0);
+
+    expect(xhrMock.open).toHaveBeenCalledWith("POST", trackingEndpointV2, true);
+    expect(xhrMock.setRequestHeader.mock.calls).toEqual([
+      ["Content-Type", "application/json"],
+      ["api-key", apiKey],
+      ["env", env],
+      ["X-Avo-Client", "gtm-web"],
+      ["Content-Encoding", "gzip"]
+    ]);
     expect(gunzipToString(sentBody())).toBe(expectedJson);
   });
 

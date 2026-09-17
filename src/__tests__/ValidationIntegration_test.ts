@@ -3,6 +3,10 @@ import { AvoInspectorEnv } from "../AvoInspectorEnv";
 import { AvoEventSpecFetcher } from "../eventSpec/AvoEventSpecFetcher";
 import { EventSpecCache } from "../eventSpec/AvoEventSpecCache";
 import type { EventSpecResponse, EventSpecResponseWire } from "../eventSpec/AvoEventSpecFetchTypes";
+import {
+  trackSchemaFromEventWithOptions,
+  withClient
+} from "./helpers/internalGateway";
 
 // Mock dependencies
 jest.mock("../AvoStorage", () => ({
@@ -509,12 +513,18 @@ describe("Validation Integration", () => {
       }));
     });
 
-    test("should validate events from Avo Functions (_avoFunctionTrackSchemaFromEvent)", async () => {
-      const inspector = new AvoInspector({
-        apiKey: "test-key",
-        env: AvoInspectorEnv.Dev,
-        version: "1.0.0"
-      });
+    // On both transports: the Codegen path follows the same transport selection
+    // and never carries the hint fields.
+    test.each([
+      ["no client (v1)", undefined],
+      ["a client (v2)", "gtm-web"]
+    ])("should validate events from Avo Functions (_avoFunctionTrackSchemaFromEvent), with %s", async (_transport, client) => {
+      const inspector = new AvoInspector(
+        withClient(
+          { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+          client
+        )
+      );
 
       callInspectorImmediatelySpy = jest
         .spyOn(
@@ -548,6 +558,78 @@ describe("Validation Integration", () => {
       // eventId should be the baseEventId from spec (or event_id_123 if no spec match)
       expect(eventBody.eventId).toBeDefined();
       expect(eventBody.eventHash).toBe("event_hash_456");
+
+      // Regression: _avoFunctionTrackSchemaFromEvent's validated branch keeps
+      // calling sendEventWithValidation with options undefined (Codegen-emitted
+      // calls have no notion of a GTM tag's per-instance gateway config), so a
+      // Codegen-tracked event's body must never carry the gateway hint fields.
+      expect(Object.prototype.hasOwnProperty.call(eventBody, 'outputReference')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(eventBody, 'originHint')).toBe(false);
+      // Codegen-tracked events never carry an originHint, so the appVersion
+      // rule leaves the SDK's root configured version in place, unreplaced.
+      expect(eventBody.appVersion).toBe("1.0.0");
+    });
+
+    test("with a client, the internal trackSchemaFromEvent with options.appVersion on the validated path sends the given appVersion when originHint is set", async () => {
+      const inspector = new AvoInspector(
+        withClient(
+          { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+          "gtm-web"
+        )
+      );
+
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      await trackSchemaFromEventWithOptions(
+        inspector,
+        "test_event",
+        { required_prop: "test", optional_prop: 50, status: "active" },
+        { originHint: "ios", appVersion: "5.1.0" }
+      );
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
+
+      expect(eventBody.appVersion).toBe("5.1.0");
+    });
+
+    test("the internal trackSchemaFromEvent with options on the validated path includes both hint fields (contrast with Avo Functions path above)", async () => {
+      // The internal client selects v2, the only transport that sends the hints.
+      const inspector = new AvoInspector(
+        withClient(
+          { apiKey: "test-key", env: AvoInspectorEnv.Dev, version: "1.0.0" },
+          "gtm-web"
+        )
+      );
+
+      callInspectorImmediatelySpy = jest
+        .spyOn(
+          (inspector as any).avoNetworkCallsHandler,
+          "callInspectorImmediately"
+        )
+        .mockImplementation((...args: any[]) => {
+          args[1](null);
+        });
+
+      // Use the manual tracking method (in scope for hints), unlike the
+      // Avo-Function path exercised above.
+      await trackSchemaFromEventWithOptions(
+        inspector,
+        "test_event",
+        { required_prop: "test", optional_prop: 50, status: "active" },
+        { outputReference: "meta-x7k2q", originHint: "web" }
+      );
+
+      const eventBody = callInspectorImmediatelySpy.mock.calls[0][0];
+
+      expect(eventBody.outputReference).toBe("meta-x7k2q");
+      expect(eventBody.originHint).toBe("web");
     });
 
     test("should send Avo Function events immediately when validation is available", async () => {

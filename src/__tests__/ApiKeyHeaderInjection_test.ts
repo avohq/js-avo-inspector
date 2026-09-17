@@ -1,0 +1,249 @@
+/**
+ * CR/LF in the `api-key` header value.
+ *
+ * Until v2 the api key travelled only inside the JSON body, where a newline is
+ * just an escaped character and cannot break framing. Moving it into a request
+ * header creates, in principle, a header-injection vector: a key containing
+ * CR/LF could terminate the header and append attacker-chosen ones. Every Avo
+ * sender that moved the key into a header inherits that question.
+ *
+ * In a browser the platform closes it — `setRequestHeader` validates the value
+ * and throws rather than serializing it, so nothing can be injected. This file
+ * pins that, and pins what happens to the send once it faults.
+ *
+ * Three separate protections are involved, and it is worth not confusing them.
+ * The caller never sees a fault: that is the outer `try`/`catch` in
+ * `trackSchemaFromEvent` and `trackSchema`, which predates the header migration.
+ * A thrown header must not end telemetry for the page: the send path's own
+ * `try`/`catch` reports it through the completion callback, so the `sending`
+ * re-entrancy guard is released (pinned in TrackingHeaders_test.ts). And a key
+ * the browser refuses would fail every send, so v2 now stops at construction
+ * and never sets the header at all (V2StopSending_test.ts).
+ *
+ * Only v2 puts the key in a header, and v2 is selected by the internal client
+ * (the web GTM template's), so the header tests below configure one. Without a client the SDK is on v1,
+ * where the key travels only in the body as it did in 3.2.0; the last block
+ * pins that.
+ *
+ * Deliberately no import of `../__mocks__/xhr`: these tests run against jsdom's
+ * real XMLHttpRequest, so the validation being relied on is the platform's own
+ * rather than an emulation of it. Only `send` is stubbed, to keep the suite off
+ * the network.
+ */
+import { AvoInspector } from "../AvoInspector";
+import { AvoInspectorLite } from "../lite/AvoInspectorLite";
+
+import { defaultOptions } from "./constants";
+import { withClient } from "./helpers/internalGateway";
+
+/** A key that would inject a header if the value were serialized verbatim. */
+const crlfKey = "api-key-xxx\r\nX-Injected: yes";
+
+/**
+ * Builds an inspector that flushes on every event.
+ *
+ * The batch size has to be set AFTER construction: the constructor assigns the
+ * static from the environment (30 in prod), so setting it first is silently
+ * undone. Getting that wrong makes every assertion below vacuous, since nothing
+ * ever reaches the network — which is what the control test at the end exists
+ * to catch.
+ */
+const flushingInspector = (apiKey: string): AvoInspector =>
+  flushingInspectorWith(withClient({ ...defaultOptions, apiKey }, "gtm-web"));
+
+/** No client, so v1: the key travels only in the body. */
+const flushingV1Inspector = (apiKey: string): AvoInspector =>
+  flushingInspectorWith({ ...defaultOptions, apiKey });
+
+const flushingInspectorWith = (
+  options: ConstructorParameters<typeof AvoInspector>[0]
+): AvoInspector => {
+  const inspector = new AvoInspector(options);
+  inspector.enableLogging(false);
+  AvoInspector.batchSize = 1;
+  return inspector;
+};
+
+const flushingLiteInspector = (apiKey: string): AvoInspectorLite => {
+  const inspector = new AvoInspectorLite(
+    withClient({ ...defaultOptions, apiKey }, "gtm-web")
+  );
+  inspector.enableLogging(false);
+  AvoInspectorLite.batchSize = 1;
+  return inspector;
+};
+
+let sendSpy: jest.SpyInstance;
+
+beforeEach(() => {
+  // Stub only send: open() and setRequestHeader() stay real, which is the whole
+  // point — the validation under test is theirs.
+  sendSpy = jest
+    .spyOn(XMLHttpRequest.prototype, "send")
+    .mockImplementation(() => {});
+});
+
+afterEach(() => {
+  sendSpy.mockRestore();
+  jest.clearAllMocks();
+});
+
+describe("the platform rejects a header value that could inject", () => {
+  const setHeader = (value: string): (() => void) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "https://api.avo.app/inspector/v2/track", true);
+    return () => {
+      xhr.setRequestHeader("api-key", value);
+    };
+  };
+
+  test("CR, LF, CRLF and NUL are all refused", () => {
+    expect(setHeader(crlfKey)).toThrow();
+    expect(setHeader("api-key-xxx\nX-Injected: yes")).toThrow();
+    expect(setHeader("api-key-xxx\rX-Injected: yes")).toThrow();
+    expect(setHeader("api-key-xxx\u0000")).toThrow();
+  });
+
+  test("a plain key is accepted", () => {
+    expect(setHeader("api-key-xxx")).not.toThrow();
+  });
+
+  test("a trailing newline is trimmed, not injected", () => {
+    // Worth pinning because it is the realistic typo — a key pasted out of a
+    // file or an env var. The header algorithm strips surrounding HTTP
+    // whitespace before validating, so this is accepted and sent as the trimmed
+    // key. It is not a fault, and it needs no SDK-side validation.
+    expect(setHeader("api-key-xxx\n")).not.toThrow();
+  });
+});
+
+describe("an unusable api key does not throw at the caller (v2, client set)", () => {
+  test("full build: trackSchemaFromEvent resolves instead of rejecting", async () => {
+    const inspector = flushingInspector(crlfKey);
+
+    // The assertion is the absence of a rejection. If the DOMException escaped
+    // sendTrackingRequest it would surface here, in the host app's await.
+    await expect(
+      inspector.trackSchemaFromEvent("Ev", { a: 1 })
+    ).resolves.toBeDefined();
+
+    // And nothing was put on the wire, so there was nothing to inject into.
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  test("lite build: trackSchemaFromEvent resolves instead of rejecting", async () => {
+    const inspector = flushingLiteInspector(crlfKey);
+
+    await expect(
+      inspector.trackSchemaFromEvent("Ev", { a: 1 })
+    ).resolves.toBeDefined();
+
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  test("full build: trackSchema resolves instead of rejecting", async () => {
+    const inspector = flushingInspector(crlfKey);
+
+    await expect(
+      inspector.trackSchema("Ev", [
+        { propertyName: "a", propertyType: "int" }
+      ])
+    ).resolves.not.toThrow();
+
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  test("v2 stops before any send attempt, so the header is never set", async () => {
+    // The key would be refused on every send, so the handler stops at
+    // construction rather than retrying (V2StopSending_test.ts). Later events do
+    // not reach request setup either.
+    const headerSpy = jest.spyOn(XMLHttpRequest.prototype, "setRequestHeader");
+    const inspector = flushingInspector(crlfKey);
+
+    await inspector.trackSchemaFromEvent("Ev one", { a: 1 });
+    await inspector.trackSchemaFromEvent("Ev two", { b: 2 });
+
+    expect(headerSpy).not.toHaveBeenCalled();
+    expect(sendSpy).not.toHaveBeenCalled();
+    headerSpy.mockRestore();
+  });
+
+  test("a key with a trailing newline is trimmed and keeps sending", async () => {
+    // The papercut this closes. setRequestHeader would refuse the raw value on
+    // every send, the send path would catch it, and telemetry would be lost in
+    // silence — from nothing worse than a copy-paste out of a config file.
+    // Trimming happens once in the constructor, so the header and the body copy
+    // carry the same string.
+    const headerSpy = jest.spyOn(XMLHttpRequest.prototype, "setRequestHeader");
+    const inspector = flushingInspector("  api-key-xxx\n");
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 });
+
+    const apiKeyHeader = headerSpy.mock.calls.find(
+      ([name]) => name === "api-key"
+    );
+    expect(apiKeyHeader).toBeDefined();
+    expect(apiKeyHeader?.[1]).toBe("api-key-xxx");
+    expect(sendSpy).toHaveBeenCalled();
+
+    // The body copy is the same trimmed string, not the raw one.
+    const body = JSON.parse(sendSpy.mock.calls[0][0] as string);
+    expect(body[0].apiKey).toBe("api-key-xxx");
+    headerSpy.mockRestore();
+  });
+
+  test("a whitespace-only key still throws the documented message", () => {
+    // Trimming must not turn an unusable key into an empty one that slips past
+    // the constructor's own check.
+    expect(() => new AvoInspector({ ...defaultOptions, apiKey: "   " })).toThrow(
+      "[Avo Inspector] No API key provided. Inspector can't operate without API key."
+    );
+    expect(
+      () => new AvoInspectorLite({ ...defaultOptions, apiKey: "   " })
+    ).toThrow(
+      "[Avo Inspector] No API key provided. Inspector can't operate without API key."
+    );
+  });
+
+  test("a usable key on the same path does reach send", async () => {
+    // Control: without this the tests above would pass even if tracking had
+    // silently stopped working for every key.
+    const inspector = flushingInspector(defaultOptions.apiKey);
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 });
+
+    expect(sendSpy).toHaveBeenCalled();
+  });
+});
+
+describe("without a client the key never becomes a header (v1)", () => {
+  test("a CR/LF key is sent in the JSON body, escaped, with no api-key header — as in 3.2.0", async () => {
+    const headerSpy = jest.spyOn(XMLHttpRequest.prototype, "setRequestHeader");
+    const inspector = flushingV1Inspector(crlfKey);
+
+    await expect(
+      inspector.trackSchemaFromEvent("Ev", { a: 1 })
+    ).resolves.toBeDefined();
+
+    expect(headerSpy.mock.calls).toEqual([["Content-Type", "text/plain"]]);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    const raw = sendSpy.mock.calls[0][0] as string;
+    // JSON escapes the control characters, so nothing breaks framing.
+    expect(raw).toContain('"apiKey":"api-key-xxx\\r\\nX-Injected: yes"');
+    expect(JSON.parse(raw)[0].apiKey).toBe(crlfKey);
+    headerSpy.mockRestore();
+  });
+
+  test("a key with surrounding whitespace is trimmed in the body on v1 too", async () => {
+    // Trimming happens once in the constructor, before the transport matters.
+    // On v1 that is a change from 3.2.0, which sent the raw value — and which
+    // v1 then failed to look up, since it does not trim the body key.
+    const inspector = flushingV1Inspector("  api-key-xxx\n");
+
+    await inspector.trackSchemaFromEvent("Ev", { a: 1 });
+
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(sendSpy.mock.calls[0][0] as string);
+    expect(body[0].apiKey).toBe("api-key-xxx");
+  });
+});
