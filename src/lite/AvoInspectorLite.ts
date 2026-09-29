@@ -36,12 +36,17 @@ export class AvoInspectorLite {
   }
 
   private static _shouldLog = false;
+  // Tracks whether the logging preference was set explicitly by the caller
+  // (via enableLogging() or AvoInspectorLite.shouldLog). When true, the
+  // constructor must not overwrite it with the environment default. See AVO-3079.
+  private static _shouldLogSetByUser = false;
   static get shouldLog() {
     return this._shouldLog;
   }
 
   static set shouldLog(enable) {
     this._shouldLog = enable;
+    this._shouldLogSetByUser = true;
   }
 
   private static _networkTimeout = 2000;
@@ -112,11 +117,18 @@ export class AvoInspectorLite {
 
     if (this.environment === AvoInspectorEnv.Dev) {
       AvoInspectorLite._batchSize = 1;
-      AvoInspectorLite._shouldLog = true;
     } else {
       AvoInspectorLite._batchSize = 30;
       AvoInspectorLite._batchFlushSeconds = 30;
-      AvoInspectorLite._shouldLog = false;
+    }
+
+    // Apply the environment's default logging behaviour (dev on, prod/staging
+    // off) only when the caller hasn't already chosen one via enableLogging()
+    // or AvoInspectorLite.shouldLog. Previously the Dev branch unconditionally
+    // forced logging on here, clobbering an explicit opt-out and capturing the
+    // wrong value in AvoStorage below. See AVO-3079.
+    if (!AvoInspectorLite._shouldLogSetByUser) {
+      AvoInspectorLite._shouldLog = this.environment === AvoInspectorEnv.Dev;
     }
 
     AvoInspectorLite.avoStorage = new AvoStorage(
@@ -308,7 +320,13 @@ export class AvoInspectorLite {
   }
 
   enableLogging(enable: boolean) {
-    AvoInspectorLite._shouldLog = enable;
+    // Going through the static setter records the explicit preference so a
+    // later constructor won't reset it to the environment default.
+    AvoInspectorLite.shouldLog = enable;
+    // AvoStorage captured shouldLog at construction time, so push the new value
+    // to it for enableLogging() to take effect on an already-initialised
+    // inspector. The lite build has no event-spec cache/fetcher. See AVO-3079.
+    AvoInspectorLite.avoStorage?.setShouldLog(enable);
   }
 
   async extractSchema(
