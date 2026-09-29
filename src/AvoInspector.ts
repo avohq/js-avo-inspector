@@ -48,11 +48,21 @@ export class AvoInspector {
   }
 
   private static _shouldLog = false;
+  // Tracks whether the logging preference was set explicitly by the caller
+  // (via enableLogging() or AvoInspector.shouldLog). When true, the constructor
+  // must not overwrite it with the environment default.
+  private static _shouldLogSetByUser = false;
   static get shouldLog() {
     return this._shouldLog;
   }
   static set shouldLog(enable) {
     this._shouldLog = enable;
+    this._shouldLogSetByUser = true;
+    // Storage captured shouldLog at construction time and is shared by all
+    // inspectors, so push the new value to it. It may be missing if its init
+    // failed. Each inspector's event spec cache and fetcher pick the value up
+    // in syncEventSpecLogging().
+    this.avoStorage?.setShouldLog(enable);
   }
 
   constructor(options: {
@@ -99,11 +109,16 @@ export class AvoInspector {
 
     if (this.environment === AvoInspectorEnv.Dev) {
       AvoInspector._batchSize = 1;
-      AvoInspector._shouldLog = true;
     } else {
       AvoInspector._batchSize = 30;
       AvoInspector._batchFlushSeconds = 30;
-      AvoInspector._shouldLog = false;
+    }
+
+    // Apply the environment's default logging (dev on, prod/staging off) only
+    // when the caller hasn't already chosen one via enableLogging() or
+    // AvoInspector.shouldLog, so an explicit opt-out isn't overwritten.
+    if (!AvoInspector._shouldLogSetByUser) {
+      AvoInspector._shouldLog = this.environment === AvoInspectorEnv.Dev;
     }
 
     try {
@@ -353,7 +368,21 @@ export class AvoInspector {
   }
 
   enableLogging(enable: boolean) {
-    AvoInspector._shouldLog = enable;
+    // Going through the static setter records the explicit preference so a
+    // later constructor won't reset it to the environment default.
+    // It also pushes the value to the shared storage.
+    AvoInspector.shouldLog = enable;
+    this.syncEventSpecLogging();
+  }
+
+  // The event spec cache and fetcher captured shouldLog at construction time.
+  // Re-applying the shared value before they are used lets a logging change
+  // made through any inspector, or via AvoInspector.shouldLog, reach them
+  // without keeping a static reference to every inspector. Prod creates no
+  // cache or fetcher.
+  private syncEventSpecLogging(): void {
+    this.eventSpecCache?.setShouldLog(AvoInspector._shouldLog);
+    this.eventSpecFetcher?.setShouldLog(AvoInspector._shouldLog);
   }
 
   extractSchema(
@@ -448,6 +477,8 @@ export class AvoInspector {
     if (!this.eventSpecCache || !this.eventSpecFetcher || !this.streamId) {
       return null;
     }
+
+    this.syncEventSpecLogging();
 
     try {
       // Check cache first

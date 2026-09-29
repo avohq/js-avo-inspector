@@ -1,5 +1,6 @@
 abstract class PlatformAvoStorage {
   abstract init(shouldLog: boolean): void;
+  abstract setShouldLog(shouldLog: boolean): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
   abstract getItem<T>(key: string): T | null;
   abstract setItem<T>(key: string, value: T): void;
@@ -16,6 +17,12 @@ abstract class PlatformAvoStorage {
   }
 }
 
+const avoInspectorKeyPrefix = "AvoInspector";
+
+function isAvoInspectorKey(key: string): boolean {
+  return key.startsWith(avoInspectorKeyPrefix);
+}
+
 class AndroidAvoStorage extends PlatformAvoStorage {
   androidMemoryDataToAvoidAsyncQueries: { [key: string]: string | null } = {};
   storageLib: any | null = null;
@@ -25,10 +32,10 @@ class AndroidAvoStorage extends PlatformAvoStorage {
   shouldLog: boolean = false;
 
   init(shouldLog: boolean) {
+    this.shouldLog = shouldLog;
+
     if (!process.env.BROWSER) {
       this.storageLib = require("@react-native-async-storage/async-storage");
-
-      this.shouldLog = shouldLog;
 
       this.AsyncStorage = this.storageLib.default;
 
@@ -38,22 +45,33 @@ class AndroidAvoStorage extends PlatformAvoStorage {
     }
   }
 
+  setShouldLog(shouldLog: boolean): void {
+    this.shouldLog = shouldLog;
+  }
+
+  // Loads only Avo Inspector's own keys (e.g. AvoInspectorEvents,
+  // AvoInspectorAnonymousId). The host app's AsyncStorage can hold other
+  // libraries' tokens or user data, which the SDK must not read or log.
   private loadAndroidDataToMemoryToAvoidAsyncQueries(onLoaded: () => void) {
-    this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
-      this.AsyncStorage.multiGet(keys).then((keyVals: Array<Array<string>>) => {
-        if (this.shouldLog) {
-          console.log("Avo Inspector: android loaded data from memory");
+    this.AsyncStorage.getAllKeys()
+      .then((keys: ReadonlyArray<string>) => {
+        const avoKeys = keys.filter(isAvoInspectorKey);
+        if (avoKeys.length === 0) {
+          return [];
         }
-        keyVals.forEach((keyVal) => {
-          let key = keyVal[0];
-          this.androidMemoryDataToAvoidAsyncQueries[key] = keyVal[1];
-          if (this.shouldLog) {
-            console.log(key, keyVal[1]);
-          }
-        });
-        onLoaded();
+        return this.AsyncStorage.multiGet(avoKeys);
       })
-    );
+      .then((keyVals: ReadonlyArray<[string, string | null]>) => {
+        keyVals.forEach(([key, value]) => {
+          this.androidMemoryDataToAvoidAsyncQueries[key] = value;
+        });
+        if (this.shouldLog) {
+          console.log(
+            "Avo Inspector: loaded " + keyVals.length + " cached items"
+          );
+        }
+        onLoaded();
+      });
   }
 
   private initializeStorageAndroid() {
@@ -107,6 +125,9 @@ class IosAvoStorage extends PlatformAvoStorage {
     }
   }
 
+  // The iOS storage doesn't log, so there is nothing to update.
+  setShouldLog(_shouldLog: boolean): void {}
+
   isInitialized() {
     return this.reactNative != null;
   }
@@ -148,6 +169,10 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   init(shouldLog: boolean) {
     this.shouldLog = shouldLog;
     this.initializeStorageWeb(this.isLocalStorageAvailable());
+  }
+
+  setShouldLog(shouldLog: boolean): void {
+    this.shouldLog = shouldLog;
   }
 
   private initializeStorageWeb(isLocalStorageAvailable: boolean) {
@@ -301,6 +326,10 @@ export class AvoStorage {
 
   isInitialized() {
     return this.storageImpl.isInitialized();
+  }
+
+  setShouldLog(shouldLog: boolean): void {
+    this.storageImpl.setShouldLog(shouldLog);
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {

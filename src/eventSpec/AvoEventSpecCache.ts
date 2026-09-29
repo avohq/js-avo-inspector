@@ -30,10 +30,18 @@ export class EventSpecCache {
   private globalEventCount: number = 0;
 
   /** Whether to log debug information */
-  private readonly shouldLog: boolean;
+  private shouldLog: boolean;
 
   constructor(shouldLog: boolean = false) {
     this.cache = new Map();
+    this.shouldLog = shouldLog;
+  }
+
+  /**
+   * Updates whether debug information is logged, so a later
+   * AvoInspector.enableLogging() call reaches this already-constructed cache.
+   */
+  setShouldLog(shouldLog: boolean): void {
     this.shouldLog = shouldLog;
   }
 
