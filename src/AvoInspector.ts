@@ -48,11 +48,16 @@ export class AvoInspector {
   }
 
   private static _shouldLog = false;
+  // Tracks whether the logging preference was set explicitly by the caller
+  // (via enableLogging() or AvoInspector.shouldLog). When true, the constructor
+  // must not overwrite it with the environment default.
+  private static _shouldLogSetByUser = false;
   static get shouldLog() {
     return this._shouldLog;
   }
   static set shouldLog(enable) {
     this._shouldLog = enable;
+    this._shouldLogSetByUser = true;
   }
 
   constructor(options: {
@@ -99,11 +104,16 @@ export class AvoInspector {
 
     if (this.environment === AvoInspectorEnv.Dev) {
       AvoInspector._batchSize = 1;
-      AvoInspector._shouldLog = true;
     } else {
       AvoInspector._batchSize = 30;
       AvoInspector._batchFlushSeconds = 30;
-      AvoInspector._shouldLog = false;
+    }
+
+    // Apply the environment's default logging (dev on, prod/staging off) only
+    // when the caller hasn't already chosen one via enableLogging() or
+    // AvoInspector.shouldLog, so an explicit opt-out isn't overwritten.
+    if (!AvoInspector._shouldLogSetByUser) {
+      AvoInspector._shouldLog = this.environment === AvoInspectorEnv.Dev;
     }
 
     try {
@@ -353,7 +363,15 @@ export class AvoInspector {
   }
 
   enableLogging(enable: boolean) {
-    AvoInspector._shouldLog = enable;
+    // Going through the static setter records the explicit preference so a
+    // later constructor won't reset it to the environment default.
+    AvoInspector.shouldLog = enable;
+    // Storage, the cache and the fetcher captured shouldLog at construction
+    // time, so the new value has to be pushed to them. Storage may be missing
+    // if its init failed, and Prod creates no cache or fetcher.
+    AvoInspector.avoStorage?.setShouldLog(enable);
+    this.eventSpecCache?.setShouldLog(enable);
+    this.eventSpecFetcher?.setShouldLog(enable);
   }
 
   extractSchema(

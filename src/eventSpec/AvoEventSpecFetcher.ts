@@ -24,7 +24,7 @@ export class AvoEventSpecFetcher {
   /** In-flight requests to prevent duplicate fetches */
   private inFlightRequests: Map<string, Promise<EventSpecResponse | null>>;
   /** Whether to log debug information */
-  private readonly shouldLog: boolean;
+  private shouldLog: boolean;
   /** Environment name */
   private readonly env: string;
 
@@ -39,6 +39,14 @@ export class AvoEventSpecFetcher {
     this.shouldLog = shouldLog;
     this.env = env;
     this.inFlightRequests = new Map();
+  }
+
+  /**
+   * Updates whether debug information is logged, so a later
+   * AvoInspector.enableLogging() call reaches this already-constructed fetcher.
+   */
+  setShouldLog(shouldLog: boolean): void {
+    this.shouldLog = shouldLog;
   }
 
   /** Generates a unique key for tracking in-flight requests. */

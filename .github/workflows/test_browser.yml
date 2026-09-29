@@ -31,4 +31,4 @@ jobs:
       - name: Test Source
         run: >-
           npm run test:browser -- --silent
-          --testPathPattern="src/__tests__/(AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\.ts$"
+          --testPathPattern="src/__tests__/(AndroidStorage|AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EnableLogging|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\.ts$"

@@ -12,7 +12,7 @@
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\\.ts$\""
+    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AndroidStorage|AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EnableLogging|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\\.ts$\""
   },
   "repository": {
     "type": "git",
