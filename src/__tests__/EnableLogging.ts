@@ -122,26 +122,36 @@ describe("enableLogging – dev log suppression", () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
-  test("enableLogging(false) on one inspector silences the others", () => {
+  // Goes through the inspector's validation path, which is where the event
+  // spec cache is used in practice: pre-populates the cache so the lookup is a
+  // hit, then clears the spy so only the cache-hit log (if any) is captured.
+  const validateWithCacheHit = async (inspector: any): Promise<void> => {
+    inspector.streamId = streamId;
+    inspector.eventSpecCache.set(apiKey, streamId, eventName, null);
+    logSpy.mockClear();
+    await inspector.fetchAndValidateEvent(eventName, {});
+  };
+
+  test("enableLogging(false) on one inspector silences the others", async () => {
     const first = build(AvoInspectorEnv.Dev);
     const second = build(AvoInspectorEnv.Dev);
 
     first.enableLogging(false);
-    triggerCacheHitLog(second);
+    await validateWithCacheHit(second);
 
     expect(logSpy).not.toHaveBeenCalled();
     expect(second.eventSpecFetcher.shouldLog).toBe(false);
   });
 
-  test("setting AvoInspector.shouldLog after construction reaches the cache", () => {
+  test("setting AvoInspector.shouldLog after construction reaches the cache", async () => {
     const inspector = build(AvoInspectorEnv.Dev);
 
     AvoInspector.shouldLog = false;
-    triggerCacheHitLog(inspector);
+    await validateWithCacheHit(inspector);
     expect(logSpy).not.toHaveBeenCalled();
 
     AvoInspector.shouldLog = true;
-    triggerCacheHitLog(inspector);
+    await validateWithCacheHit(inspector);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Cache hit"));
   });
 
