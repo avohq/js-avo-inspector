@@ -55,9 +55,17 @@ export class AvoInspector {
   static get shouldLog() {
     return this._shouldLog;
   }
+  // Each non-Prod inspector registers a listener that updates its event spec
+  // cache and fetcher, so a logging change reaches every live inspector.
+  private static _shouldLogListeners: Array<(shouldLog: boolean) => void> = [];
   static set shouldLog(enable) {
     this._shouldLog = enable;
     this._shouldLogSetByUser = true;
+    // Storage, the cache and the fetcher captured shouldLog at construction
+    // time, so the new value has to be pushed to them. Storage may be missing
+    // if its init failed.
+    this.avoStorage?.setShouldLog(enable);
+    this._shouldLogListeners.forEach((listener) => listener(enable));
   }
 
   constructor(options: {
@@ -146,6 +154,11 @@ export class AvoInspector {
           AvoInspector._shouldLog,
           this.environment
         );
+
+        AvoInspector._shouldLogListeners.push((shouldLog) => {
+          this.eventSpecCache?.setShouldLog(shouldLog);
+          this.eventSpecFetcher?.setShouldLog(shouldLog);
+        });
 
         if (AvoInspector._shouldLog) {
           console.log(
@@ -365,13 +378,9 @@ export class AvoInspector {
   enableLogging(enable: boolean) {
     // Going through the static setter records the explicit preference so a
     // later constructor won't reset it to the environment default.
+    // It also pushes the value to storage and every live inspector's event
+    // spec cache and fetcher.
     AvoInspector.shouldLog = enable;
-    // Storage, the cache and the fetcher captured shouldLog at construction
-    // time, so the new value has to be pushed to them. Storage may be missing
-    // if its init failed, and Prod creates no cache or fetcher.
-    AvoInspector.avoStorage?.setShouldLog(enable);
-    this.eventSpecCache?.setShouldLog(enable);
-    this.eventSpecFetcher?.setShouldLog(enable);
   }
 
   extractSchema(

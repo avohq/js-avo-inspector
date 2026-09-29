@@ -122,6 +122,29 @@ describe("enableLogging – dev log suppression", () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
+  test("enableLogging(false) on one inspector silences the others", () => {
+    const first = build(AvoInspectorEnv.Dev);
+    const second = build(AvoInspectorEnv.Dev);
+
+    first.enableLogging(false);
+    triggerCacheHitLog(second);
+
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(second.eventSpecFetcher.shouldLog).toBe(false);
+  });
+
+  test("setting AvoInspector.shouldLog after construction reaches the cache", () => {
+    const inspector = build(AvoInspectorEnv.Dev);
+
+    AvoInspector.shouldLog = false;
+    triggerCacheHitLog(inspector);
+    expect(logSpy).not.toHaveBeenCalled();
+
+    AvoInspector.shouldLog = true;
+    triggerCacheHitLog(inspector);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Cache hit"));
+  });
+
   test("an explicit preference persists across instances", () => {
     const first = build(AvoInspectorEnv.Dev);
     first.enableLogging(false);
