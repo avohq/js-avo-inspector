@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`enableLogging(false)` now actually silences dev logs**: The constructor unconditionally forced logging on for the `Dev` environment and handed that snapshot value to `AvoStorage`, `EventSpecCache`, and `AvoEventSpecFetcher` at construction time, so a later `enableLogging(false)` never reached those sub-components and dev log noise kept printing.
+  - The environment default (dev on, prod/staging off) is now applied only when logging hasn't been set explicitly via `enableLogging()` or `AvoInspector.shouldLog`, so an explicit opt-out is no longer clobbered.
+  - `enableLogging()` now propagates the new value to the already-constructed storage, cache, and fetcher so the toggle takes effect immediately.
+  - The same fix is applied to the lite build (`avo-inspector/lite`): `AvoInspectorLite` no longer clobbers an explicit preference for Dev, and its `enableLogging()` now propagates to `AvoStorage` (the lite build has no event-spec cache/fetcher).
+  - A logging preference set via `enableLogging()` or `AvoInspector.shouldLog` now persists across inspector instances in the same runtime: an inspector constructed later no longer resets logging to its environment default.
+
 ## [3.2.1] - 2026-09-16
 
 The public API is unchanged from 3.2.0: the same exports, constructor options and track-method signatures in both `avo-inspector` and `avo-inspector/lite`. Every npm (full and lite) and regular script-tag install sends exactly 3.2.0's request — `POST https://api.avo.app/inspector/v1/track`, a single `Content-Type: text/plain` header (plus `Content-Encoding: gzip` for a compressed batch), and the same body apart from `libVersion`.
