@@ -14,8 +14,7 @@ jest.mock("../AvoStorage", () => ({
     isInitialized: jest.fn().mockReturnValue(true),
     getItemAsync: jest.fn().mockResolvedValue(null),
     getItem: jest.fn().mockReturnValue(null),
-    setItem: jest.fn(),
-    setShouldLog: jest.fn()
+    setItem: jest.fn()
   }))
 }));
 jest.mock("../eventSpec/AvoEventSpecFetcher");
@@ -74,14 +73,12 @@ describe("Validation Integration", () => {
       (EventSpecCache as jest.Mock).mockImplementation(() => ({
         contains: jest.fn().mockReturnValue(true),
         get: jest.fn().mockReturnValue(mockValidEventSpecResponse),
-        set: jest.fn(),
-        setShouldLog: jest.fn()
+        set: jest.fn()
       }));
 
       // Mock fetcher (shouldn't be called when cache hit)
       jest.mocked(AvoEventSpecFetcher).mockImplementation(() => ({
-        fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse),
-        setShouldLog: jest.fn()
+        fetch: jest.fn().mockResolvedValue(mockValidEventSpecResponse)
       }) as any);
     });
 

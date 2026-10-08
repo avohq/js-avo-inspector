@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`enableLogging(false)` now actually silences dev logs**: The constructor unconditionally forced logging on for the `Dev` environment and handed that snapshot value to `AvoStorage`, `EventSpecCache`, and `AvoEventSpecFetcher` at construction time, so a later `enableLogging(false)` never reached those sub-components and dev log noise kept printing.
-  - The environment default (dev on, prod/staging off) is now applied only when logging hasn't been set explicitly via `enableLogging()` or `AvoInspector.shouldLog`, so an explicit opt-out is no longer clobbered.
-  - `enableLogging()` now propagates the new value to the already-constructed storage, cache, and fetcher so the toggle takes effect immediately.
-  - The same fix is applied to the lite build (`avo-inspector/lite`): `AvoInspectorLite` no longer clobbers an explicit preference for Dev, and its `enableLogging()` now propagates to `AvoStorage` (the lite build has no event-spec cache/fetcher).
-  - A logging preference set via `enableLogging()` or `AvoInspector.shouldLog` now persists across inspector instances in the same runtime: an inspector constructed later no longer resets logging to its environment default.
+- **`enableLogging(false)` now actually silences dev logs.** Previously the `Dev` environment forced logging on at construction and each of `AvoStorage`, `EventSpecCache` and `AvoEventSpecFetcher` kept its own copy of the flag, so a later `enableLogging(false)` left those sub-components printing (most visibly `EventSpecCache`'s per-hit `Cache hit for key` line). The sub-components now read the single static flag live, so:
+  - `enableLogging(false)` / `enableLogging(true)` and `AvoInspector.shouldLog` take effect immediately on an already-constructed inspector — no value is cached or pushed around.
+  - The setting applies to every inspector instance in the same runtime, not just the one `enableLogging()` was called on.
+  - An explicit preference set via `enableLogging()` or `AvoInspector.shouldLog` is no longer clobbered by a later constructor; the environment default (dev on, prod/staging off) applies only when nothing was set.
+  - Six ungated validation `console.warn`s (`EventValidator`) and the script-tag "Loaded" dev log (`browser.js`) are now gated on the logging flag too, so nothing but genuine errors prints after `enableLogging(false)`.
+  - The same behaviour applies to the lite build (`avo-inspector/lite`); it has no event-spec cache/fetcher, so `AvoStorage` is the component affected.
+- **Errors that affect data delivery are always printed**, regardless of the logging setting: the `"something went wrong"` catches, `"Failed to encrypt property value"`, `"Stopped sending events on this page"`, the batch cache-read error, the stream-id storage errors, the missing-API-key error, and the constructor's missing/unsupported-environment warnings.
 
 ## [3.2.1] - 2026-09-16
 

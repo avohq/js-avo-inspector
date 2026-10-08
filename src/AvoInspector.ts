@@ -151,7 +151,7 @@ export class AvoInspector {
     }
 
     AvoInspector.avoStorage = new AvoStorage(
-      AvoInspector._shouldLog,
+      () => AvoInspector.shouldLog,
       options.suffix != null ? options.suffix : ""
     );
 
@@ -176,10 +176,10 @@ export class AvoInspector {
 
     // Enable event spec fetching if streamId is present (and not "unknown")
     if (this.streamId) {
-      this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
+      this.eventSpecCache = new EventSpecCache(() => AvoInspector.shouldLog);
       this.eventSpecFetcher = new AvoEventSpecFetcher(
         AvoInspector._networkTimeout,
-        AvoInspector._shouldLog,
+        () => AvoInspector.shouldLog,
         this.environment
       );
 
@@ -445,19 +445,10 @@ export class AvoInspector {
   }
 
   enableLogging(enable: boolean) {
-    // Going through the static setter records the explicit preference so a
-    // later constructor won't reset it to the environment default.
+    // The static setter records the explicit preference (so a later constructor
+    // won't reset it to the environment default) and is the single source every
+    // sub-component reads live via its getter, so no propagation is needed. See AVO-3079.
     AvoInspector.shouldLog = enable;
-    // The sub-components below captured shouldLog at construction time, so the
-    // new value has to be pushed to them for enableLogging() to take effect on
-    // an already-initialised inspector. See AVO-3079.
-    this.applyShouldLogToComponents(enable);
-  }
-
-  private applyShouldLogToComponents(shouldLog: boolean): void {
-    AvoInspector.avoStorage?.setShouldLog(shouldLog);
-    this.eventSpecCache?.setShouldLog(shouldLog);
-    this.eventSpecFetcher?.setShouldLog(shouldLog);
   }
 
   async extractSchema(

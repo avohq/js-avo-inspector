@@ -132,7 +132,7 @@ export class AvoInspectorLite {
     }
 
     AvoInspectorLite.avoStorage = new AvoStorage(
-      AvoInspectorLite._shouldLog,
+      () => AvoInspectorLite.shouldLog,
       options.suffix != null ? options.suffix : ""
     );
 
@@ -320,13 +320,10 @@ export class AvoInspectorLite {
   }
 
   enableLogging(enable: boolean) {
-    // Going through the static setter records the explicit preference so a
-    // later constructor won't reset it to the environment default.
+    // The static setter records the explicit preference (so a later constructor
+    // won't reset it to the environment default) and is the single source
+    // AvoStorage reads live via its getter, so no propagation is needed. See AVO-3079.
     AvoInspectorLite.shouldLog = enable;
-    // AvoStorage captured shouldLog at construction time, so push the new value
-    // to it for enableLogging() to take effect on an already-initialised
-    // inspector. The lite build has no event-spec cache/fetcher. See AVO-3079.
-    AvoInspectorLite.avoStorage?.setShouldLog(enable);
   }
 
   async extractSchema(

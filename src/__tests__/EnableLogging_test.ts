@@ -1,20 +1,21 @@
 import type { AvoInspector as AvoInspectorClass } from "../AvoInspector";
+import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 /**
- * Regression tests for AVO-3079.
+ * Regression tests for AVO-3079 (full build).
  *
- * `enableLogging(false)` must actually silence Inspector's dev logging. The
- * constructor used to hardcode logging ON for the Dev environment and then
- * hand that snapshot value to AvoStorage / EventSpecCache / AvoEventSpecFetcher,
- * so a later `enableLogging(false)` never reached those sub-components and dev
- * log noise kept printing.
+ * `enableLogging(false)` / `AvoInspector.shouldLog = false` must silence every
+ * non-error Inspector log, immediately and for every inspector instance on the
+ * page. The sub-components (AvoStorage, EventSpecCache, AvoEventSpecFetcher)
+ * read the one static flag live through a getter rather than caching a copy, so
+ * there is a single source of truth.
  *
- * These tests exercise the sub-component that actually logs on the happy path
- * (EventSpecCache logs "Cache hit for key" on every hit when logging is on),
- * plus the propagated flags, to prove the toggle now takes effect end to end.
+ * Assertions are observable (a cache hit that does or doesn't log; a storage
+ * error that does or doesn't print; a validation warning that does or doesn't
+ * fire) rather than reaching into private flags.
  */
-describe("enableLogging – dev log suppression (AVO-3079)", () => {
+describe("enableLogging – log suppression (AVO-3079)", () => {
   // Loaded fresh in beforeEach so each test starts from clean static state.
   let AvoInspector: typeof AvoInspectorClass;
 
@@ -22,6 +23,26 @@ describe("enableLogging – dev log suppression (AVO-3079)", () => {
   const version = "1.0.0";
   const streamId = "stream-1";
   const eventName = "test_event";
+
+  // A spec with a min/max constraint, so a NaN value hits the validator's
+  // "NaN value fails min/max constraint" warning (gated on shouldLog).
+  const minMaxSpec: EventSpecResponse = {
+    events: [
+      {
+        branchId: "main",
+        baseEventId: "evt_test",
+        variantIds: [],
+        props: {
+          amount: {
+            type: "number",
+            required: false,
+            minMaxRanges: { "0,100": ["evt_test"] }
+          }
+        }
+      }
+    ],
+    metadata: { schemaId: "s", branchId: "main", latestActionId: "a" }
+  };
 
   const build = (env: string): any =>
     new AvoInspector({
@@ -31,85 +52,118 @@ describe("enableLogging – dev log suppression (AVO-3079)", () => {
       version
     });
 
-  // Populates the cache then reads it back, clearing the console spy right
-  // before the read so only the cache-hit log (if any) is captured.
-  const triggerCacheHitLog = (inspector: any): void => {
+  // Populates then reads the inspector's cache, asserting whether the cache-hit
+  // line was logged. Console spy is cleared right before the read.
+  const expectCacheHitLogged = (inspector: any, logged: boolean): void => {
     const cache = inspector.eventSpecCache;
     expect(cache).toBeDefined();
     cache.set(apiKey, streamId, eventName, null);
     (console.log as jest.Mock).mockClear();
     cache.get(apiKey, streamId, eventName);
+    if (logged) {
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Cache hit")
+      );
+    } else {
+      expect(console.log).not.toHaveBeenCalled();
+    }
   };
 
   beforeEach(() => {
     jest.resetModules();
-    // requireActual (not a bare require) after resetModules gives a freshly
-    // evaluated module, and keeps the file lint-clean (no-var-requires).
     AvoInspector = jest.requireActual<{
       AvoInspector: typeof AvoInspectorClass;
     }>("../AvoInspector").AvoInspector;
     (console.log as jest.Mock).mockClear();
+    (console.warn as jest.Mock).mockClear();
+    (console.error as jest.Mock).mockClear();
   });
 
-  test("dev logs are on by default (regression guard)", () => {
+  test("dev logs are on by default (positive control)", () => {
+    expectCacheHitLogged(build(AvoInspectorEnv.Dev), true);
+  });
+
+  test("prod logs are off by default", () => {
+    expectCacheHitLogged(build(AvoInspectorEnv.Prod), false);
+  });
+
+  test("enableLogging(false) silences the cache in dev", () => {
     const inspector = build(AvoInspectorEnv.Dev);
-
-    triggerCacheHitLog(inspector);
-
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining("Cache hit")
-    );
-  });
-
-  test("prod logs are off by default (regression guard)", () => {
-    const inspector = build(AvoInspectorEnv.Prod);
-
-    triggerCacheHitLog(inspector);
-
-    expect(console.log).not.toHaveBeenCalled();
-  });
-
-  test("enableLogging(false) silences EventSpecCache logs in dev", () => {
-    const inspector = build(AvoInspectorEnv.Dev);
-
     inspector.enableLogging(false);
-    triggerCacheHitLog(inspector);
-
-    expect(console.log).not.toHaveBeenCalled();
+    expectCacheHitLogged(inspector, false);
   });
 
-  test("enableLogging(false) propagates to storage, cache and fetcher in dev", () => {
-    const inspector = build(AvoInspectorEnv.Dev);
-
-    inspector.enableLogging(false);
-
-    expect(AvoInspector.shouldLog).toBe(false);
-    expect(inspector.eventSpecCache.shouldLog).toBe(false);
-    expect(inspector.eventSpecFetcher.shouldLog).toBe(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((AvoInspector.avoStorage.storageImpl as any).shouldLog).toBe(false);
-  });
-
-  test("enableLogging(true) propagates to the cache in prod", () => {
+  test("enableLogging(true) enables the cache log in prod", () => {
     const inspector = build(AvoInspectorEnv.Prod);
-
     inspector.enableLogging(true);
-    triggerCacheHitLog(inspector);
-
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining("Cache hit")
-    );
+    expectCacheHitLogged(inspector, true);
   });
 
   test("constructor does not clobber a logging preference set beforehand", () => {
-    // Opt out of logging before constructing a Dev inspector.
     AvoInspector.shouldLog = false;
+    expectCacheHitLogged(build(AvoInspectorEnv.Dev), false);
+  });
 
+  test("enableLogging(false) on one instance silences another instance's cache", () => {
+    const a = build(AvoInspectorEnv.Dev);
+    const b = build(AvoInspectorEnv.Dev);
+
+    a.enableLogging(false);
+
+    // b never had enableLogging called, but its cache reads the shared static
+    // flag live, so it is silenced too.
+    expectCacheHitLogged(b, false);
+    expectCacheHitLogged(a, false);
+  });
+
+  test("AvoInspector.shouldLog = false after construction silences the cache", () => {
+    const inspector = build(AvoInspectorEnv.Dev);
+    AvoInspector.shouldLog = false;
+    expectCacheHitLogged(inspector, false);
+  });
+
+  test("enableLogging toggles AvoStorage error logs live", () => {
     const inspector = build(AvoInspectorEnv.Dev);
 
-    // The Dev branch of the constructor must not force logging back on.
-    expect(AvoInspector.shouldLog).toBe(false);
-    triggerCacheHitLog(inspector);
-    expect(console.log).not.toHaveBeenCalled();
+    // Storage was initialised with a working localStorage; make writes throw now.
+    const setItemSpy = jest
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation(() => {
+        throw new Error("quota exceeded");
+      });
+
+    try {
+      (console.error as jest.Mock).mockClear();
+      AvoInspector.avoStorage.setItem("k", "v");
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("setItem error"),
+        expect.anything()
+      );
+
+      inspector.enableLogging(false);
+      (console.error as jest.Mock).mockClear();
+      AvoInspector.avoStorage.setItem("k", "v");
+      expect(console.error).not.toHaveBeenCalled();
+    } finally {
+      setItemSpy.mockRestore();
+    }
+  });
+
+  test("enableLogging(false) silences validation warnings (gated console.warn)", () => {
+    const { validateEvent } = jest.requireActual<
+      typeof import("../eventSpec/EventValidator")
+    >("../eventSpec/EventValidator");
+
+    AvoInspector.shouldLog = true;
+    (console.warn as jest.Mock).mockClear();
+    validateEvent({ amount: NaN }, minMaxSpec);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("NaN value fails min/max")
+    );
+
+    AvoInspector.shouldLog = false;
+    (console.warn as jest.Mock).mockClear();
+    validateEvent({ amount: NaN }, minMaxSpec);
+    expect(console.warn).not.toHaveBeenCalled();
   });
 });

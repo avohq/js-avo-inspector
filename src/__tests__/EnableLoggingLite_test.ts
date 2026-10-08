@@ -4,16 +4,13 @@ import { AvoInspectorEnv } from "../AvoInspectorEnv";
 /**
  * Regression tests for AVO-3079 in the lite build.
  *
- * `AvoInspectorLite` had the same bug as the full build: the constructor
- * hardcoded logging ON for the Dev environment (clobbering an explicit opt-out)
- * and handed that snapshot to `AvoStorage`, so a later `enableLogging(false)`
- * left storage's captured `true` in place and its dev error logs kept printing.
- *
- * The lite build has no EventSpecCache / AvoEventSpecFetcher, so `AvoStorage` is
- * the only sub-component to propagate to. `extractSchema` gives a network-free
- * observable log gated on the shared `shouldLog` flag for the positive control.
+ * The lite build has no EventSpecCache / AvoEventSpecFetcher, so `AvoStorage`
+ * (which reads the static flag live through a getter) is the sub-component that
+ * matters. `extractSchema` gives a network-free observable log gated on the
+ * shared `shouldLog` flag. Assertions are observable rather than on private
+ * fields.
  */
-describe("AvoInspectorLite enableLogging – dev log suppression (AVO-3079)", () => {
+describe("AvoInspectorLite enableLogging – log suppression (AVO-3079)", () => {
   // Loaded fresh in beforeEach so each test starts from clean static state.
   let AvoInspectorLite: typeof AvoInspectorLiteClass;
 
@@ -28,9 +25,22 @@ describe("AvoInspectorLite enableLogging – dev log suppression (AVO-3079)", ()
       version
     });
 
-  const storageShouldLog = (): boolean =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (AvoInspectorLite.avoStorage.storageImpl as any).shouldLog;
+  // extractSchema logs "extracting schema from ..." iff logging is on, and
+  // touches no network/storage, so it is a clean observable.
+  const expectSchemaLogged = async (
+    inspector: any,
+    logged: boolean
+  ): Promise<void> => {
+    (console.log as jest.Mock).mockClear();
+    await inspector.extractSchema({ prop: 1 });
+    if (logged) {
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("extracting schema")
+      );
+    } else {
+      expect(console.log).not.toHaveBeenCalled();
+    }
+  };
 
   beforeEach(() => {
     jest.resetModules();
@@ -38,71 +48,59 @@ describe("AvoInspectorLite enableLogging – dev log suppression (AVO-3079)", ()
       AvoInspectorLite: typeof AvoInspectorLiteClass;
     }>("../lite/AvoInspectorLite").AvoInspectorLite;
     (console.log as jest.Mock).mockClear();
+    (console.error as jest.Mock).mockClear();
   });
 
-  test("dev logs are on by default and fire when enabled (positive control)", async () => {
+  test("dev logs are on by default (positive control)", async () => {
+    await expectSchemaLogged(build(AvoInspectorEnv.Dev), true);
+  });
+
+  test("prod logs are off by default", async () => {
+    await expectSchemaLogged(build(AvoInspectorEnv.Prod), false);
+  });
+
+  test("enableLogging(false) silences logs in dev", async () => {
     const inspector = build(AvoInspectorEnv.Dev);
-
-    expect(AvoInspectorLite.shouldLog).toBe(true);
-    expect(storageShouldLog()).toBe(true);
-
-    (console.log as jest.Mock).mockClear();
-    await inspector.extractSchema({ prop: 1 });
-
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining("extracting schema")
-    );
-  });
-
-  test("prod logs are off by default (regression guard)", async () => {
-    const inspector = build(AvoInspectorEnv.Prod);
-
-    expect(AvoInspectorLite.shouldLog).toBe(false);
-    expect(storageShouldLog()).toBe(false);
-
-    (console.log as jest.Mock).mockClear();
-    await inspector.extractSchema({ prop: 1 });
-
-    expect(console.log).not.toHaveBeenCalled();
-  });
-
-  test("enableLogging(false) silences logs and propagates to storage in dev", async () => {
-    const inspector = build(AvoInspectorEnv.Dev);
-
     inspector.enableLogging(false);
-
-    expect(AvoInspectorLite.shouldLog).toBe(false);
-    // Without the propagation fix, AvoStorage keeps the `true` it was
-    // constructed with and its dev error logs keep printing.
-    expect(storageShouldLog()).toBe(false);
-
-    (console.log as jest.Mock).mockClear();
-    await inspector.extractSchema({ prop: 1 });
-    expect(console.log).not.toHaveBeenCalled();
+    await expectSchemaLogged(inspector, false);
   });
 
-  test("enableLogging(true) propagates to storage in prod", () => {
+  test("enableLogging(true) enables logs in prod", async () => {
     const inspector = build(AvoInspectorEnv.Prod);
-
     inspector.enableLogging(true);
-
-    expect(AvoInspectorLite.shouldLog).toBe(true);
-    expect(storageShouldLog()).toBe(true);
+    await expectSchemaLogged(inspector, true);
   });
 
   test("constructor does not clobber a logging preference set beforehand", async () => {
-    // Opt out of logging before constructing a Dev inspector.
     AvoInspectorLite.shouldLog = false;
+    await expectSchemaLogged(build(AvoInspectorEnv.Dev), false);
+  });
 
+  test("AvoInspectorLite.shouldLog toggles AvoStorage error logs live", () => {
     const inspector = build(AvoInspectorEnv.Dev);
 
-    // The Dev branch of the constructor must not force logging back on...
-    expect(AvoInspectorLite.shouldLog).toBe(false);
-    // ...and AvoStorage must be constructed with the opted-out value.
-    expect(storageShouldLog()).toBe(false);
+    const setItemSpy = jest
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation(() => {
+        throw new Error("quota exceeded");
+      });
 
-    (console.log as jest.Mock).mockClear();
-    await inspector.extractSchema({ prop: 1 });
-    expect(console.log).not.toHaveBeenCalled();
+    try {
+      (console.error as jest.Mock).mockClear();
+      AvoInspectorLite.avoStorage.setItem("k", "v");
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("setItem error"),
+        expect.anything()
+      );
+
+      // Setting the static flag after construction silences storage live, with
+      // no per-instance propagation.
+      inspector.enableLogging(false);
+      (console.error as jest.Mock).mockClear();
+      AvoInspectorLite.avoStorage.setItem("k", "v");
+      expect(console.error).not.toHaveBeenCalled();
+    } finally {
+      setItemSpy.mockRestore();
+    }
   });
 });

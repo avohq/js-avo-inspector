@@ -1,10 +1,4 @@
 /**
- * This file is generated. Internal development changes should be made in the generator
- * and the file should be re-generated. External contributions are welcome to submit
- * changes directly to this file, and we'll apply them to the generator internally.
- */
-
-/**
  * Wire format - Property constraints with short field names.
  * At most one constraint type will be present per property.
  */

@@ -1,9 +1,3 @@
-/**
- * This file is generated. Internal development changes should be made in the generator
- * and the file should be re-generated. External contributions are welcome to submit
- * changes directly to this file, and we'll apply them to the generator internally.
- */
-
 import type {
   EventSpecResponse,
   EventSpecResponseWire,
@@ -27,30 +21,25 @@ export class AvoEventSpecFetcher {
   private readonly timeout: number;
   /** In-flight requests to prevent duplicate fetches */
   private inFlightRequests: Map<string, Promise<EventSpecResponse | null>>;
-  /** Whether to log debug information */
-  private shouldLog: boolean;
+  /**
+   * Reads the current logging flag live, so a later enableLogging() /
+   * AvoInspector.shouldLog change is reflected without re-pushing. See AVO-3079.
+   */
+  private shouldLog: () => boolean;
   /** Environment name */
   private readonly env: string;
 
   constructor(
     timeout: number = 2000,
-    shouldLog: boolean = false,
+    shouldLog: boolean | (() => boolean) = false,
     env: string,
     baseUrl: string = "https://api.avo.app"
   ) {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
-    this.shouldLog = shouldLog;
+    this.shouldLog = typeof shouldLog === "function" ? shouldLog : () => shouldLog;
     this.env = env;
     this.inFlightRequests = new Map();
-  }
-
-  /**
-   * Updates whether debug information is logged. Lets AvoInspector propagate a
-   * later enableLogging() call to this already-constructed fetcher. See AVO-3079.
-   */
-  setShouldLog(shouldLog: boolean): void {
-    this.shouldLog = shouldLog;
   }
 
   /** Generates a unique key for tracking in-flight requests. */
@@ -104,7 +93,7 @@ export class AvoEventSpecFetcher {
         url
       );
       if (!wireResponse) {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.warn(
             `[Avo Inspector] Failed to fetch event spec for: ${params.eventName}`
           );
@@ -113,7 +102,7 @@ export class AvoEventSpecFetcher {
       }
       // Basic structure check for wire format
       if (!this.hasExpectedShape(wireResponse)) {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.warn(
             `[Avo Inspector] Invalid event spec response for: ${params.eventName}`
           );
@@ -125,7 +114,7 @@ export class AvoEventSpecFetcher {
         AvoEventSpecFetcher.parseEventSpecResponse(wireResponse);
       return response;
     } catch (error) {
-      if (this.shouldLog) {
+      if (this.shouldLog()) {
         console.error(
           `[Avo Inspector] Error fetching event spec for: ${params.eventName}`,
           error
@@ -163,7 +152,7 @@ export class AvoEventSpecFetcher {
               );
               resolve(response);
             } catch (error) {
-              if (this.shouldLog) {
+              if (this.shouldLog()) {
                 console.error(
                   "[Avo Inspector] Failed to parse response:",
                   error
@@ -172,7 +161,7 @@ export class AvoEventSpecFetcher {
               resolve(null);
             }
           } else {
-            if (this.shouldLog) {
+            if (this.shouldLog()) {
               console.warn(
                 `[Avo Inspector] Request failed with status: ${xhr.status}`
               );
@@ -181,13 +170,13 @@ export class AvoEventSpecFetcher {
           }
         };
         xhr.onerror = () => {
-          if (this.shouldLog) {
+          if (this.shouldLog()) {
             console.error("[Avo Inspector] Network error occurred");
           }
           resolve(null);
         };
         xhr.ontimeout = () => {
-          if (this.shouldLog) {
+          if (this.shouldLog()) {
             console.error(
               `[Avo Inspector] Request timed out after ${this.timeout}ms`
             );
