@@ -18,12 +18,13 @@ constructor(options: { apiKey: string; env: AvoInspectorEnvValueType; version: s
 
 - Public fields: `environment`, `avoBatcher`, `apiKey` (trimmed), `version`.
 - Statics: `avoStorage`; `batchSize` (setter clamps to ≥ 1), `batchFlushSeconds`, `shouldLog`, `networkTimeout`.
+- Private static `_shouldLogSetByUser` (initially `false`) — set to `true` by every write through the `shouldLog` setter, including `enableLogging`; never reset.
 - **Internal, untyped option `_client`** — passed to `AvoNetworkCallsHandlerLite`, which selects v2 only for `"gtm-web"`. No production caller sets it on the lite build.
 - Alias export `AvoInspector` so sibling lite modules import it under the full-build name.
 
 ## Functional requirements
 
-- **Constructor:** `env` empty/unsupported → `Dev` with `console.warn`; empty `apiKey` or `version` → throws; `apiKey` stored **trimmed**; `Dev` → `batchSize = 1`, logging on; otherwise 30 / 30 s, logging off; creates `AvoStorage`, `AvoNetworkCallsHandlerLite(apiKey, env, appName ?? "", version, libVersion, options._client)` and `AvoBatcher`.
+- **Constructor:** `env` empty/unsupported → `Dev` with `console.warn`; empty `apiKey` or `version` → throws; `apiKey` stored **trimmed**; `Dev` → `batchSize = 1`, otherwise 30 / 30 s; logging defaults to on for `Dev` and off otherwise **only when no explicit preference has been set**, else the explicit value is kept; creates `AvoStorage`, `AvoNetworkCallsHandlerLite(apiKey, env, appName ?? "", version, libVersion, options._client)` and `AvoBatcher`.
 - `async trackSchemaFromEvent(eventName, eventProperties): Promise<EventProperty[]>` — awaits `this._trackSchemaFromEventWithOptions(eventName, eventProperties, undefined)` inside a `try`/`catch`; a throw (e.g. no receiver) logs `Avo Inspector: something went wrong…` and resolves `[]`.
 - `private async _trackSchemaFromEventWithOptions(eventName, eventProperties, options)` — logs when enabled, extracts the schema, `trackSchemaInternal(…, null, null, options)`, returns the schema; `[]` on caught error.
 - `_avoFunctionTrackSchemaFromEvent(eventName, eventProperties, eventId, eventHash)` (private, Codegen) — unchanged; never passes `options`.
@@ -31,7 +32,8 @@ constructor(options: { apiKey: string; env: AvoInspectorEnvValueType; version: s
 - `private async _trackSchemaWithOptions(eventName, eventSchema, options)` — logs when enabled and batches with `options`; errors caught.
 - `trackSchemaInternal(eventName, eventSchema, eventId, eventHash, options?)` — `avoBatcher.handleTrackSchema(eventName, eventSchema, eventId, eventHash, undefined, options)` in a `try`/`catch`.
 - `extractSchema(eventProperties)` — `AvoSchemaParserLite.extractSchema(props)`; `[]` on error.
-- `enableLogging`, `setBatchSize` (through the clamping setter), `setBatchFlushSeconds`.
+- `enableLogging(enable)` — writes `shouldLog` through the static setter (marking it explicit) and calls `avoStorage.setShouldLog(enable)` so the shared storage follows immediately.
+- `setBatchSize` (through the clamping setter), `setBatchFlushSeconds`.
 
 ## Non-functional requirements
 
@@ -39,3 +41,4 @@ constructor(options: { apiKey: string; env: AvoInspectorEnvValueType; version: s
 - IMPORTANT: public track methods never throw or reject: errors, including a call without a receiver, are logged and resolve, as in 3.2.0.
 - The `*WithOptions` methods and `_client` are absent from the emitted lite `.d.ts`; options affect the wire only with the `"gtm-web"` client.
 - Every event is batched; there is no immediate send path.
+- **`shouldLog` is static and sticky:** once set explicitly, every later instance in the runtime keeps it; a direct `shouldLog = …` write after construction does not reach `AvoStorage`.
