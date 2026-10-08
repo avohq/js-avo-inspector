@@ -1,5 +1,6 @@
 import type { AvoInspector as AvoInspectorClass } from "../AvoInspector";
 import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
+import type { validateEvent as validateEventFn } from "../eventSpec/EventValidator";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
 
 /**
@@ -150,9 +151,9 @@ describe("enableLogging – log suppression (AVO-3079)", () => {
   });
 
   test("enableLogging(false) silences validation warnings (gated console.warn)", () => {
-    const { validateEvent } = jest.requireActual<
-      typeof import("../eventSpec/EventValidator")
-    >("../eventSpec/EventValidator");
+    const { validateEvent } = jest.requireActual<{
+      validateEvent: typeof validateEventFn;
+    }>("../eventSpec/EventValidator");
 
     AvoInspector.shouldLog = true;
     (console.warn as jest.Mock).mockClear();

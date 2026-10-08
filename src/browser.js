@@ -63,7 +63,7 @@ if (typeof window !== "undefined") {
 
   // Printed after the queued calls replay (which may include enableLogging(false)),
   // and gated on the logging flag, so the setting can silence it. See AVO-3079.
-  if (console !== "undefined" && AvoInspector.shouldLog) {
+  if (typeof console !== "undefined" && AvoInspector.shouldLog) {
     console.log("Avo Inspector: Loaded.");
   }
 } else if (console !== "undefined") {
