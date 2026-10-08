@@ -25,9 +25,6 @@ function routeGatewayOptions(inspector) {
 }
 
 if (typeof window !== "undefined") {
-  if (console !== "undefined" && window.inspector.__ENV__ === "dev") {
-    console.log("Avo Inspector: Loaded. Starting initialization...");
-  }
   if (console !== "undefined" && window.inspector.__API_KEY__ === "MY-API-KEY") {
     console.error("Avo Inspector: API key not provided");
   }
@@ -63,6 +60,12 @@ if (typeof window !== "undefined") {
     call.shift();
     window.inspector[method](...call);
   });
+
+  // Printed after the queued calls replay (which may include enableLogging(false)),
+  // and gated on the logging flag, so the setting can silence it. See AVO-3079.
+  if (typeof console !== "undefined" && AvoInspector.shouldLog) {
+    console.log("Avo Inspector: Loaded.");
+  }
 } else if (console !== "undefined") {
   console.log("Avo Inspector: Window not available. Aborting.");
 }

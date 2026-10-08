@@ -26,12 +26,15 @@ export class EventSpecCache {
   /** Global cache hit counter to track when to rotate cache */
   private globalEventCount: number = 0;
 
-  /** Whether to log debug information */
-  private readonly shouldLog: boolean;
+  /**
+   * Reads the current logging flag live, so a later enableLogging() /
+   * AvoInspector.shouldLog change is reflected without re-pushing. See AVO-3079.
+   */
+  private shouldLog: () => boolean;
 
-  constructor(shouldLog: boolean = false) {
+  constructor(shouldLog: boolean | (() => boolean) = false) {
     this.cache = new Map();
-    this.shouldLog = shouldLog;
+    this.shouldLog = typeof shouldLog === "function" ? shouldLog : () => shouldLog;
   }
 
   /**
@@ -95,7 +98,7 @@ export class EventSpecCache {
       return null;
     }
 
-    if (this.shouldLog) {
+    if (this.shouldLog()) {
       console.log(`[Avo Inspector] Cache hit for key: ${key}`);
     }
 
@@ -184,7 +187,7 @@ export class EventSpecCache {
   clear(): void {
     this.cache.clear();
     this.globalEventCount = 0;
-    if (this.shouldLog) {
+    if (this.shouldLog()) {
       console.log("[Avo Inspector] Cache cleared");
     }
   }

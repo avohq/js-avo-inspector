@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`enableLogging(false)` now actually silences dev logs.** Previously the `Dev` environment forced logging on at construction and each of `AvoStorage`, `EventSpecCache` and `AvoEventSpecFetcher` kept its own copy of the flag, so a later `enableLogging(false)` left those sub-components printing (most visibly `EventSpecCache`'s per-hit `Cache hit for key` line). The sub-components now read the single static flag live, so:
+  - `enableLogging(false)` / `enableLogging(true)` and `AvoInspector.shouldLog` take effect immediately on an already-constructed inspector — no value is cached or pushed around.
+  - The setting applies to every inspector instance in the same runtime, not just the one `enableLogging()` was called on.
+  - An explicit preference set via `enableLogging()` or `AvoInspector.shouldLog` is no longer clobbered by a later constructor; the environment default (dev on, prod/staging off) applies only when nothing was set.
+  - Six ungated validation `console.warn`s (`EventValidator`) and the script-tag "Loaded" dev log (`browser.js`) are now gated on the logging flag too, so nothing but genuine errors prints after `enableLogging(false)`.
+  - The same behaviour applies to the lite build (`avo-inspector/lite`); it has no event-spec cache/fetcher, so `AvoStorage` is the component affected.
+- **Errors that affect data delivery are always printed**, regardless of the logging setting: the `"something went wrong"` catches, `"Failed to encrypt property value"`, `"Stopped sending events on this page"`, the batch cache-read error, the stream-id storage errors, the missing-API-key error, and the constructor's missing/unsupported-environment warnings.
+
 ## [3.2.1] - 2026-09-16
 
 The public API is unchanged from 3.2.0: the same exports, constructor options and track-method signatures in both `avo-inspector` and `avo-inspector/lite`. Every npm (full and lite) and regular script-tag install sends exactly 3.2.0's request — `POST https://api.avo.app/inspector/v1/track`, a single `Content-Type: text/plain` header (plus `Content-Encoding: gzip` for a compressed batch), and the same body apart from `libVersion`.

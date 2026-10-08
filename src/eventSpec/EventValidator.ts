@@ -13,6 +13,12 @@
 
 import safe from 'safe-regex2';
 
+// Imported for its static shouldLog flag only, read at call time (never at
+// module evaluation), the same circular-import pattern AvoBatcher and
+// AvoNetworkCallsHandler use. Lets enableLogging(false) silence these
+// non-error validation warnings. See AVO-3079.
+import { AvoInspector } from "../AvoInspector";
+
 import type {
   EventSpecResponse,
   EventSpecEntry,
@@ -231,7 +237,9 @@ function getOrCompileRegex(pattern: string): RegExp | null {
     return regexCache.get(pattern)!;
   }
   if (!safe(pattern)) {
-    console.warn(`[Avo Inspector] Potentially unsafe regex pattern rejected, skipping constraint: ${pattern}`);
+    if (AvoInspector.shouldLog) {
+      console.warn(`[Avo Inspector] Potentially unsafe regex pattern rejected, skipping constraint: ${pattern}`);
+    }
     regexCache.set(pattern, null);
     return null;
   }
@@ -240,7 +248,9 @@ function getOrCompileRegex(pattern: string): RegExp | null {
     regexCache.set(pattern, regex);
     return regex;
   } catch (e) {
-    console.warn(`[Avo Inspector] Invalid regex pattern, skipping constraint: ${pattern}`);
+    if (AvoInspector.shouldLog) {
+      console.warn(`[Avo Inspector] Invalid regex pattern, skipping constraint: ${pattern}`);
+    }
     regexCache.set(pattern, null);
     return null;
   }
@@ -699,7 +709,9 @@ function convertValueToString(value: RuntimePropertyValue): string {
       return JSON.stringify(value);
     } catch (e) {
       // Circular reference or other serialization error
-      console.warn(`[Avo Inspector] Failed to stringify value: ${e}`);
+      if (AvoInspector.shouldLog) {
+        console.warn(`[Avo Inspector] Failed to stringify value: ${e}`);
+      }
       return String(value);
     }
   }
@@ -741,9 +753,11 @@ function checkAllowedValues(
     const allowedSet = getOrParseAllowedValues(allowedArrayJson);
     if (allowedSet === null) {
       // Invalid JSON - skip this constraint
-      console.warn(
-        `[Avo Inspector] Invalid allowed values JSON: ${allowedArrayJson}`
-      );
+      if (AvoInspector.shouldLog) {
+        console.warn(
+          `[Avo Inspector] Invalid allowed values JSON: ${allowedArrayJson}`
+        );
+      }
       continue;
     }
     if (!allowedSet.has(stringValue)) {
@@ -805,7 +819,9 @@ function checkMinMaxRanges(
 
   // NaN values fail all min/max constraints (comparisons with NaN are always false)
   if (Number.isNaN(value)) {
-    console.warn(`[Avo Inspector] NaN value fails min/max constraint`);
+    if (AvoInspector.shouldLog) {
+      console.warn(`[Avo Inspector] NaN value fails min/max constraint`);
+    }
     for (const eventIds of Object.values(minMaxRanges)) {
       addIdsToSet(eventIds, failedIds);
     }
@@ -824,7 +840,9 @@ function checkMinMaxRanges(
 
     // Only check for invalid format if a bound was specified but couldn't be parsed
     if ((hasMin && isNaN(min)) || (hasMax && isNaN(max))) {
-      console.warn(`[Avo Inspector] Invalid min/max range: ${rangeStr}`);
+      if (AvoInspector.shouldLog) {
+        console.warn(`[Avo Inspector] Invalid min/max range: ${rangeStr}`);
+      }
       continue;
     }
 
