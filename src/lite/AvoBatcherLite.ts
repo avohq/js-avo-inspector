@@ -80,7 +80,7 @@ export class AvoBatcher implements AvoBatcherType {
     if (this.networkCallsHandler.isQueueingDisabled()) {
       return;
     }
-    this.events.push(
+    this.handleEventBody(
       this.networkCallsHandler.bodyForEventSchemaCall(
         eventName,
         schema,
@@ -91,14 +91,26 @@ export class AvoBatcher implements AvoBatcherType {
         options
       )
     );
+  }
+
+  /**
+   * Queues an event body as it is, keeping its messageId and createdAt. Used to
+   * retry a failed immediate send: the request may have reached the server, and
+   * a resend must stay the same event rather than become a new one.
+   */
+  handleEventBody(eventBody: EventSchemaBody): void {
+    if (this.networkCallsHandler.isQueueingDisabled()) {
+      return;
+    }
+    this.events.push(eventBody);
     this.saveEvents();
 
     if (AvoInspector.shouldLog) {
       console.log(
         "Avo Inspector: saved event " +
-          eventName +
+          eventBody.eventName +
           " with schema " +
-          JSON.stringify(schema)
+          JSON.stringify(eventBody.eventProperties)
       );
     }
 
@@ -113,10 +125,13 @@ export class AvoBatcher implements AvoBatcherType {
   private checkIfBatchNeedsToBeSent() {
     const batchSize = this.events.length;
     if (batchSize === 0) return;
+    // One batch at a time. The queue is checked again when the batch in flight
+    // completes, so waiting events do not depend on a later event to be sent.
+    if (this.networkCallsHandler.isBatchInFlight()) return;
     const now = Date.now();
     const timeSinceLastFlushAttempt = now - this.batchFlushAttemptTimestamp;
 
-    const sendBySize = batchSize % AvoInspector.batchSize == 0;
+    const sendBySize = batchSize >= AvoInspector.batchSize;
     const sendByTime =
       timeSinceLastFlushAttempt >= AvoInspector.batchFlushSeconds * 1000;
 
@@ -152,6 +167,12 @@ export class AvoBatcher implements AvoBatcherType {
             }
           }
           avoBatcher.saveEvents();
+          // After a success, send what queued up meanwhile. After a failure the
+          // queue waits for the next event or flush, as before, rather than
+          // retrying in a loop against a failing network.
+          if (error == null && !avoBatcher.networkCallsHandler.isSendingDisabled()) {
+            avoBatcher.checkIfBatchNeedsToBeSent();
+          }
         }
       );
     }

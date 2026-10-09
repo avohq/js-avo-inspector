@@ -429,14 +429,14 @@ describe("TrackOptions on the validated/immediate-send path", () => {
     expect(Object.prototype.hasOwnProperty.call(eventBody, "originHint")).toBe(false);
   });
 
-  test("when the immediate send fails, the fallback avoBatcher.handleTrackSchema is called with options as the 6th arg and undefined eventSpecMetadata", async () => {
+  test("when the immediate send fails, the fallback re-queues the same body the immediate send built", async () => {
     const inspector = new AvoInspector({
       apiKey: "test-key",
       env: AvoInspectorEnv.Dev,
       version: "1.0.0"
     });
 
-    jest
+    const callInspectorImmediatelySpy = jest
       .spyOn(
         (inspector as any).avoNetworkCallsHandler,
         "callInspectorImmediately"
@@ -445,25 +445,23 @@ describe("TrackOptions on the validated/immediate-send path", () => {
         args[1](new Error("Network error"));
       });
 
-    const batcherHandleTrackSchemaSpy = jest.spyOn(
+    const batcherHandleEventBodySpy = jest.spyOn(
       inspector.avoBatcher,
-      "handleTrackSchema"
+      "handleEventBody"
     );
-
-    const options = { outputReference: "meta-x7k2q", originHint: "web" };
 
     await trackSchemaFromEventWithOptions(
       inspector,
       "test_event",
       { required_prop: "test_value" },
-      options
+      { outputReference: "meta-x7k2q", originHint: "web" }
     );
 
-    expect(batcherHandleTrackSchemaSpy).toHaveBeenCalledTimes(1);
-    const call = batcherHandleTrackSchemaSpy.mock.calls[0];
-    // eventSpecMetadata slot (5th arg, index 4) stays undefined on this fallback
-    expect(call[4]).toBeUndefined();
-    // options threaded as the 6th arg (index 5) so the hints aren't dropped
-    expect(call[5]).toEqual(options);
+    // The same body, so the retry keeps its messageId, createdAt and validation
+    // data — and whatever hints the immediate send carried.
+    expect(batcherHandleEventBodySpy).toHaveBeenCalledTimes(1);
+    expect(batcherHandleEventBodySpy.mock.calls[0][0]).toBe(
+      callInspectorImmediatelySpy.mock.calls[0][0]
+    );
   });
 });

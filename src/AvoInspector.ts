@@ -778,19 +778,10 @@ export class AvoInspector {
             error
           );
         }
-        // Fallback: add to batch on failure (without validation data).
-        // Explicit undefined for eventSpecMetadata (unchanged pre-existing
-        // behavior -- this fallback already dropped it before this change),
-        // options threaded as the 6th arg so a failed immediate send doesn't
-        // silently drop the hints when it re-queues onto the batch.
-        this.avoBatcher.handleTrackSchema(
-          eventName,
-          eventSchema,
-          eventId,
-          eventHash,
-          undefined,
-          options
-        );
+        // Fallback: retry through the batch with the same body. A timed-out
+        // request may still have reached the server, so the retry keeps its
+        // messageId, createdAt and validation data, and stays the same event.
+        this.avoBatcher.handleEventBody(eventBody);
       } else {
         if (AvoInspector.shouldLog) {
           console.log(

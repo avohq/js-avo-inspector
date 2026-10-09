@@ -283,6 +283,11 @@ export class AvoNetworkCallsHandlerLite {
     );
   }
 
+  /** True while a batch sent through callInspectorWithBatchBody awaits its response. */
+  isBatchInFlight(): boolean {
+    return this.sending;
+  }
+
   callInspectorWithBatchBody(
     inEvents: Array<SessionStartedBody | EventSchemaBody>,
     onCompleted: (error: Error | null, retryEvents?: RetryEvents) => any
