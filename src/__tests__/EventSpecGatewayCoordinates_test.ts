@@ -114,6 +114,17 @@ describe("AvoEventSpecFetcher - gateway coordinates", () => {
     expect(requests.urls.length).toBe(4);
   });
 
+  test("concurrent fetches for the same checkpoint of different gateway keys are not deduplicated", async () => {
+    const checkpoint = { originHint: "web", outputReference: "ga4" };
+    await Promise.all([
+      fetcher.fetch(base),
+      fetcher.fetch({ ...base, apiKey: "key2" }),
+      fetcher.fetch({ ...base, ...checkpoint }),
+      fetcher.fetch({ ...base, ...checkpoint, apiKey: "key2" })
+    ]);
+    expect(requests.urls.length).toBe(4);
+  });
+
   test("concurrent fetches for the same checkpoint are deduplicated", async () => {
     await Promise.all([
       fetcher.fetch({ ...base, originHint: "web", outputReference: "ga4" }),

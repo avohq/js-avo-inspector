@@ -46,19 +46,20 @@ export class AvoEventSpecFetcher {
   }
 
   /**
-   * Generates a unique key for tracking in-flight requests. Gateway coordinates
-   * are part of the key, so a gateway-input fetch and an output fetch for the
-   * same event name are never deduplicated into one; without them the key is
-   * unchanged.
+   * Generates a unique key for tracking in-flight requests, matching the spec
+   * cache key. The API key tells gateways apart, and gateway coordinates are
+   * part of the key, so fetches for different gateways or checkpoints of the
+   * same event name are never deduplicated into one.
    */
   private generateRequestKey(params: FetchEventSpecParams): string {
     const originHint: string | undefined = params.originHint || undefined;
     const outputReference: string | undefined =
       params.outputReference || undefined;
     if (originHint === undefined && outputReference === undefined) {
-      return `${params.streamId}:${params.eventName}`;
+      return `${params.apiKey}:${params.streamId}:${params.eventName}`;
     }
     return JSON.stringify([
+      params.apiKey,
       params.streamId,
       params.eventName,
       originHint ?? null,
