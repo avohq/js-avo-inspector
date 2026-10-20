@@ -1,4 +1,8 @@
-import type { EventSpecResponse, EventSpecCacheEntry } from "./AvoEventSpecFetchTypes";
+import type {
+  EventSpecResponse,
+  EventSpecCacheEntry,
+  EventSpecCoordinates
+} from "./AvoEventSpecFetchTypes";
 
 /**
  * EventSpecCache implements a dual-condition cache with LRU eviction.
@@ -9,6 +13,9 @@ import type { EventSpecResponse, EventSpecCacheEntry } from "./AvoEventSpecFetch
  * - Each cache entry tracks: spec, timestamp, and hit count
  *
  * Cache Key Format: ${apiKey}:${streamId}:${eventName}
+ * With gateway coordinates (originHint / outputReference, web GTM tag template
+ * only) the key is JSON.stringify([apiKey, streamId, eventName, originHint, outputReference])
+ * instead, so specs for different checkpoints of the same event never share an entry.
  *
  * Note: Event count only increments on cache hits, not on every tracked event.
  * This ensures the cache evicts based on actual usage, not overall tracking volume.
@@ -40,9 +47,21 @@ export class EventSpecCache {
   private generateKey(
     apiKey: string,
     streamId: string,
-    eventName: string
+    eventName: string,
+    coordinates?: EventSpecCoordinates
   ): string {
-    return `${apiKey}:${streamId}:${eventName}`;
+    const originHint = coordinates?.originHint || undefined;
+    const outputReference = coordinates?.outputReference || undefined;
+    if (originHint === undefined && outputReference === undefined) {
+      return `${apiKey}:${streamId}:${eventName}`;
+    }
+    return JSON.stringify([
+      apiKey,
+      streamId,
+      eventName,
+      originHint ?? null,
+      outputReference ?? null
+    ]);
   }
 
   /**
@@ -53,9 +72,10 @@ export class EventSpecCache {
   contains(
     apiKey: string,
     streamId: string,
-    eventName: string
+    eventName: string,
+    coordinates?: EventSpecCoordinates
   ): boolean {
-    const key = this.generateKey(apiKey, streamId, eventName);
+    const key = this.generateKey(apiKey, streamId, eventName, coordinates);
     const entry = this.cache.get(key);
 
     if (!entry) {
@@ -80,9 +100,10 @@ export class EventSpecCache {
   get(
     apiKey: string,
     streamId: string,
-    eventName: string
+    eventName: string,
+    coordinates?: EventSpecCoordinates
   ): EventSpecResponse | null {
-    const key = this.generateKey(apiKey, streamId, eventName);
+    const key = this.generateKey(apiKey, streamId, eventName, coordinates);
     const entry = this.cache.get(key); 
 
     if (!entry) {
@@ -123,9 +144,10 @@ export class EventSpecCache {
     apiKey: string,
     streamId: string,
     eventName: string,
-    spec: EventSpecResponse | null
+    spec: EventSpecResponse | null,
+    coordinates?: EventSpecCoordinates
   ): void {
-    const key = this.generateKey(apiKey, streamId, eventName);
+    const key = this.generateKey(apiKey, streamId, eventName, coordinates);
 
     const now = Date.now();
     const entry: EventSpecCacheEntry = {

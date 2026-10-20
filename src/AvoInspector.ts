@@ -10,9 +10,16 @@ import { AvoStreamId } from "./AvoStreamId";
 import { validateEvent } from "./eventSpec/EventValidator";
 
 import { isValueEmpty } from "./utils";
-import type { ValidationResult, PropertyValidationResult, EventSpecResponse } from "./eventSpec/AvoEventSpecFetchTypes";
+import type { ValidationResult, PropertyValidationResult, EventSpecResponse, EventSpecCoordinates } from "./eventSpec/AvoEventSpecFetchTypes";
 
 const libVersion = require("../package.json").version;
+
+/** Trims a gateway hint; anything but a non-blank string is absent (as in AvoNetworkCallsHandler). */
+function normalizeSpecHint(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
 
 export class AvoInspector {
   environment: AvoInspectorEnvValueType;
@@ -31,6 +38,10 @@ export class AvoInspector {
   private eventSpecCache?: EventSpecCache;
   private eventSpecFetcher?: AvoEventSpecFetcher;
   private currentBranchId: string | null = null;
+  // INTERNAL: whether the web GTM tag template's client ("gtm-web") is set, i.e.
+  // whether gateway options reach the track body at all (see AvoNetworkCallsHandler).
+  // Only then are they also sent with the event spec fetch.
+  private readonly hasGatewayClient: boolean;
 
   static avoStorage: AvoStorage;
 
@@ -145,6 +156,11 @@ export class AvoInspector {
 
     this.publicEncryptionKey = options.publicEncryptionKey;
 
+    this.hasGatewayClient =
+      normalizeSpecHint(
+        (options as typeof options & { _client?: unknown })._client
+      ) === "gtm-web";
+
     this.avoNetworkCallsHandler = new AvoNetworkCallsHandler(
       this.apiKey,
       this.environment.toString(),
@@ -231,10 +247,12 @@ export class AvoInspector {
 
         const eventSchema = await this.extractSchema(eventProperties, false);
 
-        // Fetch and validate event spec (sync blocking)
+        // Fetch and validate event spec (sync blocking), for the event's
+        // gateway checkpoint when it carries one
         const validationResult = await this.fetchAndValidateEvent(
           eventName,
-          eventProperties
+          eventProperties,
+          this.specCoordinates(options)
         );
 
         if (validationResult) {
@@ -388,7 +406,10 @@ export class AvoInspector {
 
         // For trackSchema we don't have raw properties, so we can't validate
         // Just fetch/cache spec for future use and use batched flow
-        await this.fetchEventSpecIfNeeded(eventName);
+        await this.fetchEventSpecIfNeeded(
+          eventName,
+          this.specCoordinates(options)
+        );
         this.trackSchemaInternal(eventName, eventSchema, null, null, options);
       } else {
         if (AvoInspector.shouldLog) {
@@ -485,13 +506,40 @@ export class AvoInspector {
     AvoInspector._batchFlushSeconds = newBatchFlushSeconds;
   }
 
+  // INTERNAL — the gateway coordinates to fetch the event's spec for: the same
+  // normalized originHint / outputReference the track body carries. Like the
+  // body, only with the web GTM tag template's client; otherwise (and when both
+  // are blank) undefined, so the fetch URL and cache key stay the source-key
+  // ones. A line comment, so none of this is emitted into the .d.ts.
+  private specCoordinates(
+    options: TrackOptions | undefined
+  ): EventSpecCoordinates | undefined {
+    if (!this.hasGatewayClient) {
+      return undefined;
+    }
+    const originHint = normalizeSpecHint(options?.originHint);
+    const outputReference = normalizeSpecHint(options?.outputReference);
+    if (originHint === undefined && outputReference === undefined) {
+      return undefined;
+    }
+    const coordinates: EventSpecCoordinates = {};
+    if (originHint !== undefined) {
+      coordinates.originHint = originHint;
+    }
+    if (outputReference !== undefined) {
+      coordinates.outputReference = outputReference;
+    }
+    return coordinates;
+  }
+
   /**
    * Handles branch change detection and cache storage for a fetched event spec.
    * This logic is shared between fetchEventSpecIfNeeded and fetchAndValidateEvent.
    */
   private handleBranchChangeAndCache(
     specResponse: EventSpecResponse,
-    eventName: string
+    eventName: string,
+    coordinates: EventSpecCoordinates | undefined
   ): void {
     // Check for branch change
     const newBranchId = specResponse.metadata.branchId;
@@ -511,7 +559,8 @@ export class AvoInspector {
         this.apiKey,
         this.streamId,
         eventName,
-        specResponse
+        specResponse,
+        coordinates
       );
     }
   }
@@ -522,7 +571,10 @@ export class AvoInspector {
    *
    * Note: EventSpec fetching only happens in dev/staging environments.
    */
-  private async fetchEventSpecIfNeeded(eventName: string): Promise<void> {
+  private async fetchEventSpecIfNeeded(
+    eventName: string,
+    coordinates?: EventSpecCoordinates
+  ): Promise<void> {
     // Only fetch specs in dev/staging environments (NOT in production)
     if (this.environment === AvoInspectorEnv.Prod) {
       return;
@@ -535,11 +587,19 @@ export class AvoInspector {
 
     try {
       // Check cache first (includes cached empty responses)
-      if (this.eventSpecCache.contains(this.apiKey, this.streamId, eventName)) {
+      if (
+        this.eventSpecCache.contains(
+          this.apiKey,
+          this.streamId,
+          eventName,
+          coordinates
+        )
+      ) {
         const cached = this.eventSpecCache.get(
           this.apiKey,
           this.streamId,
-          eventName
+          eventName,
+          coordinates
         );
         if (!cached) {
           // Cached empty response — no spec exists for this event
@@ -556,14 +616,21 @@ export class AvoInspector {
       const specResponse = await this.eventSpecFetcher.fetch({
         apiKey: this.apiKey,
         streamId: this.streamId,
-        eventName
+        eventName,
+        ...coordinates
       });
 
       if (specResponse) {
-        this.handleBranchChangeAndCache(specResponse, eventName);
+        this.handleBranchChangeAndCache(specResponse, eventName, coordinates);
       } else {
         // Cache the empty response so we don't re-fetch
-        this.eventSpecCache.set(this.apiKey, this.streamId, eventName, null);
+        this.eventSpecCache.set(
+          this.apiKey,
+          this.streamId,
+          eventName,
+          null,
+          coordinates
+        );
         if (AvoInspector.shouldLog) {
           console.log(
             `[Avo Inspector] Event spec fetch returned null for event: ${eventName}. Cached empty response.`
@@ -588,7 +655,8 @@ export class AvoInspector {
    */
   private async fetchAndValidateEvent(
     eventName: string,
-    eventProperties: Record<string, any>
+    eventProperties: Record<string, any>,
+    coordinates?: EventSpecCoordinates
   ): Promise<ValidationResult | null> {
     // Only fetch specs in dev/staging environments (NOT in production)
     if (this.environment === AvoInspectorEnv.Prod) {
@@ -602,11 +670,19 @@ export class AvoInspector {
 
     try {
       // Check cache first (includes cached empty responses)
-      if (this.eventSpecCache.contains(this.apiKey, this.streamId, eventName)) {
+      if (
+        this.eventSpecCache.contains(
+          this.apiKey,
+          this.streamId,
+          eventName,
+          coordinates
+        )
+      ) {
         const cached = this.eventSpecCache.get(
           this.apiKey,
           this.streamId,
-          eventName
+          eventName,
+          coordinates
         );
         if (cached) {
           if (AvoInspector.shouldLog) {
@@ -630,15 +706,22 @@ export class AvoInspector {
       const specResponse = await this.eventSpecFetcher.fetch({
         apiKey: this.apiKey,
         streamId: this.streamId,
-        eventName
+        eventName,
+        ...coordinates
       });
 
       if (specResponse) {
-        this.handleBranchChangeAndCache(specResponse, eventName);
+        this.handleBranchChangeAndCache(specResponse, eventName, coordinates);
         return validateEvent(eventProperties, specResponse);
       } else {
         // Cache the empty response so we don't re-fetch
-        this.eventSpecCache.set(this.apiKey, this.streamId, eventName, null);
+        this.eventSpecCache.set(
+          this.apiKey,
+          this.streamId,
+          eventName,
+          null,
+          coordinates
+        );
         if (AvoInspector.shouldLog) {
           console.log(
             `[Avo Inspector] Event spec fetch returned null for event: ${eventName}. Cached empty response.`
