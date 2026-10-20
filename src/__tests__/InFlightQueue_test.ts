@@ -9,6 +9,7 @@ import { AvoNetworkCallsHandler } from "../AvoNetworkCallsHandler";
 
 type FakeRequest = {
   body: any[];
+  timeout: number;
   respond: (status?: number) => void;
   timeOut: () => void;
 };
@@ -29,6 +30,7 @@ class FakeXHR {
   send(body: string): void {
     requests.push({
       body: JSON.parse(body),
+      timeout: this.timeout,
       respond: (status = 200) => {
         this.status = status;
         this.response = JSON.stringify({ samplingRate: 1 });
@@ -125,15 +127,7 @@ describe("AVO-3946 in-flight sends", () => {
     expect(resent.messageId).toEqual(first.body[0].messageId);
   });
 
-  test("a timed-out validated send is retried as the same body", async () => {
-    const inspector = new AvoInspector({
-      apiKey: "api-key",
-      env: AvoInspectorEnv.Dev,
-      version: "1"
-    });
-    await flush();
-    requests = [];
-
+  const sendValidated = (inspector: AvoInspector): void => {
     (inspector as any).sendEventWithValidation(
       "validated",
       [{ propertyName: "p", propertyType: "string" }],
@@ -149,6 +143,48 @@ describe("AVO-3946 in-flight sends", () => {
         propertyResults: {}
       }
     );
+  };
+
+  const newDevInspector = async (): Promise<AvoInspector> => {
+    const inspector = new AvoInspector({
+      apiKey: "api-key",
+      env: AvoInspectorEnv.Dev,
+      version: "1"
+    });
+    await flush();
+    requests = [];
+    return inspector;
+  };
+
+  test("a validated send waits at least 10 s, a batch keeps the network timeout", async () => {
+    const inspector = await newDevInspector();
+    sendValidated(inspector);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].timeout).toEqual(10000);
+
+    const batcher = newBatcher();
+    await flush();
+    requests = [];
+    batcher.handleTrackSchema("batched", [], null, null);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].timeout).toEqual(AvoInspector.networkTimeout);
+  });
+
+  test("a validated send keeps a network timeout raised above 10 s", async () => {
+    const original = AvoInspector.networkTimeout;
+    AvoInspector.networkTimeout = 15000;
+    try {
+      const inspector = await newDevInspector();
+      sendValidated(inspector);
+      expect(requests[0].timeout).toEqual(15000);
+    } finally {
+      AvoInspector.networkTimeout = original;
+    }
+  });
+
+  test("a timed-out validated send is retried as the same body", async () => {
+    const inspector = await newDevInspector();
+    sendValidated(inspector);
     expect(requests).toHaveLength(1);
     const immediate = requests.shift()!;
     const original = immediate.body[0];
