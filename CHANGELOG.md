@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-10-20
+
 ### Added
 
-- **Internal: the web GTM tag template's event-spec fetch is scoped to the event's gateway checkpoint** (AVO-4073, not public API). With the `"gtm-web"` client, an event tracked with gateway options fetches `GET https://api.avo.app/trackingPlan/eventSpec` with its normalized `originHint` and/or `outputReference` appended as query params (each only when non-blank), so dev/staging value validation runs against the spec of the gateway input or output it is observed at. Both coordinates are part of the spec cache key and the in-flight request key, so specs for different checkpoints of one event never share an entry. A 404 (e.g. a gateway key and no `originHint`) is cached as "no spec" and the event is sent unvalidated, as before.
+- **Internal: the web GTM tag template's event-spec fetch is scoped to the event's gateway checkpoint** (AVO-4073, not public API). With the `"gtm-web"` client, an event tracked with gateway options fetches `GET https://api.avo.app/trackingPlan/eventSpec` with its normalized `originHint` and/or `outputReference` appended as query params (each only when non-blank), so dev/staging value validation runs against the spec of the gateway input or output it is observed at. Both coordinates are part of the spec cache key and the in-flight request key, so specs for different checkpoints of one event never share an entry. The in-flight request key also includes the API key, matching the cache key. A 404 (e.g. a gateway key and no `originHint`) is cached as "no spec" and the event is sent unvalidated, as before.
 
   Every other install — npm full and lite, a regular script tag, Avo Codegen events, and gateway options without the client — fetches exactly the same URL and uses exactly the same cache key as 3.2.1.
 
