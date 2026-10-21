@@ -122,7 +122,10 @@ export class AvoBatcher implements AvoBatcherType {
     this.checkIfBatchNeedsToBeSent();
   }
 
-  private checkIfBatchNeedsToBeSent() {
+  // afterSuccess: called once a batch succeeded, so a queue that grew past the
+  // batch size while it was in flight is sent rather than left for a later event.
+  // Not after a failure, where it would resend the whole queue on every event.
+  private checkIfBatchNeedsToBeSent(afterSuccess = false) {
     const batchSize = this.events.length;
     if (batchSize === 0) return;
     // One batch at a time. The queue is checked again when the batch in flight
@@ -131,7 +134,9 @@ export class AvoBatcher implements AvoBatcherType {
     const now = Date.now();
     const timeSinceLastFlushAttempt = now - this.batchFlushAttemptTimestamp;
 
-    const sendBySize = batchSize % AvoInspector.batchSize == 0;
+    const sendBySize =
+      batchSize % AvoInspector.batchSize == 0 ||
+      (afterSuccess && batchSize >= AvoInspector.batchSize);
     const sendByTime =
       timeSinceLastFlushAttempt >= AvoInspector.batchFlushSeconds * 1000;
 
@@ -171,7 +176,7 @@ export class AvoBatcher implements AvoBatcherType {
           // queue waits for the next event or flush, as before, rather than
           // retrying in a loop against a failing network.
           if (error == null && !avoBatcher.networkCallsHandler.isSendingDisabled()) {
-            avoBatcher.checkIfBatchNeedsToBeSent();
+            avoBatcher.checkIfBatchNeedsToBeSent(true);
           }
         }
       );

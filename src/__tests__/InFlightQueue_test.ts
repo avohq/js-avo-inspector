@@ -115,7 +115,9 @@ describe("AVO-3946 in-flight sends", () => {
     }
     expect(requests).toHaveLength(1);
     expect(requests[0].body).toHaveLength(30);
-    requests.shift()!.timeOut();
+    const failed = requests.shift();
+    expect(failed).toBeDefined();
+    failed?.timeOut();
     await flush();
 
     // The failed 30 are queued again. Each later event must not resend the
@@ -125,6 +127,31 @@ describe("AVO-3946 in-flight sends", () => {
     }
     await flush();
     expect(requests).toHaveLength(0);
+  });
+
+  test("after a successful batch, a queue that passed the batch size is sent", async () => {
+    const batcher = newBatcher();
+    AvoInspector.batchSize = 30;
+    await flush();
+    requests = [];
+
+    for (let i = 0; i < 30; i++) {
+      batcher.handleTrackSchema("first-" + i, [], null, null);
+    }
+    expect(requests).toHaveLength(1);
+    const inFlight = requests.shift();
+
+    // 31 events arrive while the first batch is in flight: the 30th is skipped
+    // by the in-flight guard and 31 is not a multiple of the batch size.
+    for (let i = 0; i < 31; i++) {
+      batcher.handleTrackSchema("second-" + i, [], null, null);
+    }
+    expect(requests).toHaveLength(0);
+
+    inFlight?.respond(200);
+    await flush();
+    expect(requests).toHaveLength(1);
+    expect(requests[0].body).toHaveLength(31);
   });
 
   const sentRequests: FakeRequest[] = [];
@@ -138,7 +165,7 @@ describe("AVO-3946 in-flight sends", () => {
     requests = [];
 
     batcher.handleTrackSchema("a", [], null, null);
-    const first = requests.shift()!;
+    const first = requests.shift() as FakeRequest;
     first.timeOut();
     await flush();
 
@@ -209,7 +236,7 @@ describe("AVO-3946 in-flight sends", () => {
     const inspector = await newDevInspector();
     sendValidated(inspector);
     expect(requests).toHaveLength(1);
-    const immediate = requests.shift()!;
+    const immediate = requests.shift() as FakeRequest;
     const original = immediate.body[0];
     expect(original.validatedBranchId).toEqual("branch-1");
 
