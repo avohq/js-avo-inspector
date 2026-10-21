@@ -29,7 +29,7 @@ Same shapes as the full handler, with the lite differences below:
 
 - `constructor(apiKey, envName, appName, appVersion, libVersion, client?)` — on v2, an api key or env that is not a header value stops sending immediately (one `console.error`).
 - `isSendingDisabled()` / `isQueueingDisabled()` — as in the full handler: sending stops for both triggers, queueing only for the unusable-api-key one.
-- `callInspectorWithBatchBody`, `callInspectorImmediately`, `bodyForSessionStartedCall`, `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — same guard, null filtering, empty-list short-circuit and sampling drop as the full handler. `fixStreamIds` is a no-op; `callInspectorImmediately` does not touch the stream id. `callInspectorImmediately` times out at `max(AvoInspector.networkTimeout, validatedSendMinTimeout)`, batch sends at `networkTimeout`; `AvoInspectorLite` never calls `callInspectorImmediately`.
+- `callInspectorWithBatchBody`, `callInspectorImmediately`, `bodyForSessionStartedCall`, `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — same guard, null filtering, empty-list short-circuit and sampling drop as the full handler. `fixStreamIds` is a no-op; `callInspectorImmediately` does not touch the stream id. `callInspectorImmediately` times out at `max(AvoInspector.networkTimeout, validatedSendMinTimeout)` (0 stays 0, no timeout), batch sends at `networkTimeout`; `AvoInspectorLite` never calls `callInspectorImmediately`.
 
 ### Gateway coordinates (identical to the full handler)
 

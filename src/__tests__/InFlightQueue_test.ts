@@ -207,6 +207,18 @@ describe("AVO-3946 in-flight sends", () => {
     }
   });
 
+  test("a validated send keeps a network timeout of 0 (no timeout)", async () => {
+    const original = AvoInspector.networkTimeout;
+    AvoInspector.networkTimeout = 0;
+    try {
+      const inspector = await newDevInspector();
+      sendValidated(inspector);
+      expect(requests[0].timeout).toEqual(0);
+    } finally {
+      AvoInspector.networkTimeout = original;
+    }
+  });
+
   test("a timed-out validated send is retried as the same body", async () => {
     const inspector = await newDevInspector();
     sendValidated(inspector);

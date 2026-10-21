@@ -176,7 +176,7 @@ const gzipMinBodyLength = 1024;
  * up. A send that times out is retried, and a request that was slow but did
  * reach the server would then be ingested twice, so the client waits longer for
  * the answer instead of giving up at the batch timeout. A larger
- * AvoInspector.networkTimeout still applies.
+ * AvoInspector.networkTimeout still applies, and so does 0 (no timeout).
  */
 const validatedSendMinTimeout = 10000;
 
@@ -461,7 +461,10 @@ export class AvoNetworkCallsHandlerLite {
     this.callInspectorApi(
       [eventBody],
       onCompleted,
-      Math.max(AvoInspector.networkTimeout, validatedSendMinTimeout)
+      // 0 means no timeout for XMLHttpRequest, so it stays 0.
+      AvoInspector.networkTimeout === 0
+        ? 0
+        : Math.max(AvoInspector.networkTimeout, validatedSendMinTimeout)
     );
   }
 
