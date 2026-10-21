@@ -127,6 +127,20 @@ describe("AVO-3946 in-flight sends", () => {
     }
     await flush();
     expect(requests).toHaveLength(0);
+
+    // Once the flush window has passed, the next event sends the whole queue.
+    const now = Date.now();
+    const dateNow = jest
+      .spyOn(Date, "now")
+      .mockReturnValue(now + AvoInspector.batchFlushSeconds * 1000);
+    try {
+      batcher.handleTrackSchema("flush", [], null, null);
+      await flush();
+      expect(requests).toHaveLength(1);
+      expect(requests[0].body).toHaveLength(41);
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 
   const sentRequests: FakeRequest[] = [];

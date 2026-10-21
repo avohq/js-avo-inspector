@@ -96,6 +96,8 @@ describe("AVO-3946 validated send timeout on every transport", () => {
 
   test("a gzipped validated send waits at least 10 s", async () => {
     const { CompressionStream } = require("node:stream/web");
+    const hadCompressionStream = "CompressionStream" in globalThis;
+    const originalCompressionStream = (globalThis as any).CompressionStream;
     (globalThis as any).CompressionStream = CompressionStream;
     try {
       const inspector = new AvoInspector({
@@ -123,7 +125,11 @@ describe("AVO-3946 validated send timeout on every transport", () => {
       expect(requests[0].gzipped).toBe(true);
       expect(requests[0].timeout).toEqual(10000);
     } finally {
-      delete (globalThis as any).CompressionStream;
+      if (hadCompressionStream) {
+        (globalThis as any).CompressionStream = originalCompressionStream;
+      } else {
+        delete (globalThis as any).CompressionStream;
+      }
     }
   });
 });
