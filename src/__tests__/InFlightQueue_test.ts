@@ -104,6 +104,29 @@ describe("AVO-3946 in-flight sends", () => {
       .toEqual(["a", "b", "c", "d"]);
   });
 
+  test("after a failed batch, later events wait for the next batch or the flush window", async () => {
+    const batcher = newBatcher();
+    AvoInspector.batchSize = 30;
+    await flush();
+    requests = [];
+
+    for (let i = 0; i < 30; i++) {
+      batcher.handleTrackSchema("before-" + i, [], null, null);
+    }
+    expect(requests).toHaveLength(1);
+    expect(requests[0].body).toHaveLength(30);
+    requests.shift()!.timeOut();
+    await flush();
+
+    // The failed 30 are queued again. Each later event must not resend the
+    // whole queue while the network is failing.
+    for (let i = 0; i < 10; i++) {
+      batcher.handleTrackSchema("after-" + i, [], null, null);
+    }
+    await flush();
+    expect(requests).toHaveLength(0);
+  });
+
   const sentRequests: FakeRequest[] = [];
   beforeEach(() => {
     sentRequests.length = 0;

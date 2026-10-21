@@ -131,7 +131,7 @@ export class AvoBatcher implements AvoBatcherType {
     const now = Date.now();
     const timeSinceLastFlushAttempt = now - this.batchFlushAttemptTimestamp;
 
-    const sendBySize = batchSize >= AvoInspector.batchSize;
+    const sendBySize = batchSize % AvoInspector.batchSize == 0;
     const sendByTime =
       timeSinceLastFlushAttempt >= AvoInspector.batchFlushSeconds * 1000;
 
