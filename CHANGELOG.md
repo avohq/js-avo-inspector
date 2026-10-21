@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A validated send waits at least 10 seconds for the response** (was the 2-second `networkTimeout`), or `networkTimeout` if that is longer. A slow request that did reach the server is no longer sent a second time. Batched sends and the event-spec fetch keep `networkTimeout`. Production sends are always batched, so they are unchanged.
 - **Events no longer wait in the queue while a batch is in flight** (AVO-3946). An event tracked while a batch was being sent stayed queued, with nothing scheduled to send it, until the next tracked event or page load. The queue is now checked again when a batch succeeds, and sent if it has reached the batch size. With batch size 1, four rapid events now send four events on the same page. After a failed batch, the queue still waits for the next event or the flush window, as before.
 
-Same changes in `avo-inspector/lite`.
+The queue fix also applies to `avo-inspector/lite`.
 
 ## [3.2.2] - 2026-10-20
 
