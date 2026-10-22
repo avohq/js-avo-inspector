@@ -63,7 +63,7 @@ describe("AVO-3946 in-flight sends", () => {
     AvoInspector.batchSize = 30;
   });
 
-  const newBatcher = (): AvoBatcher => {
+  const newBatcher = (env: string = "prod"): AvoBatcher => {
     const inspector = new AvoInspector({
       apiKey: "api-key",
       env: AvoInspectorEnv.Prod,
@@ -72,7 +72,7 @@ describe("AVO-3946 in-flight sends", () => {
     AvoInspector.batchSize = 1;
     const handler = new AvoNetworkCallsHandler(
       "api-key",
-      "prod",
+      env,
       "",
       "1",
       "test"
@@ -195,7 +195,7 @@ describe("AVO-3946 in-flight sends", () => {
     return inspector;
   };
 
-  test("a validated send waits at least 10 s, a batch keeps the network timeout", async () => {
+  test("a validated send waits at least 10 s, a prod batch keeps the network timeout", async () => {
     const inspector = await newDevInspector();
     sendValidated(inspector);
     expect(requests).toHaveLength(1);
@@ -227,6 +227,39 @@ describe("AVO-3946 in-flight sends", () => {
     try {
       const inspector = await newDevInspector();
       sendValidated(inspector);
+      expect(requests[0].timeout).toEqual(0);
+    } finally {
+      AvoInspector.networkTimeout = original;
+    }
+  });
+
+  test("a dev or staging batch waits at least 10 s, a prod batch keeps the network timeout", async () => {
+    const timeouts: Record<string, number> = {};
+    for (const env of ["dev", "staging", "prod"]) {
+      // Each batcher replays the stored queue on construction; start empty.
+      window.localStorage.clear();
+      const batcher = newBatcher(env);
+      await flush();
+      requests = [];
+      batcher.handleTrackSchema("batched", [], null, null);
+      expect(requests).toHaveLength(1);
+      timeouts[env] = requests[0].timeout;
+    }
+    expect(timeouts).toEqual({
+      dev: 10000,
+      staging: 10000,
+      prod: AvoInspector.networkTimeout
+    });
+  });
+
+  test("a dev batch keeps a network timeout of 0 (no timeout)", async () => {
+    const original = AvoInspector.networkTimeout;
+    AvoInspector.networkTimeout = 0;
+    try {
+      const batcher = newBatcher("dev");
+      await flush();
+      requests = [];
+      batcher.handleTrackSchema("batched", [], null, null);
       expect(requests[0].timeout).toEqual(0);
     } finally {
       AvoInspector.networkTimeout = original;

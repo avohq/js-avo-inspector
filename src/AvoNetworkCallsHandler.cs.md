@@ -31,7 +31,7 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 
 `gzipMinBodyLength = 1024` — bodies shorter than this (JS string length) are sent uncompressed.
 
-`validatedSendMinTimeout = 10000` — the lowest request timeout, in ms, for `callInspectorImmediately`.
+`validatedSendMinTimeout = 10000` — the lowest request timeout, in ms, for every send outside prod. `nonProdSendTimeout()` returns `max(AvoInspector.networkTimeout, validatedSendMinTimeout)`, or 0 (no timeout) when `networkTimeout` is 0.
 
 `webGtmTemplateClient = "gtm-web"` — the only client that selects v2 and the only `X-Avo-Client` value ever sent.
 
@@ -56,8 +56,8 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 - `isQueueingDisabled(): boolean` — `true` only for the constructor's unusable-api-key stop, where every event this instance builds would carry that key; the batcher then queues nothing. Always `false` on v1.
 - `disableSending(reason)` (private) — sets `sendingDisabled` and logs once: `console.error("[Avo Inspector] Stopped sending events on this page: <reason>.")`. Reasons: `the api key cannot be sent as a request header` (constructor) and `the Avo Inspector API refused its events 3 times in a row` (runtime). The key value is never logged.
 - `isBatchInFlight(): boolean` — `true` while a send started by `callInspectorWithBatchBody` awaits completion (the `sending` flag). Immediate sends do not set it.
-- `callInspectorWithBatchBody(events, onCompleted: (error, retryEvents?) => any)` — rejects re-entrant sends while one is in flight (Error callback, no send); filters null events; reconciles stream ids; returns silently on an empty list; may drop the batch by sampling; sets `sending`, sends, and clears `sending` before forwarding to `onCompleted` — with `retryEvents` only when the send supplied them (v2), otherwise with the error alone.
-- `callInspectorImmediately(eventBody, onCompleted)` — single-event send bypassing batching and sampling; reconciles an `"unknown"` stream id. Its request timeout is `max(AvoInspector.networkTimeout, validatedSendMinTimeout)`, or 0 (no timeout) when `networkTimeout` is 0; batch sends use `AvoInspector.networkTimeout`.
+- `callInspectorWithBatchBody(events, onCompleted: (error, retryEvents?) => any)` — rejects re-entrant sends while one is in flight (Error callback, no send); filters null events; reconciles stream ids; returns silently on an empty list; may drop the batch by sampling; sets `sending`, sends with timeout `AvoInspector.networkTimeout` when `envName` is `"prod"` and `nonProdSendTimeout()` otherwise, and clears `sending` before forwarding to `onCompleted` — with `retryEvents` only when the send supplied them (v2), otherwise with the error alone.
+- `callInspectorImmediately(eventBody, onCompleted)` — single-event send bypassing batching and sampling; reconciles an `"unknown"` stream id. Its request timeout is `nonProdSendTimeout()`.
 - `bodyForSessionStartedCall()` / `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — construct the typed bodies from instance config; the event body then applies the gateway rules below.
 - `fixStreamIds(events)` — replaces `"unknown"` stream ids with the first known id in the batch, else `AvoStreamId.streamId`.
 

@@ -23,13 +23,13 @@ Same shapes as the full handler, with the lite differences below:
 - `normalizeHint`, `webGtmTemplateClient = "gtm-web"`, `normalizeClient` — identical to the full handler: `client` is `"gtm-web"` only when the argument trims to exactly that string, otherwise `undefined`.
 - `client: string | undefined` and `trackingEndpoint` (v1 `https://api.avo.app/inspector/v1/track` / v2 `https://api.avo.app/inspector/v2/track`) — instance fields set once in the constructor.
 - `apiKey` — arrives trimmed from `AvoInspectorLite`.
-- `isHeaderValue`, `maxConsecutivePermanentFailures = 3`, `permanentFailures`, `foreignFailures`, `sendingDisabled`, `queueingDisabled`, `isSendingDisabled()`, `isQueueingDisabled()`, `isBatchInFlight()`, `validatedSendMinTimeout = 10000` — identical to the full handler.
+- `isHeaderValue`, `maxConsecutivePermanentFailures = 3`, `permanentFailures`, `foreignFailures`, `sendingDisabled`, `queueingDisabled`, `isSendingDisabled()`, `isQueueingDisabled()`, `isBatchInFlight()`, `validatedSendMinTimeout = 10000`, `nonProdSendTimeout()` — identical to the full handler.
 
 ## Functional requirements
 
 - `constructor(apiKey, envName, appName, appVersion, libVersion, client?)` — on v2, an api key or env that is not a header value stops sending immediately (one `console.error`).
 - `isSendingDisabled()` / `isQueueingDisabled()` — as in the full handler: sending stops for both triggers, queueing only for the unusable-api-key one.
-- `callInspectorWithBatchBody`, `callInspectorImmediately`, `bodyForSessionStartedCall`, `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — same guard, null filtering, empty-list short-circuit and sampling drop as the full handler. `fixStreamIds` is a no-op; `callInspectorImmediately` does not touch the stream id. `callInspectorImmediately` times out at `max(AvoInspector.networkTimeout, validatedSendMinTimeout)` (0 stays 0, no timeout), batch sends at `networkTimeout`; `AvoInspectorLite` never calls `callInspectorImmediately`.
+- `callInspectorWithBatchBody`, `callInspectorImmediately`, `bodyForSessionStartedCall`, `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — same guard, null filtering, empty-list short-circuit and sampling drop as the full handler. `fixStreamIds` is a no-op; `callInspectorImmediately` does not touch the stream id. `callInspectorImmediately` times out at `nonProdSendTimeout()` (`max(AvoInspector.networkTimeout, validatedSendMinTimeout)`, 0 stays 0, no timeout); batch sends use the same outside prod and `networkTimeout` in prod; `AvoInspectorLite` never calls `callInspectorImmediately`.
 
 ### Gateway coordinates (identical to the full handler)
 

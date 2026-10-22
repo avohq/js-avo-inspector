@@ -174,14 +174,21 @@ export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
 const gzipMinBodyLength = 1024;
 
 /**
- * Lowest timeout, in milliseconds, for an immediate (validated) send. Those run
- * only in dev and staging, outside the batcher, so waiting longer holds nothing
- * up. A send that times out is retried, and a request that was slow but did
- * reach the server would then be ingested twice, so the client waits longer for
- * the answer instead of giving up at the batch timeout. A larger
- * AvoInspector.networkTimeout still applies, and so does 0 (no timeout).
+ * Lowest timeout, in milliseconds, for every send in dev and staging: immediate
+ * (validated) sends and batches. A send that times out is retried, and a
+ * request that was slow but did reach the server would then be ingested twice,
+ * so outside prod the client waits longer for the answer instead of giving up at
+ * networkTimeout. A larger AvoInspector.networkTimeout still applies, and so
+ * does 0 (no timeout). Prod batches keep networkTimeout.
  */
 const validatedSendMinTimeout = 10000;
+
+/** networkTimeout raised to validatedSendMinTimeout; 0 means no timeout for XMLHttpRequest, so it stays 0. */
+function nonProdSendTimeout(): number {
+  return AvoInspector.networkTimeout === 0
+    ? 0
+    : Math.max(AvoInspector.networkTimeout, validatedSendMinTimeout);
+}
 
 /**
  * Gzips a string body using the browser-native CompressionStream API.
@@ -350,14 +357,20 @@ export class AvoNetworkCallsHandler {
     }
 
     this.sending = true;
-    this.callInspectorApi(events, (error, retryEvents) => {
-      this.sending = false;
-      if (retryEvents === undefined) {
-        onCompleted(error);
-      } else {
-        onCompleted(error, retryEvents);
-      }
-    });
+    const timeout =
+      this.envName === "prod" ? AvoInspector.networkTimeout : nonProdSendTimeout();
+    this.callInspectorApi(
+      events,
+      (error, retryEvents) => {
+        this.sending = false;
+        if (retryEvents === undefined) {
+          onCompleted(error);
+        } else {
+          onCompleted(error, retryEvents);
+        }
+      },
+      timeout
+    );
   }
 
   private fixStreamIds(
@@ -493,10 +506,7 @@ export class AvoNetworkCallsHandler {
     this.callInspectorApi(
       [eventBody],
       onCompleted,
-      // 0 means no timeout for XMLHttpRequest, so it stays 0.
-      AvoInspector.networkTimeout === 0
-        ? 0
-        : Math.max(AvoInspector.networkTimeout, validatedSendMinTimeout)
+      nonProdSendTimeout()
     );
   }
 
