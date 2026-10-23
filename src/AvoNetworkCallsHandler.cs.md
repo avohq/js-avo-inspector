@@ -31,6 +31,8 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 
 `gzipMinBodyLength = 1024` — bodies shorter than this (JS string length) are sent uncompressed.
 
+`validatedSendMinTimeout = 10000` — the lowest request timeout, in ms, for every send outside prod. `nonProdSendTimeout()` returns `max(AvoInspector.networkTimeout, validatedSendMinTimeout)`, or 0 (no timeout) when `networkTimeout` is 0.
+
 `webGtmTemplateClient = "gtm-web"` — the only client that selects v2 and the only `X-Avo-Client` value ever sent.
 
 `normalizeHint(value: unknown): string | undefined` — non-strings → `undefined`; strings → `trim()`, `""` → `undefined`. No length or cardinality check.
@@ -53,8 +55,9 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 - `isSendingDisabled(): boolean` — `true` once v2 has stopped sending for this page; always `false` on v1. The batcher then keeps queueing and saving, but stops attempting a flush, so the events stay stored for a later page load.
 - `isQueueingDisabled(): boolean` — `true` only for the constructor's unusable-api-key stop, where every event this instance builds would carry that key; the batcher then queues nothing. Always `false` on v1.
 - `disableSending(reason)` (private) — sets `sendingDisabled` and logs once: `console.error("[Avo Inspector] Stopped sending events on this page: <reason>.")`. Reasons: `the api key cannot be sent as a request header` (constructor) and `the Avo Inspector API refused its events 3 times in a row` (runtime). The key value is never logged.
-- `callInspectorWithBatchBody(events, onCompleted: (error, retryEvents?) => any)` — rejects re-entrant sends while one is in flight (Error callback, no send); filters null events; reconciles stream ids; returns silently on an empty list; may drop the batch by sampling; sets `sending`, sends, and clears `sending` before forwarding to `onCompleted` — with `retryEvents` only when the send supplied them (v2), otherwise with the error alone.
-- `callInspectorImmediately(eventBody, onCompleted)` — single-event send bypassing batching and sampling; reconciles an `"unknown"` stream id.
+- `isBatchInFlight(): boolean` — `true` while a send started by `callInspectorWithBatchBody` awaits completion (the `sending` flag). Immediate sends do not set it.
+- `callInspectorWithBatchBody(events, onCompleted: (error, retryEvents?) => any)` — rejects re-entrant sends while one is in flight (Error callback, no send); filters null events; reconciles stream ids; returns silently on an empty list; may drop the batch by sampling; sets `sending`, sends with timeout `AvoInspector.networkTimeout` when `envName` is `"prod"` and `nonProdSendTimeout()` otherwise, and clears `sending` before forwarding to `onCompleted` — with `retryEvents` only when the send supplied them (v2), otherwise with the error alone.
+- `callInspectorImmediately(eventBody, onCompleted)` — single-event send bypassing batching and sampling; reconciles an `"unknown"` stream id. Its request timeout is `nonProdSendTimeout()`.
 - `bodyForSessionStartedCall()` / `bodyForEventSchemaCall(eventName, eventProperties, eventId, eventHash, eventSpecMetadata?, validatedBranchId?, options?)` — construct the typed bodies from instance config; the event body then applies the gateway rules below.
 - `fixStreamIds(events)` — replaces `"unknown"` stream ids with the first known id in the batch, else `AvoStreamId.streamId`.
 
@@ -76,6 +79,8 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 
 ### Send path (`callInspectorApi` → `sendEvents` → `sendTrackingRequest`)
 
+`callInspectorApi(events, onCompleted, timeout = AvoInspector.networkTimeout)` threads `timeout` unchanged to every request it opens.
+
 0. **v1:** `sendEvents(events, this.apiKey, this.envName, …)` and forward the error alone — one request, as before.
    **v2 — one request per queued api key and env:** events are grouped by their own `apiKey`/`env` body fields, in order of first appearance, and the groups are sent **sequentially** (the next request opens when the previous completes). Each group's headers come from its bodies, so events persisted by an earlier page with another configuration (a published container's prod queue flushed by a GTM Preview load, or the reverse) are attributed as queued. A group is *own* when its api key and env equal this instance's. Per group:
    - `sendingDisabled` → not sent; kept for retry.
@@ -89,10 +94,10 @@ Exported from this module for the inspector and batcher, **not** re-exported fro
 1. `sendEvents` serializes the group: `body = JSON.stringify(events)`.
 2. **Uncompressed fast path (synchronous):** `CompressionStream` undefined OR `body.length < gzipMinBodyLength` → `sendTrackingRequest(body, false, …)`.
 3. **Compressed path (async):** `gzip(body)`; success → send the `Uint8Array` with `isGzipped=true`; `null` → send the string uncompressed.
-4. `sendTrackingRequest(body, isGzipped, apiKey, env, onCompleted: (error, permanent?) => any)` — async POST to `this.trackingEndpoint`, headers in order:
+4. `sendTrackingRequest(body, isGzipped, apiKey, env, timeout, onCompleted: (error, permanent?) => any)` — async POST to `this.trackingEndpoint`, headers in order:
    - **v1:** `Content-Type: text/plain` only.
    - **v2:** `Content-Type: application/json`, `api-key: <group apiKey>`, `env: <group env>`, `X-Avo-Client: gtm-web`.
-   - Both: `Content-Encoding: gzip` only when `isGzipped`; `timeout = AvoInspector.networkTimeout`.
+   - Both: `Content-Encoding: gzip` only when `isGzipped`; `xmlhttp.timeout = timeout`.
    
    IMPORTANT: construction, `open`, every `setRequestHeader`, `timeout` and `send` run inside one `try`/`catch`; a throw calls `onCompleted(new Error("Failed to send request: …"), true)` (permanent) and returns. No synchronous XHR setup step escapes the method on either path. A throw from `onCompleted` itself still propagates (on the gzipped path as an unhandled rejection); `sending` is already cleared by then. `onload`/`onerror`/`ontimeout` are assigned after the `try`.
 5. `onload`: non-200 → Error, **permanent** for a 4xx other than 408 and 429; 200 → parse JSON (failure → Error), adopt a numeric non-NaN `response.samplingRate`, `onCompleted(null)`. `onerror` / `ontimeout` → corresponding transient Errors.
