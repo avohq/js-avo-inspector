@@ -152,10 +152,10 @@ describe("AVO-3946 queue fix in avo-inspector/lite", () => {
     return new AvoBatcherLite(handler as any);
   };
 
-  test("a dev batch waits at least 10 s, a prod batch keeps the network timeout", async () => {
+  test("dev and staging batches wait at least 10 s, a prod batch keeps the network timeout", async () => {
     AvoInspectorLite.batchSize = 1;
     const timeouts: Record<string, number> = {};
-    for (const env of ["dev", "prod"]) {
+    for (const env of ["dev", "staging", "prod"]) {
       // Each batcher replays the stored queue on construction; start empty.
       window.localStorage.clear();
       const batcher = newLiteBatcher(env);
@@ -166,7 +166,11 @@ describe("AVO-3946 queue fix in avo-inspector/lite", () => {
       expect(requests).toHaveLength(1);
       timeouts[env] = requests[0].timeout;
     }
-    expect(timeouts).toEqual({ dev: 10000, prod: AvoInspectorLite.networkTimeout });
+    expect(timeouts).toEqual({
+      dev: 10000,
+      staging: 10000,
+      prod: AvoInspectorLite.networkTimeout
+    });
   });
 
   test("4 rapid events send 4 events on the same page", async () => {
