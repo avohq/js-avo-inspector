@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.2.3] - 2026-10-27
 
 ### Fixed
 
@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **In dev and staging, sends wait at least 10 seconds for the response** (was the 2-second `networkTimeout`), or `networkTimeout` if that is longer. A `networkTimeout` of 0 (no timeout) is kept. This covers validated sends and batches. A slow request that did reach the server and answers within that timeout is no longer sent a second time. The event-spec fetch and production batches keep `networkTimeout`.
 - **Events queued while a batch is in flight are checked again when it succeeds** (AVO-3946). An event tracked while a batch was being sent stayed queued, with nothing scheduled to send it, until the next tracked event or page load. The queue is now checked again when a batch succeeds, and sent if it meets the usual batch-size or flush-time rule. With batch size 1, four rapid events now send four events on the same page. After a failed batch, the queue still waits for the next tracked event, as before.
 
-The queue fix also applies to `avo-inspector/lite`.
+The queue fix and the dev/staging batch timeout also apply to `avo-inspector/lite`.
 
 ## [3.2.2] - 2026-10-20
 
