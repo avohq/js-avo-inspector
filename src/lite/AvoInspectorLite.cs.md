@@ -41,4 +41,4 @@ constructor(options: { apiKey: string; env: AvoInspectorEnvValueType; version: s
 - IMPORTANT: public track methods never throw or reject: errors, including a call without a receiver, are logged and resolve, as in 3.2.0.
 - The `*WithOptions` methods and `_client` are absent from the emitted lite `.d.ts`; options affect the wire only with the `"gtm-web"` client.
 - Every event is batched; there is no immediate send path.
-- **`shouldLog` is static and sticky:** once set explicitly, every later instance in the runtime keeps it; `AvoStorage` reads the flag live, so a direct `shouldLog = …` write after construction reaches it immediately.
+- **`shouldLog` is static and sticky (behavior change vs 3.x):** once set explicitly, every later instance in the runtime keeps it; `AvoStorage` reads the flag live, so a direct `shouldLog = …` write after construction reaches it immediately. In 3.x every construction reset the flag to the environment default, so this is an observable change for existing integrations and ships as a major version.
