@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`enableLogging(false)` now actually silences dev logs.** Previously the `Dev` environment forced logging on at construction and each of `AvoStorage`, `EventSpecCache` and `AvoEventSpecFetcher` kept its own copy of the flag, so a later `enableLogging(false)` left those sub-components printing (most visibly `EventSpecCache`'s per-hit `Cache hit for key` line). The sub-components now read the single static flag live, so the toggle takes effect immediately on an already-constructed inspector. The same applies to the lite build (`avo-inspector/lite`), which has no event-spec cache/fetcher, so `AvoStorage` is the component affected.
+- **`enableLogging(false)` now actually silences dev logs.** Previously the `Dev` environment forced logging on at construction and each of `AvoStorage`, `EventSpecCache` and `AvoEventSpecFetcher` kept its own copy of the flag, so a later `enableLogging(false)` left those sub-components printing (most visibly `EventSpecCache`'s per-hit `Cache hit for key` line). The sub-components now read the single static flag live, so the toggle takes effect immediately on an already-constructed inspector. The same applies to the lite build (`avo-inspector/lite`), which has no event-spec cache/fetcher, so `AvoStorage` is the component affected. In the script-tag build a queued `enableLogging(false)` is now applied **before** the inspector is constructed, so the constructor's own dev logs (e.g. `Event spec fetching and validation enabled`) are suppressed too — a script-tag page cannot set the flag any earlier, since the bundle exposes only the instance.
 
 ## [3.2.1] - 2026-09-16
 

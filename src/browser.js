@@ -49,6 +49,17 @@ if (typeof window !== "undefined") {
   if (webGtmTemplateClient) {
     options._client = webGtmTemplateClient;
   }
+  // Apply a queued enableLogging preference before construction, so the
+  // constructor's own dev logs (e.g. "[Avo Inspector] Event spec fetching and
+  // validation enabled") honour it too. A script-tag page cannot set the flag
+  // any earlier — the bundle exposes only the instance, never the class — so
+  // this is the only point at which a queued enableLogging(false) can reach the
+  // constructor. The replay below runs the same call again; the setter makes the
+  // preference sticky and the last enableLogging wins either way. See AVO-3079.
+  const queuedLogging = callQueue.filter((call) => call[0] === "enableLogging").pop();
+  if (queuedLogging) {
+    AvoInspector.shouldLog = queuedLogging[1];
+  }
   const inspector = new AvoInspector(options);
   if (webGtmTemplateClient) {
     routeGatewayOptions(inspector);
