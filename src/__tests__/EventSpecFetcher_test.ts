@@ -360,6 +360,38 @@ describe("EventSpecFetcher", () => {
 
       expect(console.log).not.toHaveBeenCalled();
     });
+
+    // AVO-3079: the fetcher reads the logging flag live through a getter, so a
+    // later enableLogging()/AvoInspector.shouldLog change is honoured without
+    // reconstructing it. The boolean-constructed `fetcher` above only covers the
+    // static case; this covers the getter path the full build actually wires up.
+    test("reads the shouldLog getter live between fetches", async () => {
+      let shouldLog = true;
+      const liveFetcher = new AvoEventSpecFetcher(2000, () => shouldLog, "dev");
+
+      // A 404 makes the fetcher warn "Request failed with status: 404" while
+      // logging is on.
+      (console.warn as jest.Mock).mockClear();
+      await liveFetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "404"
+      });
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Request failed with status")
+      );
+
+      // Flip the getter; the same failure must now stay quiet, proving the flag
+      // is read per-call rather than captured at construction.
+      shouldLog = false;
+      (console.warn as jest.Mock).mockClear();
+      await liveFetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "404-again"
+      });
+      expect(console.warn).not.toHaveBeenCalled();
+    });
   });
 
   describe("Custom Base URL", () => {

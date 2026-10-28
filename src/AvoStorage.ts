@@ -1,5 +1,17 @@
+import { toShouldLogGetter, type ShouldLogFlag } from "./utils";
+
+// A failed write means the persisted event queue (and stream id) won't survive
+// a page unload — a data-delivery error — so the first write failure is printed
+// regardless of the logging flag. Repeats are gated, since once storage is full
+// every event's write fails and that would be per-event noise. Module-scoped so
+// every BrowserAvoStorage in one loaded copy of the SDK shares the "first"
+// (a page with two inspectors logs it once, not twice); a separately bundled
+// copy, the lite build, or an iframe copy each load this module afresh and so
+// keep their own flag. See AVO-3079 review.
+let reportedWriteFailure = false;
+
 abstract class PlatformAvoStorage {
-  abstract init (shouldLog: boolean, suffix: string): void;
+  abstract init (shouldLog: ShouldLogFlag, suffix: string): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
   abstract getItem<T>(key: string): T | null;
   abstract setItem<T>(key: string, value: T): void;
@@ -21,11 +33,13 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   fallbackStorage: Record<string, string | null> = {};
   storageInitialized = false;
   onStorageInitFuncs: Array<() => void> = [];
-  shouldLog: boolean = false;
+  // Reads the current logging flag live so a later enableLogging() /
+  // AvoInspector.shouldLog change is reflected without re-pushing. See AVO-3079.
+  shouldLog: () => boolean = () => false;
   suffix: string = "";
 
-  init (shouldLog: boolean, suffix: string): void {
-    this.shouldLog = shouldLog;
+  init (shouldLog: ShouldLogFlag, suffix: string): void {
+    this.shouldLog = toShouldLogGetter(shouldLog);
     this.suffix = suffix;
     this.initializeStorageWeb(this.isLocalStorageAvailable());
   }
@@ -71,7 +85,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
             try {
               maybeItem = window.localStorage.getItem(key + this.suffix);
             } catch (error) {
-              if (this.shouldLog) {
+              if (this.shouldLog()) {
                 console.error(
                   "Avo Inspector Storage getItemAsync error:",
                   error
@@ -100,7 +114,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
         try {
           maybeItem = window.localStorage.getItem(key + this.suffix);
         } catch (error) {
-          if (this.shouldLog) {
+          if (this.shouldLog()) {
             console.error("Avo Inspector Storage getItem error:", error);
           }
         }
@@ -119,7 +133,10 @@ class BrowserAvoStorage extends PlatformAvoStorage {
           try {
             window.localStorage.setItem(key + this.suffix, JSON.stringify(value));
           } catch (error) {
-            if (this.shouldLog) {
+            // Print the first write failure unconditionally (it means the queue
+            // may not survive unload); gate the repeats. See AVO-3079 review.
+            if (!reportedWriteFailure || this.shouldLog()) {
+              reportedWriteFailure = true;
               console.error("Avo Inspector Storage setItem error:", error);
             }
           }
@@ -137,7 +154,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
           try {
             window.localStorage.removeItem(key + this.suffix);
           } catch (error) {
-            if (this.shouldLog) {
+            if (this.shouldLog()) {
               console.error("Avo Inspector Storage removeItem error:", error);
             }
           }
@@ -160,7 +177,7 @@ export class AvoStorage {
 
   storageImpl: PlatformAvoStorage;
 
-  constructor (shouldLog: boolean, suffix: string = "") {
+  constructor (shouldLog: ShouldLogFlag, suffix: string = "") {
     this.Platform = "browser";
     this.storageImpl = new BrowserAvoStorage();
     this.storageImpl.init(shouldLog, suffix);

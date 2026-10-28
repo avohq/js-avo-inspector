@@ -119,6 +119,37 @@ describe("script-tag bootstrap", () => {
     expect(AvoInspector.batchSize).toBe(11);
   });
 
+  // A queued enableLogging(false) is applied before construction, so in dev it
+  // silences both the constructor's own "Event spec fetching…" dev log and the
+  // post-replay "Loaded." line: no console.log should fire at all. (The missing/
+  // unsupported-environment console.warns are not gated and still print — a
+  // misconfiguration, not an ordinary log.) See AVO-3079.
+  test("suppresses every dev log when enableLogging(false) is queued before load", () => {
+    const callQueue: any[] = [["enableLogging", false]];
+    Object.assign(callQueue, baseQueueProps, { __ENV__: "dev" });
+    (window as any).inspector = callQueue;
+
+    (console.log as jest.Mock).mockClear();
+    jest.resetModules();
+    require("../browser");
+
+    expect(console.log).not.toHaveBeenCalled();
+  });
+
+  test("logs Loaded in dev when logging is left on (control)", () => {
+    const callQueue: any[] = [];
+    Object.assign(callQueue, baseQueueProps, { __ENV__: "dev" });
+    (window as any).inspector = callQueue;
+
+    (console.log as jest.Mock).mockClear();
+    jest.resetModules();
+    require("../browser");
+
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining("Avo Inspector: Loaded.")
+    );
+  });
+
   test("forwards the api key and env the snippet carries, in the body on v1", () => {
     const { body } = requestAfterBootstrap();
 

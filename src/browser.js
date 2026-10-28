@@ -25,9 +25,6 @@ function routeGatewayOptions(inspector) {
 }
 
 if (typeof window !== "undefined") {
-  if (console !== "undefined" && window.inspector.__ENV__ === "dev") {
-    console.log("Avo Inspector: Loaded. Starting initialization...");
-  }
   if (console !== "undefined" && window.inspector.__API_KEY__ === "MY-API-KEY") {
     console.error("Avo Inspector: API key not provided");
   }
@@ -52,6 +49,17 @@ if (typeof window !== "undefined") {
   if (webGtmTemplateClient) {
     options._client = webGtmTemplateClient;
   }
+  // Apply a queued enableLogging preference before construction, so the
+  // constructor's own dev logs (e.g. "[Avo Inspector] Event spec fetching and
+  // validation enabled") honour it too. A script-tag page cannot set the flag
+  // any earlier — the bundle exposes only the instance, never the class — so
+  // this is the only point at which a queued enableLogging(false) can reach the
+  // constructor. The replay below runs the same call again; the setter makes the
+  // preference sticky and the last enableLogging wins either way. See AVO-3079.
+  const queuedLogging = callQueue.filter((call) => call[0] === "enableLogging").pop();
+  if (queuedLogging) {
+    AvoInspector.shouldLog = queuedLogging[1];
+  }
   const inspector = new AvoInspector(options);
   if (webGtmTemplateClient) {
     routeGatewayOptions(inspector);
@@ -63,6 +71,12 @@ if (typeof window !== "undefined") {
     call.shift();
     window.inspector[method](...call);
   });
+
+  // Printed after the queued calls replay (which may include enableLogging(false)),
+  // and gated on the logging flag, so the setting can silence it. See AVO-3079.
+  if (typeof console !== "undefined" && AvoInspector.shouldLog) {
+    console.log("Avo Inspector: Loaded.");
+  }
 } else if (console !== "undefined") {
   console.log("Avo Inspector: Window not available. Aborting.");
 }
