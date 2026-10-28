@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **The event-spec fetch only requests its base URL's host** (defence in depth). Before the dev/staging `GET /trackingPlan/eventSpec` request, the fetcher compares the built URL's hostname with the base URL's (`https://api.avo.app`). On a mismatch it sends nothing and returns no spec, like any failed fetch, so the event is sent unvalidated; with logging on it warns `[Avo Inspector] Host mismatch detected for: <eventName>`. A URL that does not parse takes the fetcher's existing error path: no request, no spec. Today's URL building always keeps the base host, so no install's request changes; the check stops a future change from sending the request, and the API key in its query, to another host. Production never fetches specs, and `avo-inspector/lite` has no fetcher, so neither is affected.
+
 ## [3.2.3] - 2026-10-27
 
 ### Fixed

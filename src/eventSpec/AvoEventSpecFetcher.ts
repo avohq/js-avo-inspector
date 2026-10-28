@@ -109,6 +109,17 @@ export class AvoEventSpecFetcher {
     }
     const url: string = this.buildUrl(params);
     try {
+      // Host validation (defence-in-depth): only request the baseUrl's host
+      const parsedUrl: URL = new URL(url);
+      const parsedBaseUrl: URL = new URL(this.baseUrl);
+      if (parsedUrl.hostname !== parsedBaseUrl.hostname) {
+        if (this.shouldLog) {
+          console.warn(
+            `[Avo Inspector] Host mismatch detected for: ${params.eventName}`
+          );
+        }
+        return null;
+      }
       const wireResponse: EventSpecResponseWire | null = await this.makeRequest(
         url
       );
