@@ -44,7 +44,7 @@ Constructed by `AvoInspector` / `AvoInspectorLite` and held on their static `avo
 ## Non-functional requirements
 
 - localStorage errors in get/set/remove are swallowed; the read/remove errors log `console.error("Avo Inspector Storage <op> error:", error)` only when the `shouldLog` getter returns true (read live on each error). Failed reads return `null`.
-- `setItem` errors are the exception: the **first** write failure per `BrowserAvoStorage` instance (i.e. per page) prints unconditionally, since it means the persisted event queue may not survive unload; later write failures are gated on `shouldLog` (so a full quota does not log per event). The `reportedWriteFailure` flag tracks this and is never reset. See AVO-3079.
+- `setItem` errors are the exception: the **first** write failure per loaded SDK module prints unconditionally, since it means the persisted event queue may not survive unload; later write failures are gated on `shouldLog` (so a full quota does not log per event). A module-scoped `reportedWriteFailure` flag tracks this — shared by every `BrowserAvoStorage` in one loaded copy of the SDK (a page with two inspectors logs it once), while a separately bundled copy, the lite build, or an iframe copy each load the module afresh and keep their own — and is never reset. See AVO-3079.
 - `shouldLog` gates read/remove error logging and repeat write failures; storage behaviour itself does not depend on it.
 - A stored value that is not valid JSON makes `getItem` throw and `getItemAsync` reject; `parseJson` does not catch.
 - Init completes inside the constructor, so `runAfterInit` callbacks run immediately in practice.

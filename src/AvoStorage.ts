@@ -1,5 +1,15 @@
 import { toShouldLogGetter, type ShouldLogFlag } from "./utils";
 
+// A failed write means the persisted event queue (and stream id) won't survive
+// a page unload — a data-delivery error — so the first write failure is printed
+// regardless of the logging flag. Repeats are gated, since once storage is full
+// every event's write fails and that would be per-event noise. Module-scoped so
+// every BrowserAvoStorage in one loaded copy of the SDK shares the "first"
+// (a page with two inspectors logs it once, not twice); a separately bundled
+// copy, the lite build, or an iframe copy each load this module afresh and so
+// keep their own flag. See AVO-3079 review.
+let reportedWriteFailure = false;
+
 abstract class PlatformAvoStorage {
   abstract init (shouldLog: ShouldLogFlag, suffix: string): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
@@ -27,12 +37,6 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   // AvoInspector.shouldLog change is reflected without re-pushing. See AVO-3079.
   shouldLog: () => boolean = () => false;
   suffix: string = "";
-  // A failed write means the persisted event queue (and stream id) won't survive
-  // a page unload — a data-delivery error — so the first write failure per page
-  // is printed regardless of the logging flag. Repeats are gated, since once
-  // storage is full every event's write fails and that would be per-event noise.
-  // See AVO-3079 review.
-  reportedWriteFailure = false;
 
   init (shouldLog: ShouldLogFlag, suffix: string): void {
     this.shouldLog = toShouldLogGetter(shouldLog);
@@ -131,8 +135,8 @@ class BrowserAvoStorage extends PlatformAvoStorage {
           } catch (error) {
             // Print the first write failure unconditionally (it means the queue
             // may not survive unload); gate the repeats. See AVO-3079 review.
-            if (!this.reportedWriteFailure || this.shouldLog()) {
-              this.reportedWriteFailure = true;
+            if (!reportedWriteFailure || this.shouldLog()) {
+              reportedWriteFailure = true;
               console.error("Avo Inspector Storage setItem error:", error);
             }
           }
