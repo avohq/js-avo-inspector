@@ -414,6 +414,96 @@ describe("EventSpecFetcher", () => {
     });
   });
 
+  describe("Host Validation", () => {
+    const attackerUrl =
+      "https://attacker.example.com/trackingPlan/eventSpec?apiKey=apiKey1&streamId=stream1&eventName=success";
+    let openSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      openSpy = jest.spyOn(MockXMLHttpRequest.prototype, "open");
+      (console.warn as jest.Mock).mockClear();
+      (console.error as jest.Mock).mockClear();
+    });
+
+    afterEach(() => {
+      openSpy.mockRestore();
+    });
+
+    // buildUrl always prefixes baseUrl, so today the built URL cannot leave
+    // the base host. Stubbing it pins the guard against a future change to
+    // URL building that would send the request (and its apiKey) elsewhere.
+    test("should resolve null and send no request when the built URL's host differs from the base URL's", async () => {
+      const loggingFetcher = new AvoEventSpecFetcher(2000, true, "dev");
+      jest
+        .spyOn(loggingFetcher as any, "buildUrl")
+        .mockReturnValue(attackerUrl);
+
+      const result = await loggingFetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      expect(result).toBeNull();
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith(
+        "[Avo Inspector] Host mismatch detected for: success"
+      );
+    });
+
+    test("should not log a host mismatch when shouldLog is false", async () => {
+      jest.spyOn(fetcher as any, "buildUrl").mockReturnValue(attackerUrl);
+
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      expect(result).toBeNull();
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    test("should still fetch from the default https://api.avo.app host", async () => {
+      const result = await fetcher.fetch({
+        apiKey: "apiKey1",
+        streamId: "stream1",
+        eventName: "success"
+      });
+
+      expect(result).not.toBeNull();
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(MockXMLHttpRequest.lastCalledUrl).toMatch(
+        /^https:\/\/api\.avo\.app\/trackingPlan\/eventSpec\?/
+      );
+    });
+
+    test("should resolve null and send no request when the base URL does not parse", async () => {
+      const badBaseFetcher = new AvoEventSpecFetcher(
+        2000,
+        true,
+        "dev",
+        "not a url"
+      );
+
+      await expect(
+        badBaseFetcher.fetch({
+          apiKey: "apiKey1",
+          streamId: "stream1",
+          eventName: "success"
+        })
+      ).resolves.toBeNull();
+
+      expect(openSpy).not.toHaveBeenCalled();
+      // The URL parse error is caught and logged by fetchInternal's catch.
+      expect(console.error).toHaveBeenCalledWith(
+        "[Avo Inspector] Error fetching event spec for: success",
+        expect.objectContaining({ name: "TypeError" })
+      );
+    });
+  });
+
   describe("Environment Restrictions", () => {
     test("should work in dev environment", async () => {
       const devFetcher = new AvoEventSpecFetcher(2000, false, "dev");
