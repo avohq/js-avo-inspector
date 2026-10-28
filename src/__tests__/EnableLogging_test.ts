@@ -2,6 +2,7 @@ import type { AvoInspector as AvoInspectorClass } from "../AvoInspector";
 import type { EventSpecResponse } from "../eventSpec/AvoEventSpecFetchTypes";
 import type { validateEvent as validateEventFn } from "../eventSpec/EventValidator";
 import { AvoInspectorEnv } from "../AvoInspectorEnv";
+import { AvoSchemaParser } from "../AvoSchemaParser";
 
 /**
  * Regression tests for AVO-3079 (full build).
@@ -203,4 +204,115 @@ describe("enableLogging – log suppression (AVO-3079)", () => {
       );
     }
   );
+
+  // Data-delivery errors stay printed with logging off. These are the
+  // always-printed entries the CHANGELOG lists that were not otherwise pinned
+  // under enableLogging(false). ("something went wrong" is covered by
+  // UnboundPublicMethods_test on the Prod defaults, and "Stopped sending events
+  // on this page" by V2StopSending_test.) See AVO-3079.
+  test("the first storage write failure prints with logging off; repeats are gated", () => {
+    // Back localStorage with an in-memory map so the availability probe passes
+    // (another test in this file leaves a throwing setItem spy that would
+    // otherwise force fallback mode, where writes never fail). Writes only start
+    // throwing after construction, so the first-failure flag is unset going in.
+    const store = new Map<string, string>();
+    let failWrites = false;
+    const getSpy = jest
+      .spyOn(window.localStorage, "getItem")
+      .mockImplementation((k: string) => (store.has(k) ? store.get(k)! : null));
+    const removeSpy = jest
+      .spyOn(window.localStorage, "removeItem")
+      .mockImplementation((k: string) => {
+        store.delete(k);
+      });
+    const setSpy = jest
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((k: string, v: string) => {
+        if (failWrites) {
+          throw new Error("quota exceeded");
+        }
+        store.set(k, v);
+      });
+
+    try {
+      const inspector = build(AvoInspectorEnv.Dev);
+      inspector.enableLogging(false);
+      failWrites = true;
+
+      (console.error as jest.Mock).mockClear();
+      AvoInspector.avoStorage.setItem("k", "v");
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("setItem error"),
+        expect.anything()
+      );
+
+      // The second failure, still with logging off, is gated — no per-event noise.
+      (console.error as jest.Mock).mockClear();
+      AvoInspector.avoStorage.setItem("k", "v");
+      expect(console.error).not.toHaveBeenCalled();
+    } finally {
+      getSpy.mockRestore();
+      removeSpy.mockRestore();
+      setSpy.mockRestore();
+    }
+  });
+
+  test("'Failed to encrypt property value' prints with logging off", async () => {
+    AvoInspector.shouldLog = false;
+    (console.error as jest.Mock).mockClear();
+
+    // A non-empty key in dev enables encryption; an unparseable key makes
+    // encryptValue throw, which the parser logs (ungated) and swallows.
+    await AvoSchemaParser.extractSchema(
+      { secret: "value" },
+      "not-a-valid-public-key",
+      "dev"
+    );
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to encrypt property value"),
+      expect.anything()
+    );
+  });
+
+  test("the batch cache-read error prints with logging off", async () => {
+    // Map-backed localStorage (so the availability probe passes regardless of
+    // other tests' leaked spies), pre-seeded with invalid JSON at the batcher
+    // cache key so getItemAsync's parseJson throws, rejecting the promise the
+    // AvoBatcher constructor awaits.
+    const store = new Map<string, string>([
+      ["AvoInspectorEvents", "{not valid json"]
+    ]);
+    const getSpy = jest
+      .spyOn(window.localStorage, "getItem")
+      .mockImplementation((k: string) => (store.has(k) ? store.get(k)! : null));
+    const setSpy = jest
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((k: string, v: string) => {
+        store.set(k, v);
+      });
+    const removeSpy = jest
+      .spyOn(window.localStorage, "removeItem")
+      .mockImplementation((k: string) => {
+        store.delete(k);
+      });
+
+    try {
+      AvoInspector.shouldLog = false;
+      (console.error as jest.Mock).mockClear();
+
+      build(AvoInspectorEnv.Prod);
+      // The batcher reads the cache asynchronously; let its .catch run.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("error getting events from cache"),
+        expect.anything()
+      );
+    } finally {
+      getSpy.mockRestore();
+      setSpy.mockRestore();
+      removeSpy.mockRestore();
+    }
+  });
 });
