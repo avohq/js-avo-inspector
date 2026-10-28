@@ -100,7 +100,10 @@ export class EventSpecCache {
     }
 
     if (this.shouldLog()) {
-      console.log(`[Avo Inspector] Cache hit for key: ${key}`);
+      // Deliberately omits the api key (the first segment of `key`): this line
+      // prints on every cache hit in dev/staging, and the api key adds no
+      // debugging value within a page. See AVO-3079 review.
+      console.log(`[Avo Inspector] Cache hit for: ${streamId}:${eventName}`);
     }
 
     // Update lastAccessed for LRU (Least Recently Used) eviction
