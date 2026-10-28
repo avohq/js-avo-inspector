@@ -2,7 +2,7 @@
 
 ## Short description
 
-Key-value persistence used by both Inspector builds (full and lite) for the batch queue and stream-id state. Backed by `window.localStorage` under suffix-namespaced keys, with an in-memory map as fallback when localStorage is unavailable.
+Key-value persistence used by both Inspector builds for the batch queue. The full build also uses it for stream-id state. Backed by `window.localStorage` under suffix-namespaced keys, with an in-memory map as fallback when localStorage is unavailable.
 
 ## Tech stack
 
@@ -36,8 +36,8 @@ Constructed by `AvoInspector` / `AvoInspectorLite` and held on their static `avo
 
 - **Constructor:** creates a `BrowserAvoStorage` and initialises it synchronously: normalises `shouldLog` (a boolean or a `() => boolean` getter) to a getter and stores it with `suffix`; probes localStorage by writing, reading back and removing a timestamp key (a throw or mismatch → unavailable); marks initialised; switches to the in-memory fallback when unavailable; runs queued `runAfterInit` callbacks.
 - Every key is stored as `key + suffix`; values are `JSON.stringify`-ed on write and `JSON.parse`-d on read.
-- `getItemAsync(key)` — after init: fallback map, else localStorage; no `window` → `null`.
-- `getItem(key)` — `null` before init; fallback map; localStorage only when `process.env.BROWSER` is set and `window` exists; otherwise `null`.
+- `getItemAsync(key)` — after init, reads the fallback map when localStorage is unavailable, including when `window` is absent; otherwise reads localStorage.
+- `getItem(key)` — `null` before init; reads the fallback map when enabled; otherwise reads localStorage only when `process.env.BROWSER` is set and `window` exists; returns `null` when neither path is available.
 - `setItem(key, value)` / `removeItem(key)` — run after init; write to the fallback map (`removeItem` stores `null`) or to localStorage.
 - `isInitialized()`; `runAfterInit(func)` — runs `func` now when initialised, else queues it.
 
