@@ -76,6 +76,13 @@ describe("AvoInspectorLite enableLogging – log suppression (AVO-3079)", () => 
     await expectSchemaLogged(build(AvoInspectorEnv.Dev), false);
   });
 
+  test("an explicit enableLogging(true) survives a later prod construction (sticky; BREAKING vs 3.x)", async () => {
+    // A leftover debug opt-in from an earlier inspector/session; 3.x reset it on
+    // every construction, now it sticks, so a later prod inspector keeps logging.
+    build(AvoInspectorEnv.Dev).enableLogging(true);
+    await expectSchemaLogged(build(AvoInspectorEnv.Prod), true);
+  });
+
   test("AvoInspectorLite.shouldLog toggles AvoStorage error logs live", () => {
     const inspector = build(AvoInspectorEnv.Dev);
 

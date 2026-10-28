@@ -65,6 +65,12 @@ describe("enableLogging – log suppression (AVO-3079)", () => {
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining("Cache hit")
       );
+      // The api key must never appear in the hit line — it prints on every
+      // cache hit in dev/staging. Without this, putting the key back would
+      // still pass the "Cache hit" assertion above. See AVO-3079 review.
+      expect(console.log).not.toHaveBeenCalledWith(
+        expect.stringContaining(apiKey)
+      );
     } else {
       expect(console.log).not.toHaveBeenCalled();
     }
@@ -103,6 +109,16 @@ describe("enableLogging – log suppression (AVO-3079)", () => {
   test("constructor does not clobber a logging preference set beforehand", () => {
     AvoInspector.shouldLog = false;
     expectCacheHitLogged(build(AvoInspectorEnv.Dev), false);
+  });
+
+  test("an explicit enableLogging(true) survives a later prod construction (sticky; BREAKING vs 3.x)", () => {
+    // A leftover debug opt-in from an earlier inspector/session.
+    build(AvoInspectorEnv.Dev).enableLogging(true);
+    // 3.x reset the flag to the environment default on every construction; now
+    // it sticks, so a prod inspector constructed afterwards keeps logging on.
+    // This is the leftover-enableLogging(true) case the migration note warns
+    // about, and the direction the CHANGELOG headlines as BREAKING.
+    expectCacheHitLogged(build(AvoInspectorEnv.Prod), true);
   });
 
   test("enableLogging(false) on one instance silences another instance's cache", () => {
@@ -167,4 +183,24 @@ describe("enableLogging – log suppression (AVO-3079)", () => {
     validateEvent({ amount: NaN }, minMaxSpec);
     expect(console.warn).not.toHaveBeenCalled();
   });
+
+  // The constructor's environment misconfiguration warnings are deliberately
+  // NOT gated on the logging flag: disabling logging must not hide a
+  // misconfiguration. These are the always-printed messages the CHANGELOG
+  // headlines; the "something went wrong" family is pinned (with logging off,
+  // on Prod defaults) in UnboundPublicMethods_test.ts. See AVO-3079.
+  test.each([
+    ["missing", "", "No environment provided"],
+    ["unsupported", "bogus", "Unsupported environment"]
+  ])(
+    "a %s environment still warns with enableLogging(false)",
+    (_label, env, message) => {
+      AvoInspector.shouldLog = false;
+      (console.warn as jest.Mock).mockClear();
+      build(env);
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining(message)
+      );
+    }
+  );
 });
