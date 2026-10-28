@@ -1,4 +1,5 @@
 import type { EventSpecResponse, EventSpecCacheEntry } from "./AvoEventSpecFetchTypes";
+import { toShouldLogGetter, type ShouldLogFlag } from "../utils";
 
 /**
  * EventSpecCache implements a dual-condition cache with LRU eviction.
@@ -32,9 +33,9 @@ export class EventSpecCache {
    */
   private shouldLog: () => boolean;
 
-  constructor(shouldLog: boolean | (() => boolean) = false) {
+  constructor(shouldLog: ShouldLogFlag = false) {
     this.cache = new Map();
-    this.shouldLog = typeof shouldLog === "function" ? shouldLog : () => shouldLog;
+    this.shouldLog = toShouldLogGetter(shouldLog);
   }
 
   /**

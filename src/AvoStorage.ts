@@ -1,5 +1,7 @@
+import { toShouldLogGetter, type ShouldLogFlag } from "./utils";
+
 abstract class PlatformAvoStorage {
-  abstract init (shouldLog: boolean | (() => boolean), suffix: string): void;
+  abstract init (shouldLog: ShouldLogFlag, suffix: string): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
   abstract getItem<T>(key: string): T | null;
   abstract setItem<T>(key: string, value: T): void;
@@ -26,8 +28,8 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   shouldLog: () => boolean = () => false;
   suffix: string = "";
 
-  init (shouldLog: boolean | (() => boolean), suffix: string): void {
-    this.shouldLog = typeof shouldLog === "function" ? shouldLog : () => shouldLog;
+  init (shouldLog: ShouldLogFlag, suffix: string): void {
+    this.shouldLog = toShouldLogGetter(shouldLog);
     this.suffix = suffix;
     this.initializeStorageWeb(this.isLocalStorageAvailable());
   }
@@ -162,7 +164,7 @@ export class AvoStorage {
 
   storageImpl: PlatformAvoStorage;
 
-  constructor (shouldLog: boolean | (() => boolean), suffix: string = "") {
+  constructor (shouldLog: ShouldLogFlag, suffix: string = "") {
     this.Platform = "browser";
     this.storageImpl = new BrowserAvoStorage();
     this.storageImpl.init(shouldLog, suffix);

@@ -2,6 +2,18 @@ const isValueEmpty = (value: string | null | undefined): boolean => {
   return value === null || value === undefined || value.trim().length == 0;
 };
 
+/**
+ * A logging-flag argument: either a fixed boolean or a getter read live. The
+ * logging components take this and normalise it to a getter with
+ * `toShouldLogGetter`, so a shared static flag is read live (and a bare
+ * `if (this.shouldLog)` on the stored getter is a compile error, not an
+ * always-truthy silent bug). See AVO-3079.
+ */
+export type ShouldLogFlag = boolean | (() => boolean);
+
+export const toShouldLogGetter = (flag: ShouldLogFlag): (() => boolean) =>
+  typeof flag === "function" ? flag : () => flag;
+
 function deepEquals (x: any, y: any) {
   if (x === y) {
     return true;

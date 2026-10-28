@@ -7,6 +7,7 @@ import type {
   PropertyConstraintsWire,
   FetchEventSpecParams,
 } from "./AvoEventSpecFetchTypes";
+import { toShouldLogGetter, type ShouldLogFlag } from "../utils";
 
 /**
  * EventSpecFetcher handles fetching event specifications from the Avo API.
@@ -31,13 +32,13 @@ export class AvoEventSpecFetcher {
 
   constructor(
     timeout: number = 2000,
-    shouldLog: boolean | (() => boolean) = false,
+    shouldLog: ShouldLogFlag = false,
     env: string,
     baseUrl: string = "https://api.avo.app"
   ) {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
-    this.shouldLog = typeof shouldLog === "function" ? shouldLog : () => shouldLog;
+    this.shouldLog = toShouldLogGetter(shouldLog);
     this.env = env;
     this.inFlightRequests = new Map();
   }
