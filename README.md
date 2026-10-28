@@ -269,6 +269,8 @@ inspector.setBatchFlushSeconds(10);
 
 You can control the network timeout for the SDK. Default is 2 seconds.
 
+In dev and staging, every send waits at least 10 seconds, or `networkTimeout` if it is longer (0, no timeout, is kept). That includes an event that has an event spec, which is validated and sent on its own, right away. Production sends use `networkTimeout`.
+
 ```javascript
 Inspector.AvoInspector.networkTimeout = 5000;
 ```

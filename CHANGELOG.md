@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`enableLogging(false)` now actually silences dev logs.** Previously the `Dev` environment forced logging on at construction and each of `AvoStorage`, `EventSpecCache` and `AvoEventSpecFetcher` kept its own copy of the flag, so a later `enableLogging(false)` left those sub-components printing (most visibly `EventSpecCache`'s per-hit `Cache hit for key` line). The sub-components now read the single static flag live, so the toggle takes effect immediately on an already-constructed inspector. The same applies to the lite build (`avo-inspector/lite`), which has no event-spec cache/fetcher, so `AvoStorage` is the component affected. In the script-tag build a queued `enableLogging(false)` is now applied **before** the inspector is constructed, so the constructor's own dev logs (e.g. `Event spec fetching and validation enabled`) are suppressed too — a script-tag page cannot set the flag any earlier, since the bundle exposes only the instance.
 
+## [3.2.3] - 2026-10-27
+
+### Fixed
+
+- **A validated send that times out no longer comes back as a second, unvalidated event** (AVO-3946). In dev and staging, an event with an event spec is sent on its own with validation. When that request failed or timed out, the SDK queued a new copy of the event, with a new `messageId`, a later `createdAt` and no `validatedBranchId`, which the debugger showed as a second "Validation didn't run" row. It now retries the same body, so the `messageId`, `createdAt`, `validatedBranchId` and spec metadata are unchanged.
+- **In dev and staging, sends wait at least 10 seconds for the response** (was the 2-second `networkTimeout`), or `networkTimeout` if that is longer. A `networkTimeout` of 0 (no timeout) is kept. This covers validated sends and batches. A slow request that did reach the server and answers within that timeout is no longer sent a second time. The event-spec fetch and production batches keep `networkTimeout`.
+- **Events queued while a batch is in flight are checked again when it succeeds** (AVO-3946). An event tracked while a batch was being sent stayed queued, with nothing scheduled to send it, until the next tracked event or page load. The queue is now checked again when a batch succeeds, and sent if it meets the usual batch-size or flush-time rule. With batch size 1, four rapid events now send four events on the same page. After a failed batch, the queue still waits for the next tracked event, as before.
+
+The queue fix and the dev/staging batch timeout also apply to `avo-inspector/lite`.
+
+## [3.2.2] - 2026-10-20
+
+### Added
+
+- **Internal: the web GTM tag template's event-spec fetch is scoped to the event's gateway checkpoint** (AVO-4073, not public API). With the `"gtm-web"` client, an event tracked with gateway options fetches `GET https://api.avo.app/trackingPlan/eventSpec` with its normalized `originHint` and/or `outputReference` appended as query params (each only when non-blank), so dev/staging value validation runs against the spec of the gateway input or output it is observed at. Both coordinates are part of the spec cache key and the in-flight request key, so specs for different checkpoints of one event never share an entry. The in-flight request key also includes the API key, matching the cache key. A 404 (e.g. a gateway key and no `originHint`) is cached as "no spec" and the event is sent unvalidated, as before.
+
+  Every other install — npm full and lite, a regular script tag, Avo Codegen events, and gateway options without the client — fetches exactly the same URL and uses exactly the same cache key as 3.2.1.
+
 ## [3.2.1] - 2026-09-16
 
 The public API is unchanged from 3.2.0: the same exports, constructor options and track-method signatures in both `avo-inspector` and `avo-inspector/lite`. Every npm (full and lite) and regular script-tag install sends exactly 3.2.0's request — `POST https://api.avo.app/inspector/v1/track`, a single `Content-Type: text/plain` header (plus `Content-Encoding: gzip` for a compressed batch), and the same body apart from `libVersion`.

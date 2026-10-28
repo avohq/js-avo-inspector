@@ -339,9 +339,9 @@ describe("Validation Integration", () => {
           args[1](new Error("Network error"));
         });
 
-      batcherHandleTrackSchemaSpy = jest.spyOn(
+      const batcherHandleEventBodySpy = jest.spyOn(
         inspector.avoBatcher,
-        "handleTrackSchema"
+        "handleEventBody"
       );
 
       await inspector.trackSchemaFromEvent("test_event", {
@@ -351,8 +351,11 @@ describe("Validation Integration", () => {
       // Should try immediate send first
       expect(callInspectorImmediatelySpy).toHaveBeenCalledTimes(1);
 
-      // On failure, should fall back to batcher
-      expect(batcherHandleTrackSchemaSpy).toHaveBeenCalledTimes(1);
+      // On failure, should fall back to batcher with the same body
+      expect(batcherHandleEventBodySpy).toHaveBeenCalledTimes(1);
+      const retried = batcherHandleEventBodySpy.mock.calls[0][0] as any;
+      expect(retried).toBe(callInspectorImmediatelySpy.mock.calls[0][0]);
+      expect(retried.validatedBranchId).toBe("main");
     });
   });
 

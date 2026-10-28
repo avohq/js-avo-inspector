@@ -121,8 +121,20 @@ export interface EventSpecCacheEntry {
   eventCount: number;
 }
 
+/**
+ * Gateway coordinates of the event a spec is fetched for (internal, web GTM tag
+ * template only). Both are already normalized by the caller: trimmed, and absent
+ * when blank. With neither set, the spec fetch is exactly the source-key fetch.
+ */
+export interface EventSpecCoordinates {
+  /** The source that produced the event, as the gateway names it */
+  originHint?: string;
+  /** The gateway output whose checkpoint observes the event */
+  outputReference?: string;
+}
+
 /** Parameters for fetching event specifications from the API. */
-export interface FetchEventSpecParams {
+export interface FetchEventSpecParams extends EventSpecCoordinates {
   /** The API key */
   apiKey: string;
   /** The stream ID */

@@ -43,9 +43,26 @@ export class AvoEventSpecFetcher {
     this.inFlightRequests = new Map();
   }
 
-  /** Generates a unique key for tracking in-flight requests. */
+  /**
+   * Generates a unique key for tracking in-flight requests, matching the spec
+   * cache key. The API key tells gateways apart, and gateway coordinates are
+   * part of the key, so fetches for different gateways or checkpoints of the
+   * same event name are never deduplicated into one.
+   */
   private generateRequestKey(params: FetchEventSpecParams): string {
-    return `${params.streamId}:${params.eventName}`;
+    const originHint: string | undefined = params.originHint || undefined;
+    const outputReference: string | undefined =
+      params.outputReference || undefined;
+    if (originHint === undefined && outputReference === undefined) {
+      return `${params.apiKey}:${params.streamId}:${params.eventName}`;
+    }
+    return JSON.stringify([
+      params.apiKey,
+      params.streamId,
+      params.eventName,
+      originHint ?? null,
+      outputReference ?? null,
+    ]);
   }
 
   /**
@@ -132,6 +149,14 @@ export class AvoEventSpecFetcher {
       streamId: params.streamId,
       eventName: params.eventName,
     });
+    // Gateway coordinates (web GTM tag template only). Appended only when set,
+    // so a fetch without them requests exactly the source-key URL.
+    if (params.originHint) {
+      queryParams.append("originHint", params.originHint);
+    }
+    if (params.outputReference) {
+      queryParams.append("outputReference", params.outputReference);
+    }
     return `${this.baseUrl}/trackingPlan/eventSpec?${queryParams.toString()}`;
   }
 

@@ -174,6 +174,23 @@ export interface EventSchemaBody extends Omit<BaseBody, "appVersion"> {
 const gzipMinBodyLength = 1024;
 
 /**
+ * Lowest timeout, in milliseconds, for every send in dev and staging: immediate
+ * (validated) sends and batches. A send that times out is retried, and a
+ * request that was slow but did reach the server would then be ingested twice,
+ * so outside prod the client waits longer for the answer instead of giving up at
+ * networkTimeout. A larger AvoInspector.networkTimeout still applies, and so
+ * does 0 (no timeout). Prod batches keep networkTimeout.
+ */
+const validatedSendMinTimeout = 10000;
+
+/** networkTimeout raised to validatedSendMinTimeout; 0 means no timeout for XMLHttpRequest, so it stays 0. */
+function nonProdSendTimeout(): number {
+  return AvoInspector.networkTimeout === 0
+    ? 0
+    : Math.max(AvoInspector.networkTimeout, validatedSendMinTimeout);
+}
+
+/**
  * Gzips a string body using the browser-native CompressionStream API.
  * Returns null if compression fails for any reason.
  */
@@ -289,6 +306,11 @@ export class AvoNetworkCallsHandler {
     );
   }
 
+  /** True while a batch sent through callInspectorWithBatchBody awaits its response. */
+  isBatchInFlight(): boolean {
+    return this.sending;
+  }
+
   callInspectorWithBatchBody(
     inEvents: Array<SessionStartedBody | EventSchemaBody>,
     onCompleted: (error: Error | null, retryEvents?: RetryEvents) => any
@@ -335,14 +357,20 @@ export class AvoNetworkCallsHandler {
     }
 
     this.sending = true;
-    this.callInspectorApi(events, (error, retryEvents) => {
-      this.sending = false;
-      if (retryEvents === undefined) {
-        onCompleted(error);
-      } else {
-        onCompleted(error, retryEvents);
-      }
-    });
+    const timeout =
+      this.envName === "prod" ? AvoInspector.networkTimeout : nonProdSendTimeout();
+    this.callInspectorApi(
+      events,
+      (error, retryEvents) => {
+        this.sending = false;
+        if (retryEvents === undefined) {
+          onCompleted(error);
+        } else {
+          onCompleted(error, retryEvents);
+        }
+      },
+      timeout
+    );
   }
 
   private fixStreamIds(
@@ -475,7 +503,11 @@ export class AvoNetworkCallsHandler {
       console.log("Avo Inspector: event body", eventBody);
     }
 
-    this.callInspectorApi([eventBody], onCompleted);
+    this.callInspectorApi(
+      [eventBody],
+      onCompleted,
+      nonProdSendTimeout()
+    );
   }
 
   /**
@@ -495,10 +527,11 @@ export class AvoNetworkCallsHandler {
    */
   private callInspectorApi(
     events: Array<SessionStartedBody | EventSchemaBody>,
-    onCompleted: (error: Error | null, retryEvents?: RetryEvents) => any
+    onCompleted: (error: Error | null, retryEvents?: RetryEvents) => any,
+    timeout: number = AvoInspector.networkTimeout
   ): void {
     if (this.client === undefined) {
-      this.sendEvents(events, this.apiKey, this.envName, (error) => {
+      this.sendEvents(events, this.apiKey, this.envName, timeout, (error) => {
         onCompleted(error);
       });
       return;
@@ -587,7 +620,7 @@ export class AvoNetworkCallsHandler {
           true
         );
       } else {
-        this.sendEvents(group, apiKey, env, completed);
+        this.sendEvents(group, apiKey, env, timeout, completed);
       }
     };
     sendGroup(0);
@@ -597,6 +630,7 @@ export class AvoNetworkCallsHandler {
     events: Array<SessionStartedBody | EventSchemaBody>,
     apiKey: string,
     env: string,
+    timeout: number,
     onCompleted: (error: Error | null, permanent?: boolean) => any
   ): void {
     const body = JSON.stringify(events);
@@ -605,15 +639,22 @@ export class AvoNetworkCallsHandler {
       typeof CompressionStream === "undefined" ||
       body.length < gzipMinBodyLength
     ) {
-      this.sendTrackingRequest(body, false, apiKey, env, onCompleted);
+      this.sendTrackingRequest(body, false, apiKey, env, timeout, onCompleted);
       return;
     }
 
     gzip(body).then((compressed) => {
       if (compressed !== null) {
-        this.sendTrackingRequest(compressed, true, apiKey, env, onCompleted);
+        this.sendTrackingRequest(
+          compressed,
+          true,
+          apiKey,
+          env,
+          timeout,
+          onCompleted
+        );
       } else {
-        this.sendTrackingRequest(body, false, apiKey, env, onCompleted);
+        this.sendTrackingRequest(body, false, apiKey, env, timeout, onCompleted);
       }
     });
   }
@@ -628,6 +669,7 @@ export class AvoNetworkCallsHandler {
     isGzipped: boolean,
     apiKey: string,
     env: string,
+    timeout: number,
     onCompleted: (error: Error | null, permanent?: boolean) => any
   ): void {
     // Everything from construction up to and including send() runs synchronously,
@@ -673,7 +715,7 @@ export class AvoNetworkCallsHandler {
       if (isGzipped) {
         xmlhttp.setRequestHeader("Content-Encoding", "gzip");
       }
-      xmlhttp.timeout = AvoInspector.networkTimeout;
+      xmlhttp.timeout = timeout;
       xmlhttp.send(body as XMLHttpRequestBodyInit);
     } catch (e) {
       onCompleted(
