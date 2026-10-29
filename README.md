@@ -70,6 +70,8 @@ let inspector = new Inspector.AvoInspector({
 
 Logs are enabled by default in the dev mode and disabled in prod mode.
 
+Since 4.0.0 the setting is shared by every inspector created from the same copy of the SDK, and creating an inspector no longer resets it. Remove any leftover `enableLogging(true)` before upgrading, or production pages keep printing logs.
+
 ```javascript
 inspector.enableLogging(true);
 ```
