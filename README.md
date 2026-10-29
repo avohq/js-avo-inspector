@@ -25,6 +25,16 @@ or
     yarn add avo-inspector
 ```
 
+# Upgrading to 4.0.0
+
+4.0.0 changes only console logging; the API and the events sent are unchanged.
+
+- `enableLogging(...)` now sticks: creating an inspector no longer resets it, and it applies to every inspector created from the same copy of the SDK.
+- Before upgrading, remove any leftover `enableLogging(true)` calls, such as ones added while debugging. Otherwise production pages keep printing logs.
+- `enableLogging(false)` now silences all ordinary dev logs.
+
+See the [CHANGELOG](https://github.com/avohq/js-avo-inspector/blob/main/CHANGELOG.md#400---2026-10-29) for the full list.
+
 # Lite Build (Production Only)
 
 Available since version `3.1.0`. For production environments where bundle size matters (GTM, script tags, etc.), use the lite entry point which excludes encryption and event spec validation. Use the full build in dev/staging environments for the complete development experience:

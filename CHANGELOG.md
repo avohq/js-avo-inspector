@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.0.0] - 2026-10-29
 
+### Upgrading from 3.x
+
+4.0.0 changes only console logging. The public API, the events sent and the network traffic are the same as 3.2.3.
+
+- **What changed:** `enableLogging(...)` now sticks. Creating an inspector no longer resets logging to the environment default, and the setting applies to every inspector created from the same copy of the SDK. The lite build (`avo-inspector/lite`) works the same way, with its own setting.
+- **What to do:** remove any leftover `enableLogging(true)` calls, such as ones added while debugging. In 3.x a later `new AvoInspector(...)` cancelled them; in 4.0.0 they keep logs printing on production pages.
+- **What you get:** `enableLogging(false)` now silences all ordinary dev logs, including the validation warnings and the per-event cache lines. A few problems are still always printed; they are listed below.
+
 ### Changed
 
 - **BREAKING (behavior change vs 3.x): a logging preference now persists across construction and, within one loaded copy of the SDK, is shared by every inspector instance.** An existing integration can see different console output with no change to its own code. Two deltas, both intentional:
