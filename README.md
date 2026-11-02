@@ -94,6 +94,8 @@ Logs are enabled by default in the dev mode and disabled in prod mode.
 inspector.enableLogging(true);
 ```
 
+> **Upgrade note:** an explicit `enableLogging(...)` (or `AvoInspector.shouldLog = ...`) now sticks and applies to every inspector in the app, including ones created later in a different environment. Remove leftover `enableLogging(true)` calls before shipping to production.
+
 # Integrating with Avo Functions (Avo generated code)
 
 The setup is lightweight and is covered [in this guide](https://www.avo.app/docs/implementation/start-using-inspector-with-avo-functions).

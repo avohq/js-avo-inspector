@@ -46,4 +46,14 @@ function deepEquals(x: any, y: any) {
   return true;
 }
 
+/**
+ * A logging flag, either a fixed boolean or a getter that is read on every
+ * log call. Components receive a getter so a logging change made after
+ * construction (enableLogging() or AvoInspector.shouldLog) applies immediately.
+ */
+export type ShouldLogFlag = boolean | (() => boolean);
+
+export const toShouldLogGetter = (flag: ShouldLogFlag): (() => boolean) =>
+  typeof flag === "function" ? flag : () => flag;
+
 export { isValueEmpty, deepEquals };

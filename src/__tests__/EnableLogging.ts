@@ -84,15 +84,37 @@ describe("enableLogging – dev log suppression", () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
-  test("enableLogging(false) propagates to storage, cache and fetcher in dev", () => {
+  test("enableLogging(false) silences storage errors in the browser storage", () => {
     const inspector = build(AvoInspectorEnv.Dev);
+    expect(inspector).toBeDefined();
+    const storage = (AvoInspector as any).avoStorage.storageImpl;
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const hadWindow = "window" in global;
+    const originalWindow = (global as any).window;
+    (global as any).window = {
+      localStorage: {
+        getItem: () => {
+          throw new Error("boom");
+        },
+      },
+    };
+    try {
+      storage.useFallbackStorage = false;
+      storage.getItem("k");
+      expect(errorSpy).toHaveBeenCalled(); // positive control
 
-    inspector.enableLogging(false);
-
-    expect(AvoInspector.shouldLog).toBe(false);
-    expect(inspector.eventSpecCache.shouldLog).toBe(false);
-    expect(inspector.eventSpecFetcher.shouldLog).toBe(false);
-    expect((AvoInspector.avoStorage.storageImpl as any).shouldLog).toBe(false);
+      errorSpy.mockClear();
+      inspector.enableLogging(false);
+      storage.getItem("k");
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      if (hadWindow) {
+        (global as any).window = originalWindow;
+      } else {
+        delete (global as any).window;
+      }
+      errorSpy.mockRestore();
+    }
   });
 
   test("enableLogging(true) propagates to the cache in staging", () => {
@@ -117,42 +139,109 @@ describe("enableLogging – dev log suppression", () => {
     const inspector = build(AvoInspectorEnv.Dev);
 
     expect(AvoInspector.shouldLog).toBe(false);
-    expect((AvoInspector.avoStorage.storageImpl as any).shouldLog).toBe(false);
     triggerCacheHitLog(inspector);
     expect(logSpy).not.toHaveBeenCalled();
   });
 
-  // Goes through the inspector's validation path, which is where the event
-  // spec cache is used in practice: pre-populates the cache so the lookup is a
-  // hit, then clears the spy so only the cache-hit log (if any) is captured.
-  const validateWithCacheHit = async (inspector: any): Promise<void> => {
-    inspector.streamId = streamId;
-    inspector.eventSpecCache.set(apiKey, streamId, eventName, null);
-    logSpy.mockClear();
-    await inspector.fetchAndValidateEvent(eventName, {});
-  };
-
-  test("enableLogging(false) on one inspector silences the others", async () => {
+  test("enableLogging(false) on one inspector silences the others immediately", () => {
     const first = build(AvoInspectorEnv.Dev);
     const second = build(AvoInspectorEnv.Dev);
 
+    // Positive control: the second inspector's cache hit logs while logging is on.
+    triggerCacheHitLog(second);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Cache hit"));
+
+    // No fetchAndValidateEvent in between: the change must apply right away.
     first.enableLogging(false);
-    await validateWithCacheHit(second);
+    logSpy.mockClear();
+    second.eventSpecCache.get(apiKey, streamId, eventName);
 
     expect(logSpy).not.toHaveBeenCalled();
-    expect(second.eventSpecFetcher.shouldLog).toBe(false);
   });
 
-  test("setting AvoInspector.shouldLog after construction reaches the cache", async () => {
+  test("setting AvoInspector.shouldLog after construction reaches the cache", () => {
     const inspector = build(AvoInspectorEnv.Dev);
 
     AvoInspector.shouldLog = false;
-    await validateWithCacheHit(inspector);
+    triggerCacheHitLog(inspector);
     expect(logSpy).not.toHaveBeenCalled();
 
     AvoInspector.shouldLog = true;
-    await validateWithCacheHit(inspector);
+    triggerCacheHitLog(inspector);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Cache hit"));
+  });
+
+  test("the cache-hit log does not contain the API key", () => {
+    const inspector = build(AvoInspectorEnv.Dev);
+
+    triggerCacheHitLog(inspector);
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(eventName));
+    expect(JSON.stringify(logSpy.mock.calls)).not.toContain(apiKey);
+  });
+
+  test("an explicit enableLogging(true) sticks for a later Prod inspector", () => {
+    AvoInspector.shouldLog = true;
+
+    const prod = build(AvoInspectorEnv.Prod);
+    logSpy.mockClear();
+    prod.trackSchemaFromEvent("evt", { a: 1 });
+
+    expect(AvoInspector.shouldLog).toBe(true);
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Avo Inspector: supplied event")
+    );
+  });
+
+  test("a Prod inspector stays silent when logging was never set explicitly", () => {
+    const prod = build(AvoInspectorEnv.Prod);
+    logSpy.mockClear();
+    prod.trackSchemaFromEvent("evt", { a: 1 });
+
+    expect(AvoInspector.shouldLog).toBe(false);
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  describe("EventValidator warnings", () => {
+    const validateInvalidRegex = async (): Promise<void> => {
+      const { validateEvent } = jest.requireActual(
+        "../eventSpec/EventValidator"
+      );
+      const spec = {
+        events: [
+          {
+            branchId: "b",
+            baseEventId: "e1",
+            variantIds: [],
+            props: {
+              p: { regexPatterns: { "(a+)+$": ["e1"] } },
+            },
+          },
+        ],
+        metadata: { schemaId: "s", branchId: "b", latestActionId: "a" },
+      };
+      await validateEvent({ p: "aaaa" }, spec as any);
+    };
+
+    let warnSpy: jest.SpyInstance;
+    beforeEach(() => {
+      warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => warnSpy.mockRestore());
+
+    test("an unsafe regex pattern warns when logging is on", async () => {
+      AvoInspector.shouldLog = true;
+      await validateInvalidRegex();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("unsafe regex pattern")
+      );
+    });
+
+    test("an unsafe regex pattern does not warn when logging is off", async () => {
+      AvoInspector.shouldLog = false;
+      await validateInvalidRegex();
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
   });
 
   test("an explicit preference persists across instances", () => {

@@ -14,6 +14,9 @@
  * Promise.race + clearTimeout for per-match 1-second timeout.
  */
 
+// Circular import, same as AvoBatcher: AvoInspector.shouldLog is read when a
+// warning is logged, never at import time.
+import { AvoInspector } from "../AvoInspector";
 import type {
   EventSpecResponse,
   EventSpecEntry,
@@ -236,9 +239,11 @@ function getOrCompileRegex(pattern: string): RegExp | null {
 
   // Check pattern safety with safe-regex2
   if (!safe(pattern)) {
-    console.warn(
-      `[Avo Inspector] Warning: unsafe regex pattern skipped: ${pattern}`
-    );
+    if (AvoInspector.shouldLog) {
+      console.warn(
+        `[Avo Inspector] Warning: unsafe regex pattern skipped: ${pattern}`
+      );
+    }
     return null;
   }
 
@@ -247,9 +252,11 @@ function getOrCompileRegex(pattern: string): RegExp | null {
     regexCache.set(pattern, regex);
     return regex;
   } catch (e) {
-    console.warn(
-      `[Avo Inspector] Warning: invalid regex pattern skipped: ${pattern}`
-    );
+    if (AvoInspector.shouldLog) {
+      console.warn(
+        `[Avo Inspector] Warning: invalid regex pattern skipped: ${pattern}`
+      );
+    }
     return null;
   }
 }
@@ -273,9 +280,11 @@ async function testRegexWithTimeout(
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
-        console.warn(
-          `[Avo Inspector] Warning: regex match timed out after ${timeoutMs}ms`
-        );
+        if (AvoInspector.shouldLog) {
+          console.warn(
+            `[Avo Inspector] Warning: regex match timed out after ${timeoutMs}ms`
+          );
+        }
         resolve(false);
       }
     }, timeoutMs);
@@ -686,7 +695,9 @@ function convertValueToString(value: RuntimePropertyValue): string {
     try {
       return JSON.stringify(value);
     } catch (e) {
-      console.warn(`[Avo Inspector] Failed to stringify value: ${e}`);
+      if (AvoInspector.shouldLog) {
+        console.warn(`[Avo Inspector] Failed to stringify value: ${e}`);
+      }
       return String(value);
     }
   }
@@ -723,9 +734,11 @@ function checkAllowedValues(
   for (const [allowedArrayJson, eventIds] of Object.entries(allowedValues)) {
     const allowedSet = getOrParseAllowedValues(allowedArrayJson);
     if (allowedSet === null) {
-      console.warn(
-        `[Avo Inspector] Invalid allowed values JSON: ${allowedArrayJson}`
-      );
+      if (AvoInspector.shouldLog) {
+        console.warn(
+          `[Avo Inspector] Invalid allowed values JSON: ${allowedArrayJson}`
+        );
+      }
       continue;
     }
     if (!allowedSet.has(stringValue)) {
@@ -781,7 +794,9 @@ function checkMinMaxRanges(
   }
 
   if (Number.isNaN(value)) {
-    console.warn(`[Avo Inspector] NaN value fails min/max constraint`);
+    if (AvoInspector.shouldLog) {
+      console.warn(`[Avo Inspector] NaN value fails min/max constraint`);
+    }
     for (const eventIds of Object.values(minMaxRanges)) {
       addIdsToSet(eventIds, failedIds);
     }
@@ -798,7 +813,9 @@ function checkMinMaxRanges(
     const max = hasMax ? parseFloat(maxStr) : Infinity;
 
     if ((hasMin && isNaN(min)) || (hasMax && isNaN(max))) {
-      console.warn(`[Avo Inspector] Invalid min/max range: ${rangeStr}`);
+      if (AvoInspector.shouldLog) {
+        console.warn(`[Avo Inspector] Invalid min/max range: ${rangeStr}`);
+      }
       continue;
     }
 

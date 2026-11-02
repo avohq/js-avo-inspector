@@ -1,8 +1,7 @@
 /**
- * Regression tests for AVO-3848: on Android, the storage loads AsyncStorage
- * into memory at startup. It used to load every key of the host app and, with
- * logging on, print each key and value. It must only read Avo Inspector keys
- * and never print stored values.
+ * Regression tests for AVO-3848: on Android the storage used to enumerate the
+ * host app's whole AsyncStorage at startup and, with logging on, print every
+ * key and value. It must never list or read the host app's AsyncStorage.
  */
 
 const hostKeys: { [key: string]: string } = {
@@ -37,15 +36,7 @@ describe("Android storage", () => {
   const originalBrowser = process.env.BROWSER;
   let logSpy: jest.SpyInstance;
 
-  const initStorage = (shouldLog: boolean): Promise<AvoStorage> => {
-    const storage = new AvoStorage(shouldLog);
-    return new Promise((resolve) =>
-      storage.runAfterInit(() => resolve(storage))
-    );
-  };
-
-  const loggedText = (): string =>
-    JSON.stringify(logSpy.mock.calls.map((call) => call.map(String)));
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   beforeEach(() => {
     delete process.env.BROWSER;
@@ -62,56 +53,63 @@ describe("Android storage", () => {
     }
   });
 
-  test("only reads Avo Inspector keys from AsyncStorage", async () => {
-    await initStorage(true);
+  test("never lists or reads the host app's AsyncStorage at startup", async () => {
+    new AvoStorage(true);
+    await flush();
 
-    expect(mockAsyncStorage.multiGet).toHaveBeenCalledTimes(1);
-    const requestedKeys = mockAsyncStorage.multiGet.mock.calls[0][0];
-    expect([...requestedKeys].sort()).toEqual(Object.keys(avoKeys).sort());
-  });
-
-  test("keeps only Avo Inspector data in memory", async () => {
-    const storage = await initStorage(true);
-    const memory = (storage.storageImpl as any)
-      .androidMemoryDataToAvoidAsyncQueries;
-
-    expect(Object.keys(memory).sort()).toEqual(Object.keys(avoKeys).sort());
-    expect(storage.getItem("AvoInspectorAnonymousId")).toBe("anon-id");
-    expect(storage.getItem("some-auth-lib:token")).toBeNull();
-  });
-
-  test("never logs stored keys or values, but logs a summary when logging is on", async () => {
-    await initStorage(true);
-
-    const text = loggedText();
-    expect(text).toContain("loaded 2 cached items");
-    [...Object.keys(allData), ...Object.values(allData)].forEach((s) => {
-      expect(text).not.toContain(s);
-    });
-  });
-
-  test("logs nothing when logging is off", async () => {
-    await initStorage(false);
-
-    expect(logSpy).not.toHaveBeenCalled();
-  });
-
-  test("setShouldLog(false) before the load finishes silences the summary", async () => {
-    const storage = new AvoStorage(true);
-    storage.setShouldLog(false);
-    await new Promise<void>((resolve) => storage.runAfterInit(resolve));
-
-    expect(logSpy).not.toHaveBeenCalled();
-  });
-
-  test("skips multiGet when there are no Avo Inspector keys", async () => {
-    mockAsyncStorage.getAllKeys.mockImplementationOnce(() =>
-      Promise.resolve(Object.keys(hostKeys))
-    );
-
-    const storage = await initStorage(false);
-
+    expect(mockAsyncStorage.getAllKeys).not.toHaveBeenCalled();
     expect(mockAsyncStorage.multiGet).not.toHaveBeenCalled();
-    expect(storage.isInitialized()).toBeTruthy();
+    expect(mockAsyncStorage.getItem).not.toHaveBeenCalled();
+  });
+
+  test("logs nothing at startup even when logging is on", async () => {
+    new AvoStorage(() => true);
+    await flush();
+
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  test("getItemAsync reads the stored Avo value (positive control: mock is wired)", async () => {
+    const storage = new AvoStorage(false);
+
+    await expect(storage.getItemAsync("AvoInspectorAnonymousId")).resolves.toBe(
+      "anon-id"
+    );
+    expect(mockAsyncStorage.getItem).toHaveBeenCalledWith(
+      "AvoInspectorAnonymousId"
+    );
+  });
+
+  test("setItem and removeItem go straight to AsyncStorage", () => {
+    const storage = new AvoStorage(false);
+
+    storage.setItem("AvoInspectorEvents", [1]);
+    storage.removeItem("AvoInspectorEvents");
+
+    expect(mockAsyncStorage.setItem).toHaveBeenCalledWith(
+      "AvoInspectorEvents",
+      "[1]"
+    );
+    expect(mockAsyncStorage.removeItem).toHaveBeenCalledWith(
+      "AvoInspectorEvents"
+    );
+  });
+
+  test("synchronous getItem throws instead of returning null", () => {
+    const storage = new AvoStorage(false);
+
+    expect(() => storage.getItem("AvoInspectorAnonymousId")).toThrow(
+      /not supported on Android/
+    );
+  });
+
+  test("is initialized and runAfterInit runs its callback immediately", () => {
+    const storage = new AvoStorage(false);
+    const callback = jest.fn();
+
+    storage.runAfterInit(callback);
+
+    expect(storage.isInitialized()).toBe(true);
+    expect(callback).toHaveBeenCalledTimes(1);
   });
 });
