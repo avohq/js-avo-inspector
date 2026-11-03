@@ -12,7 +12,7 @@
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|StreamId)\\.ts$\""
+    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AndroidStorage|AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|Batcher|BatcherPublic|Deduplicator|EnableLogging|EventSpecCache|EventValidator|InstallationId|NetworkCallsHandler|NetworkCallsHandlerModelA|Parsing|Sessions|Storage|StreamId)\\.ts$\""
   },
   "repository": {
     "type": "git",
@@ -29,7 +29,11 @@
       "node_modules",
       "dist",
       "dist-native",
-      "\\.claude/"
+      "\\.claude/",
+      "jest\\.setup\\.js$"
+    ],
+    "setupFiles": [
+      "<rootDir>/src/__tests__/jest.setup.js"
     ],
     "modulePathIgnorePatterns": [
       "\\.claude/",
@@ -71,6 +75,7 @@
     "eslint": "9.9.0",
     "eslint-plugin-react": "7.35.0",
     "jest": "29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "prettier": "3.3.3",
     "prettier-eslint": "16.3.0",
     "react-native": "^0.84.1",

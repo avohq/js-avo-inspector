@@ -1,4 +1,5 @@
 import { validateEvent } from "../eventSpec/EventValidator";
+import { AvoInspector } from "../AvoInspector";
 import type {
   EventSpecResponse,
   EventSpecEntry,
@@ -130,6 +131,8 @@ describe("EventValidator", () => {
 
     test("safe-regex2: unsafe regex patterns are skipped with warning", async () => {
       const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+      // Validator warnings are gated on AvoInspector.shouldLog
+      AvoInspector.shouldLog = true;
 
       const spec = makeSpecResponse([
         makeEvent("evt_1", {

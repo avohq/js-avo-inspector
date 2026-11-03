@@ -48,11 +48,16 @@ export class AvoInspector {
   }
 
   private static _shouldLog = false;
+  // Tracks whether the logging preference was set explicitly by the caller
+  // (via enableLogging() or AvoInspector.shouldLog). When true, the constructor
+  // must not overwrite it with the environment default.
+  private static _shouldLogSetByUser = false;
   static get shouldLog() {
     return this._shouldLog;
   }
   static set shouldLog(enable) {
     this._shouldLog = enable;
+    this._shouldLogSetByUser = true;
   }
 
   constructor(options: {
@@ -99,15 +104,20 @@ export class AvoInspector {
 
     if (this.environment === AvoInspectorEnv.Dev) {
       AvoInspector._batchSize = 1;
-      AvoInspector._shouldLog = true;
     } else {
       AvoInspector._batchSize = 30;
       AvoInspector._batchFlushSeconds = 30;
-      AvoInspector._shouldLog = false;
+    }
+
+    // Apply the environment's default logging (dev on, prod/staging off) only
+    // when the caller hasn't already chosen one via enableLogging() or
+    // AvoInspector.shouldLog, so an explicit opt-out isn't overwritten.
+    if (!AvoInspector._shouldLogSetByUser) {
+      AvoInspector._shouldLog = this.environment === AvoInspectorEnv.Dev;
     }
 
     try {
-      AvoInspector.avoStorage = new AvoStorage(AvoInspector._shouldLog);
+      AvoInspector.avoStorage = new AvoStorage(() => AvoInspector.shouldLog);
     } catch (e) {
       console.error(
         "[Avo Inspector] Failed to initialize storage. " +
@@ -130,10 +140,10 @@ export class AvoInspector {
     // Initialize event spec validation infrastructure for dev/staging
     if (this.environment !== AvoInspectorEnv.Prod) {
       try {
-        this.eventSpecCache = new EventSpecCache(AvoInspector._shouldLog);
+        this.eventSpecCache = new EventSpecCache(() => AvoInspector.shouldLog);
         this.eventSpecFetcher = new AvoEventSpecFetcher(
           5000,
-          AvoInspector._shouldLog,
+          () => AvoInspector.shouldLog,
           this.environment
         );
 
@@ -353,7 +363,10 @@ export class AvoInspector {
   }
 
   enableLogging(enable: boolean) {
-    AvoInspector._shouldLog = enable;
+    // Going through the static setter records the explicit preference so a
+    // later constructor won't reset it to the environment default. Storage,
+    // cache and fetcher read the flag live, so it applies immediately.
+    AvoInspector.shouldLog = enable;
   }
 
   extractSchema(

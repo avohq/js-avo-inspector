@@ -1,5 +1,7 @@
+import { ShouldLogFlag, toShouldLogGetter } from "./utils";
+
 abstract class PlatformAvoStorage {
-  abstract init(shouldLog: boolean): void;
+  abstract init(shouldLog: ShouldLogFlag): void;
   abstract getItemAsync<T>(key: string): Promise<T | null>;
   abstract getItem<T>(key: string): T | null;
   abstract setItem<T>(key: string, value: T): void;
@@ -17,54 +19,21 @@ abstract class PlatformAvoStorage {
 }
 
 class AndroidAvoStorage extends PlatformAvoStorage {
-  androidMemoryDataToAvoidAsyncQueries: { [key: string]: string | null } = {};
   storageLib: any | null = null;
   AsyncStorage: any | null = null;
-  memoryStorageInitialized = false;
-  onStorageInitFuncs: Array<() => void> = [];
-  shouldLog: boolean = false;
 
-  init(shouldLog: boolean) {
+  // Android storage has nothing to log, so it ignores shouldLog (like iOS).
+  // It never enumerates or reads the host app's AsyncStorage at startup.
+  init(_shouldLog: ShouldLogFlag) {
     if (!process.env.BROWSER) {
       this.storageLib = require("@react-native-async-storage/async-storage");
 
-      this.shouldLog = shouldLog;
-
       this.AsyncStorage = this.storageLib.default;
-
-      this.loadAndroidDataToMemoryToAvoidAsyncQueries(() => {
-        this.initializeStorageAndroid();
-      });
     }
   }
 
-  private loadAndroidDataToMemoryToAvoidAsyncQueries(onLoaded: () => void) {
-    this.AsyncStorage.getAllKeys().then((keys: Array<any>) =>
-      this.AsyncStorage.multiGet(keys).then((keyVals: Array<Array<string>>) => {
-        if (this.shouldLog) {
-          console.log("Avo Inspector: android loaded data from memory");
-        }
-        keyVals.forEach((keyVal) => {
-          let key = keyVal[0];
-          this.androidMemoryDataToAvoidAsyncQueries[key] = keyVal[1];
-          if (this.shouldLog) {
-            console.log(key, keyVal[1]);
-          }
-        });
-        onLoaded();
-      })
-    );
-  }
-
-  private initializeStorageAndroid() {
-    this.memoryStorageInitialized = true;
-    this.onStorageInitFuncs.forEach((func) => {
-      func();
-    });
-  }
-
   isInitialized() {
-    return this.storageLib && this.memoryStorageInitialized;
+    return this.storageLib != null;
   }
 
   getItemAsync<T>(key: string): Promise<T | null> {
@@ -74,34 +43,32 @@ class AndroidAvoStorage extends PlatformAvoStorage {
     });
   }
 
-  getItem<T>(key: string): T | null {
-    let maybeItem = this.androidMemoryDataToAvoidAsyncQueries[key];
-    return this.parseJson(maybeItem);
+  // AsyncStorage has no synchronous API, so a synchronous read can't be
+  // answered. Fail loudly instead of returning null, which would silently
+  // mean "not stored".
+  getItem<T>(_key: string): T | null {
+    throw new Error(
+      "[Avo Inspector] Synchronous getItem is not supported on Android; use getItemAsync."
+    );
   }
 
   setItem<T>(key: string, value: T): void {
     this.AsyncStorage.setItem(key, JSON.stringify(value));
-    this.androidMemoryDataToAvoidAsyncQueries[key] = JSON.stringify(value);
   }
 
   removeItem(key: string): void {
     this.AsyncStorage.removeItem(key);
-    this.androidMemoryDataToAvoidAsyncQueries[key] = null;
   }
 
   runAfterInit(func: () => void) {
-    if (this.memoryStorageInitialized === true) {
-      func();
-    } else {
-      this.onStorageInitFuncs.push(func);
-    }
+    func();
   }
 }
 
 class IosAvoStorage extends PlatformAvoStorage {
   reactNative: any | null = null;
 
-  init(_shouldLog: boolean) {
+  init(_shouldLog: ShouldLogFlag) {
     if (!process.env.BROWSER) {
       this.reactNative = require("react-native");
     }
@@ -143,10 +110,10 @@ class BrowserAvoStorage extends PlatformAvoStorage {
   fallbackStorage: { [key: string]: string | null } = {};
   storageInitialized = false;
   onStorageInitFuncs: Array<() => void> = [];
-  shouldLog: boolean = false;
+  shouldLog: () => boolean = () => false;
 
-  init(shouldLog: boolean) {
-    this.shouldLog = shouldLog;
+  init(shouldLog: ShouldLogFlag) {
+    this.shouldLog = toShouldLogGetter(shouldLog);
     this.initializeStorageWeb(this.isLocalStorageAvailable());
   }
 
@@ -192,7 +159,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
             try {
               maybeItem = window.localStorage.getItem(key);
             } catch (error) {
-              if (thisStorage.shouldLog) {
+              if (thisStorage.shouldLog()) {
                 console.error(
                   "Avo Inspector Storage getItemAsync error:",
                   error
@@ -221,7 +188,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
         try {
           maybeItem = window.localStorage.getItem(key);
         } catch (error) {
-          if (this.shouldLog) {
+          if (this.shouldLog()) {
             console.error("Avo Inspector Storage getItem error:", error);
           }
         }
@@ -240,7 +207,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
           try {
             window.localStorage.setItem(key, JSON.stringify(value));
           } catch (error) {
-            if (this.shouldLog) {
+            if (this.shouldLog()) {
               console.error("Avo Inspector Storage setItem error:", error);
             }
           }
@@ -258,7 +225,7 @@ class BrowserAvoStorage extends PlatformAvoStorage {
           try {
             window.localStorage.removeItem(key);
           } catch (error) {
-            if (this.shouldLog) {
+            if (this.shouldLog()) {
               console.error("Avo Inspector Storage removeItem error:", error);
             }
           }
@@ -281,7 +248,7 @@ export class AvoStorage {
 
   storageImpl: PlatformAvoStorage;
 
-  constructor(shouldLog: boolean) {
+  constructor(shouldLog: ShouldLogFlag) {
     if (!process.env.BROWSER) {
       let reactNative = require("react-native");
       this.Platform = reactNative.Platform.OS;

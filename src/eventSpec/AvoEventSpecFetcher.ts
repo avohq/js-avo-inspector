@@ -7,6 +7,7 @@ import type {
   PropertyConstraintsWire,
   FetchEventSpecParams,
 } from "./AvoEventSpecFetchTypes";
+import { ShouldLogFlag, toShouldLogGetter } from "../utils";
 
 /**
  * EventSpecFetcher handles fetching event specifications from the Avo API.
@@ -24,19 +25,19 @@ export class AvoEventSpecFetcher {
   /** In-flight requests to prevent duplicate fetches */
   private inFlightRequests: Map<string, Promise<EventSpecResponse | null>>;
   /** Whether to log debug information */
-  private readonly shouldLog: boolean;
+  private shouldLog: () => boolean;
   /** Environment name */
   private readonly env: string;
 
   constructor(
     timeout: number = 2000,
-    shouldLog: boolean = false,
+    shouldLog: ShouldLogFlag = false,
     env: string,
     baseUrl: string = "https://api.avo.app"
   ) {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
-    this.shouldLog = shouldLog;
+    this.shouldLog = toShouldLogGetter(shouldLog);
     this.env = env;
     this.inFlightRequests = new Map();
   }
@@ -97,7 +98,7 @@ export class AvoEventSpecFetcher {
         url
       );
       if (!wireResponse) {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.warn(
             `[Avo Inspector] Failed to fetch event spec for: ${params.eventName}`
           );
@@ -106,7 +107,7 @@ export class AvoEventSpecFetcher {
       }
       // Basic structure check for wire format
       if (!this.hasExpectedShape(wireResponse)) {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.warn(
             `[Avo Inspector] Invalid event spec response for: ${params.eventName}`
           );
@@ -118,7 +119,7 @@ export class AvoEventSpecFetcher {
         AvoEventSpecFetcher.parseEventSpecResponse(wireResponse);
       return response;
     } catch (error) {
-      if (this.shouldLog) {
+      if (this.shouldLog()) {
         console.error(
           `[Avo Inspector] Error fetching event spec for: ${params.eventName}`,
           error
@@ -155,7 +156,7 @@ export class AvoEventSpecFetcher {
       clearTimeout(timeoutId);
 
       if (response.status !== 200) {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.warn(
             `[Avo Inspector] Request failed with status: ${response.status}`
           );
@@ -167,7 +168,7 @@ export class AvoEventSpecFetcher {
         const json: EventSpecResponseWire = await response.json();
         return json;
       } catch (parseError) {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.error(
             "[Avo Inspector] Failed to parse response:",
             parseError
@@ -178,13 +179,13 @@ export class AvoEventSpecFetcher {
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error && error.name === "AbortError") {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.error(
             `[Avo Inspector] Request timed out after ${this.timeout}ms`
           );
         }
       } else {
-        if (this.shouldLog) {
+        if (this.shouldLog()) {
           console.error("[Avo Inspector] Network error occurred");
         }
       }

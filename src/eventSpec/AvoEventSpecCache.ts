@@ -1,4 +1,5 @@
 import type { EventSpecResponse, EventSpecCacheEntry } from "./AvoEventSpecFetchTypes";
+import { ShouldLogFlag, toShouldLogGetter } from "../utils";
 
 /**
  * EventSpecCache implements a dual-condition cache with LRU eviction.
@@ -30,11 +31,11 @@ export class EventSpecCache {
   private globalEventCount: number = 0;
 
   /** Whether to log debug information */
-  private readonly shouldLog: boolean;
+  private shouldLog: () => boolean;
 
-  constructor(shouldLog: boolean = false) {
+  constructor(shouldLog: ShouldLogFlag = false) {
     this.cache = new Map();
-    this.shouldLog = shouldLog;
+    this.shouldLog = toShouldLogGetter(shouldLog);
   }
 
   /**
@@ -80,8 +81,8 @@ export class EventSpecCache {
       return undefined;
     }
 
-    if (this.shouldLog) {
-      console.log(`[Avo Inspector] Cache hit for key: ${key}`);
+    if (this.shouldLog()) {
+      console.log(`[Avo Inspector] Cache hit for: ${streamId}:${eventName}`);
     }
 
     // Update lastAccessed for LRU eviction
@@ -188,7 +189,7 @@ export class EventSpecCache {
   clear(): void {
     this.cache.clear();
     this.globalEventCount = 0;
-    if (this.shouldLog) {
+    if (this.shouldLog()) {
       console.log("[Avo Inspector] Cache cleared");
     }
   }

@@ -1,3 +1,4 @@
+/** @jest-environment jsdom */
 import AvoGuid from "../AvoGuid";
 import { AvoStreamId } from "../AvoStreamId";
 import { AvoNetworkCallsHandler, BaseBody } from "../AvoNetworkCallsHandler";
