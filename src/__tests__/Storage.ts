@@ -1,3 +1,4 @@
+/** @jest-environment jsdom */
 import { AvoStorage } from "../AvoStorage";
 import { defaultOptions } from "../__tests__/constants";
 
