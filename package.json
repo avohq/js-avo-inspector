@@ -12,7 +12,7 @@
     "test": "jest",
     "test:browser": "BROWSER=1 jest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AndroidStorage|AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|BatcherPublic|Deduplicator|EnableLogging|EventSpecCache|EventValidator|InstallationId|Parsing|Sessions|Storage|StreamId)\\.ts$\""
+    "prepublishOnly": "npm run build && npm run test:browser -- --testPathPattern=\"src/__tests__/(AndroidStorage|AvoEncryption|AvoEncryptionIntegration|AvoEventSpecFetcher|AvoInspector|Batcher|BatcherPublic|Deduplicator|EnableLogging|EventSpecCache|EventValidator|InstallationId|NetworkCallsHandler|NetworkCallsHandlerModelA|Parsing|Sessions|Storage|StreamId)\\.ts$\""
   },
   "repository": {
     "type": "git",
@@ -29,7 +29,11 @@
       "node_modules",
       "dist",
       "dist-native",
-      "\\.claude/"
+      "\\.claude/",
+      "jest\\.setup\\.js$"
+    ],
+    "setupFiles": [
+      "<rootDir>/src/__tests__/jest.setup.js"
     ],
     "modulePathIgnorePatterns": [
       "\\.claude/",

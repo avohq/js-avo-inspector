@@ -1,3 +1,4 @@
+/** @jest-environment jsdom */
 import { AvoBatcher } from "../AvoBatcher";
 import { AvoInspector } from "../AvoInspector";
 import { AvoNetworkCallsHandler, EventSchemaBody } from "../AvoNetworkCallsHandler";
